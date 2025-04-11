@@ -66,3 +66,6 @@ class UserAuthTests(APITestCase):
         response = self.client.post(self.login_url, login_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertIn('Invalid credentials', response.data['message'])
+
+def test_user_logout_success(self):
+    logout_data = {}

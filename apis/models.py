@@ -62,7 +62,7 @@ class AddressField(models.JSONField):
 
 
 class AgriUserManager(BaseUserManager):
-    def create_user(self, username, email, name, phone_no, address, aadhaar_no, password=None, user_type=UserType.USER.value):
+    def create_user(self, username, email, name, phone_no, address, aadhaar_no, password=None, user_type=UserType.USER.value, **extra_fields):
         validate_username(username)
         validate_email(email)
         validate_name(name)
@@ -74,6 +74,11 @@ class AgriUserManager(BaseUserManager):
         validate_password(password)
         if user_type not in [ut.value for ut in UserType]:
           raise ValidationError(f"Invalid user_type: {user_type}")
+        
+        if user_type == UserType.ADMIN.value:
+            extra_fields.setdefault('is_admin', True)
+            extra_fields.setdefault('is_superuser', False) 
+
         user = self.model(
             username=username,
             email=self.normalize_email(email),
@@ -82,6 +87,7 @@ class AgriUserManager(BaseUserManager):
             address=address,
             aadhaar_no=aadhaar_no,
             user_type=user_type,
+            **extra_fields
         )
         user.set_password(password)
         user.save(using=self._db)
@@ -173,8 +179,11 @@ class AgriUser(AbstractBaseUser, PermissionsMixin):
 
     def clean(self):
         super().clean()
-        if self.user_type == UserType.ADMIN.value and not self.is_admin:
-            raise ValidationError("Admin users must have is_admin=True")
+        if self.user_type == UserType.ADMIN.value:
+            if not self.is_admin:
+                raise ValidationError("Admin users must have is_admin=True")
+        elif self.is_admin:  # Regular user shouldn't be admin
+            raise ValidationError("Non-admin users cannot have is_admin=True")
 
     def to_dict(self):
         return {
