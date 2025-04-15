@@ -159,6 +159,14 @@ def logout_user(request):
                 status_code=status.HTTP_400_BAD_REQUEST
             )
 
+        
+        try:
+            refresh_token = request.data.get('refresh_token')
+            if refresh_token:
+                blacklist_token(refresh_token)
+        except Exception:
+            pass  
+
         blacklist_token(token)
         logout(request)
 

@@ -2,7 +2,7 @@ import hashlib
 import uuid
 import logging
 from datetime import datetime, timedelta
-
+import time
 import jwt
 from django.conf import settings
 from jwt import InvalidTokenError
@@ -56,7 +56,7 @@ def validate_access_token(token):
             raise InvalidTokenError("Invalid token type")
             
         if is_token_blacklisted(token):
-            raise InvalidTokenError("Token is blacklisted")
+            raise InvalidTokenError(ErrorMessage.TOKEN_BLACKLISTED.value)
             
         return payload
         
@@ -108,7 +108,8 @@ def blacklist_token(token, expiry_seconds=None):
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     if not expiry_seconds:
         expiry_seconds = settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds()
-    cache.set(token_hash, 'blacklisted', timeout=expiry_seconds)
+    cache.set(token_hash, {'status': 'blacklisted', 'timestamp': time.time()}, timeout=expiry_seconds)
+
 
 #token required
 def token_required(func):
