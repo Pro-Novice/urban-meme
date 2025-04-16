@@ -178,3 +178,106 @@ def logout_user(request):
             message=ErrorMessage.SERVER_ERROR.value,
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(['GET'])
+@token_required
+def get_profile(request):
+    """
+    API endpoint to get the authenticated user's profile
+    """
+    try:
+        # User is already attached to request by token_required decorator
+        user = request.user
+        
+        return SuccessResponse(
+            data={'user': user.to_dict()},
+            message="Profile retrieved successfully"
+        )
+    
+    except Exception as e:
+        logger.error(f"Get profile error: {str(e)}", exc_info=True)
+        return ErrorResponse(
+            message=ErrorMessage.SERVER_ERROR.value,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['PUT'])
+@parser_classes([JSONParser])
+@token_required
+def update_profile(request):
+    """
+    API endpoint to update the authenticated user's profile
+    """
+    try:
+        # User is already attached to request by token_required decorator
+        user = request.user
+        data = request.data
+        
+        # Fields that are allowed to be updated
+        allowed_fields = ['name', 'phone_no', 'address']
+        
+        # Check if there's any field to update
+        update_fields = [field for field in allowed_fields if field in data]
+        if not update_fields:
+            return ValidationErrorResponse(
+                message="No valid fields to update",
+                errors={'fields': f"Provide at least one of {', '.join(allowed_fields)}"}
+            )
+        
+        # Update fields
+        if 'name' in data:
+            try:
+                from .models import validate_name
+                validate_name(data['name'])
+                user.name = data['name']
+            except ValidationError as e:
+                return ValidationErrorResponse(
+                    message="Invalid name",
+                    errors={'name': str(e)}
+                )
+        
+        if 'phone_no' in data:
+            try:
+                # Check if phone number already exists for another user
+                if AgriUser.objects.filter(phone_no=data['phone_no']).exclude(id=user.id).exists():
+                    return ErrorResponse(
+                        message=ErrorMessage.PHONE_EXISTS.value,
+                        status_code=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                from .models import validate_mobile
+                validate_mobile(data['phone_no'])
+                user.phone_no = data['phone_no']
+            except ValidationError as e:
+                return ValidationErrorResponse(
+                    message="Invalid phone number",
+                    errors={'phone_no': str(e)}
+                )
+        
+        if 'address' in data:
+            try:
+                from .models import validate_address
+                validate_address(data['address'])
+                user.address = data['address']
+            except ValidationError as e:
+                return ValidationErrorResponse(
+                    message="Invalid address",
+                    errors={'address': str(e)}
+                )
+        
+        # Save the updated user
+        user.save()
+        
+        return SuccessResponse(
+            data={'user': user.to_dict()},
+            message="Profile updated successfully"
+        )
+    
+    except Exception as e:
+        logger.error(f"Update profile error: {str(e)}", exc_info=True)
+        return ErrorResponse(
+            message=ErrorMessage.SERVER_ERROR.value,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
