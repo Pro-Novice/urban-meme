@@ -14,5 +14,3 @@ env/
 # log files
 agri_auth.log
 
-#requirements
-requirements.txt
