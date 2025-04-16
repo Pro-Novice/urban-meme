@@ -7,10 +7,10 @@ class ErrorMessage(Enum):
     LOGIN_NOT_ALLOWED = "Login not allowed for this user type"
     TOKEN_EXPIRED = "Token has expired"
     INVALID_TOKEN = "Invalid token"
-    TOKEN_BLACKLISTED = "Token is blacklisted"
+    TOKEN_BLACKLISTED = "Token is already blacklisted"
     AUTH_HEADER_MISSING = "Authorization header is required"
     INVALID_AUTH_HEADER = "Invalid Authorization header format"
-    
+    MISSING_FIELDS = "Required fields are missing" 
     # User errors
     USERNAME_EXISTS = "Username already exists"
     EMAIL_EXISTS = "Email already exists"
