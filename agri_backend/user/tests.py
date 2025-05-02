@@ -1,8 +1,9 @@
+import ast
 from rest_framework.test import APITestCase
 from django.urls import reverse
 from rest_framework import status
-from .services.error_messages import ErrorMessage
-from apis.models import AgriUser
+from agri_backend.services.response_messages.response_messages import ErrorMessage
+from .models import AgriUser
 
 class AuthAPITestCase(APITestCase):
 
@@ -10,6 +11,10 @@ class AuthAPITestCase(APITestCase):
         self.register_url = reverse('register')
         self.login_url = reverse('login')
         self.logout_url = reverse('logout')
+        self.profile_url = reverse('get_profile')
+        self.update_profile_url = reverse('update_profile')
+        self.password_reset_url = reverse('request_reset')
+        self.password_reset_otp_url = reverse('reset_password')
 
         self.user_data = {
             'username': 'testuser',
@@ -107,3 +112,72 @@ class AuthAPITestCase(APITestCase):
         response_data = response.json()
         self.assertEqual(response_data['message'], 'Invalid Authorization header format')
        
+    def test_get_user_profile_success(self):
+        login_data = {
+            "username": "testuser",
+            "password": "Testpassword@2"
+        }
+        login_response = self.client.post(self.login_url, login_data, format='json')
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        tokens = login_response.json().get('data', {}).get('tokens', {})
+        access_token = tokens.get('access')
+        
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + access_token)
+        response = self.client.get(self.profile_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response_data = response.json()
+        self.assertIn('user', response_data['data'])
+
+    def test_get_user_profile_unauthorized(self):
+        response = self.client.get(self.profile_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        response_data = response.json()
+        self.assertEqual(response_data['message'], 'Invalid Authorization header format')
+
+    
+    def test_update_user_profile_invalid_phone(self):
+        login_data = {
+            "username": "testuser",
+            "password": "Testpassword@2"
+        }
+        login_response = self.client.post(self.login_url, login_data, format='json')
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        tokens = login_response.json().get('data', {}).get('tokens', {})
+        access_token = tokens.get('access')
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + access_token)
+        update_data = {
+            'phone_no': 'invalid-phone'
+        }
+        response = self.client.put(self.update_profile_url, update_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        response_data = response.json()
+        message = ast.literal_eval(response_data['message']) 
+        self.assertIn('Invalid phone number', message['phone_no'])
+        
+
+    def test_request_password_reset_success(self):
+        data = {'email': 'testuser@example.com'}
+        response = self.client.post(self.password_reset_url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response_data = response.json()
+        self.assertEqual(response_data['message'], 'OTP sent to email')
+
+   
+    def test_reset_password_with_otp_invalid_otp(self):
+        # First request the OTP
+        data = {'email': 'testuser@example.com'}
+        self.client.post(self.password_reset_url, data, format='json')
+
+        # Reset password with invalid OTP
+        reset_data = {
+            'email': 'testuser@example.com',
+            'otp': 'wrong-otp',  # Invalid OTP
+            'new_password': 'NewPassword@123'
+        }
+        response = self.client.post(self.password_reset_otp_url, reset_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        response_data = response.json()
+        self.assertEqual(response_data['message'], 'Invalid or expired OTP')
+
+   

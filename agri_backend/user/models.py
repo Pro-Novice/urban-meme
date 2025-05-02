@@ -4,7 +4,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser, PermissionsMixin
 from django.core.validators import validate_email as django_validate_email
-from .enums import UserType
+from ..enums.enums import UserType
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ def validate_aadhaar(value):
 
 def validate_mobile(value):
     if not re.match(r"^(\+91[\-\s]?)?[6-9]\d{9}$", value):
-        raise ValidationError("Invalid Indian mobile number")
+        raise ValidationError("Invalid phone number")
 
 def validate_username(value):
     if not re.match(r"^[\w.@+-]+$", value):

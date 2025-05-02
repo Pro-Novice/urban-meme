@@ -1,0 +1,557 @@
+[
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "licenseId",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "farmerAddress",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "enum SeedLicenseTrackingSystem.LicenseType",
+				"name": "licenseType",
+				"type": "uint8"
+			}
+		],
+		"name": "LicenseApplied",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "licenseId",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "officerAddress",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "reason",
+				"type": "string"
+			}
+		],
+		"name": "LicenseRevoked",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "licenseId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "enum SeedLicenseTrackingSystem.LicenseStatus",
+				"name": "previousStatus",
+				"type": "uint8"
+			},
+			{
+				"indexed": false,
+				"internalType": "enum SeedLicenseTrackingSystem.LicenseStatus",
+				"name": "newStatus",
+				"type": "uint8"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "officerAddress",
+				"type": "address"
+			}
+		],
+		"name": "LicenseStatusUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "officerAddress",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "enum SeedLicenseTrackingSystem.DepartmentRole",
+				"name": "role",
+				"type": "uint8"
+			}
+		],
+		"name": "OfficerAdded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "officerAddress",
+				"type": "address"
+			}
+		],
+		"name": "OfficerRemoved",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_officerAddress",
+				"type": "address"
+			},
+			{
+				"internalType": "enum SeedLicenseTrackingSystem.DepartmentRole",
+				"name": "_role",
+				"type": "uint8"
+			}
+		],
+		"name": "addDepartmentOfficer",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "admin",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_farmerName",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_farmerAadhaar",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_location",
+				"type": "string"
+			},
+			{
+				"internalType": "enum SeedLicenseTrackingSystem.LicenseType",
+				"name": "_licenseType",
+				"type": "uint8"
+			},
+			{
+				"internalType": "string",
+				"name": "_seedVariety",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_cropType",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_quantity",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "_qualityParameters",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_source",
+				"type": "string"
+			}
+		],
+		"name": "applyForLicense",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "authorizedOfficers",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_newAdmin",
+				"type": "address"
+			}
+		],
+		"name": "changeAdmin",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_licenseId",
+				"type": "uint256"
+			}
+		],
+		"name": "generateCertificateHash",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_licenseId",
+				"type": "uint256"
+			}
+		],
+		"name": "getActionCount",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_licenseId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_actionId",
+				"type": "uint256"
+			}
+		],
+		"name": "getActionSummary",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address",
+						"name": "departmentOfficer",
+						"type": "address"
+					},
+					{
+						"internalType": "enum SeedLicenseTrackingSystem.DepartmentRole",
+						"name": "officerRole",
+						"type": "uint8"
+					},
+					{
+						"internalType": "enum SeedLicenseTrackingSystem.LicenseStatus",
+						"name": "previousStatus",
+						"type": "uint8"
+					},
+					{
+						"internalType": "enum SeedLicenseTrackingSystem.LicenseStatus",
+						"name": "newStatus",
+						"type": "uint8"
+					},
+					{
+						"internalType": "string",
+						"name": "remarks",
+						"type": "string"
+					}
+				],
+				"internalType": "struct SeedLicenseTrackingSystem.ActionSummary",
+				"name": "",
+				"type": "tuple"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_licenseId",
+				"type": "uint256"
+			}
+		],
+		"name": "getLicenseSummary",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "licenseId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address",
+						"name": "farmerAddress",
+						"type": "address"
+					},
+					{
+						"internalType": "string",
+						"name": "farmerName",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "location",
+						"type": "string"
+					},
+					{
+						"internalType": "enum SeedLicenseTrackingSystem.LicenseType",
+						"name": "licenseType",
+						"type": "uint8"
+					},
+					{
+						"internalType": "enum SeedLicenseTrackingSystem.LicenseStatus",
+						"name": "status",
+						"type": "uint8"
+					},
+					{
+						"internalType": "uint256",
+						"name": "applicationDate",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "approvalDate",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "expiryDate",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "isActive",
+						"type": "bool"
+					},
+					{
+						"components": [
+							{
+								"internalType": "string",
+								"name": "seedVariety",
+								"type": "string"
+							},
+							{
+								"internalType": "string",
+								"name": "cropType",
+								"type": "string"
+							},
+							{
+								"internalType": "uint256",
+								"name": "quantity",
+								"type": "uint256"
+							},
+							{
+								"internalType": "string",
+								"name": "qualityParameters",
+								"type": "string"
+							},
+							{
+								"internalType": "string",
+								"name": "source",
+								"type": "string"
+							}
+						],
+						"internalType": "struct SeedLicenseTrackingSystem.SeedDetails",
+						"name": "seedDetails",
+						"type": "tuple"
+					}
+				],
+				"internalType": "struct SeedLicenseTrackingSystem.LicenseSummary",
+				"name": "",
+				"type": "tuple"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_licenseId",
+				"type": "uint256"
+			}
+		],
+		"name": "isLicenseValid",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "officerRoles",
+		"outputs": [
+			{
+				"internalType": "enum SeedLicenseTrackingSystem.DepartmentRole",
+				"name": "",
+				"type": "uint8"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_officerAddress",
+				"type": "address"
+			}
+		],
+		"name": "removeDepartmentOfficer",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_licenseId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "enum SeedLicenseTrackingSystem.LicenseStatus",
+				"name": "_newStatus",
+				"type": "uint8"
+			},
+			{
+				"internalType": "string",
+				"name": "_remarks",
+				"type": "string"
+			},
+			{
+				"internalType": "bytes",
+				"name": "_attachedDocumentsHash",
+				"type": "bytes"
+			}
+		],
+		"name": "updateLicenseStatus",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_licenseId",
+				"type": "uint256"
+			}
+		],
+		"name": "verifyCertificate",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "isValid",
+				"type": "bool"
+			},
+			{
+				"internalType": "enum SeedLicenseTrackingSystem.LicenseType",
+				"name": "licenseType",
+				"type": "uint8"
+			},
+			{
+				"internalType": "string",
+				"name": "farmerName",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "approvalDate",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "expiryDate",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+]

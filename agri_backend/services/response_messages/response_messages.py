@@ -22,7 +22,7 @@ class ErrorMessage(Enum):
     INVALID_EMAIL = "Invalid email address"
     INVALID_PINCODE = "Pincode must be 6 digits (no leading zero)"
     INVALID_AADHAAR = "Aadhaar must be 12 digits (no leading zero)"
-    INVALID_MOBILE = "Invalid Indian mobile number"
+    INVALID_MOBILE = "Invalid phone number"
     INVALID_USERNAME = "Username may contain only letters, digits and @/./+/-/_"
     INVALID_NAME = "Name must be 2-100 characters with valid characters"
     INVALID_PASSWORD = "Password must be at least 8 characters with uppercase, lowercase and digit"

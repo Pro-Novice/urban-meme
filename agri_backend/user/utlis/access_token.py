@@ -11,10 +11,10 @@ from rest_framework.authentication import get_authorization_header
 from django.core.cache import cache
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .api_response import ApiResponse, ErrorResponse, ForbiddenResponse, UnauthorizedResponse
-from .error_messages import ErrorMessage
+from agri_backend.services.api_response import ApiResponse, ErrorResponse, ForbiddenResponse, UnauthorizedResponse
+from agri_backend.services.response_messages.response_messages import ErrorMessage
 from ..models import AgriUser
-from ..enums import UserType
+from agri_backend.enums.enums import UserType
 from django.http import JsonResponse
 
 #logger
@@ -44,7 +44,7 @@ def is_token_blacklisted(token):
         return True, ErrorMessage.TOKEN_BLACKLISTED.value
     except Exception as e:
         logger.error(f"Cache connection error while checking token blacklist: {str(e)}")
-        # If cache is down, assume token is not blacklisted but log the error
+       
         return False, None
     
 def validate_access_token(token):

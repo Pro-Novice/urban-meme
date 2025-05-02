@@ -1,0 +1,449 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+/**
+ * @title SeedLicenseTrackingSystem
+ * @dev Smart contract to track seed licenses and actions performed by various department heads in Rajasthan
+ */
+contract SeedLicenseTrackingSystem {
+    // Administrator address
+    address public admin;
+    
+    // Counter for license IDs
+    uint256 private licenseIdCounter;
+    
+    // Roles for different department heads
+    enum DepartmentRole {
+        AGRICULTURE_OFFICER,
+        DISTRICT_COLLECTOR,
+        SEED_CERTIFICATION_OFFICER,
+        SUBSIDY_APPROVAL_OFFICER,
+        QUALITY_CONTROL_OFFICER
+    }
+    
+    // License status
+    enum LicenseStatus {
+        APPLIED,
+        DOCUMENTS_VERIFIED,
+        FIELD_INSPECTION_COMPLETED,
+        QUALITY_VERIFIED,
+        APPROVED,
+        REJECTED,
+        REVOKED,
+        EXPIRED
+    }
+    
+    // License type
+    enum LicenseType {
+        SEED_PRODUCTION,
+        SEED_DISTRIBUTION,
+        SEED_CERTIFICATION,
+        HYBRID_SEED_PRODUCTION,
+        ORGANIC_SEED_PRODUCTION
+    }
+    
+    // Seed details structure
+    struct SeedDetails {
+        string seedVariety;
+        string cropType;
+        uint256 quantity;
+        string qualityParameters;
+        string source;
+    }
+    
+    // Structure to store license information
+    struct License {
+        uint256 licenseId;
+        address farmerAddress;
+        string farmerName;
+        string farmerAadhaar;
+        string location;
+        LicenseType licenseType;
+        LicenseStatus status;
+        uint256 applicationDate;
+        uint256 approvalDate;
+        uint256 expiryDate;
+        SeedDetails seedDetails;
+        mapping(uint256 => ActionRecord) actions;
+        uint256 actionCount;
+        bool isActive;
+    }
+    
+    // Structure to record actions taken on a license
+    struct ActionRecord {
+        uint256 timestamp;
+        address departmentOfficer;
+        DepartmentRole officerRole;
+        LicenseStatus previousStatus;
+        LicenseStatus newStatus;
+        string remarks;
+        bytes attachedDocumentsHash;
+    }
+    
+    // Public view of license for frontend
+    struct LicenseSummary {
+        uint256 licenseId;
+        address farmerAddress;
+        string farmerName;
+        string location;
+        LicenseType licenseType;
+        LicenseStatus status;
+        uint256 applicationDate;
+        uint256 approvalDate;
+        uint256 expiryDate;
+        bool isActive;
+        SeedDetails seedDetails;
+    }
+    
+    // Public view of action record for frontend
+    struct ActionSummary {
+        uint256 timestamp;
+        address departmentOfficer;
+        DepartmentRole officerRole;
+        LicenseStatus previousStatus;
+        LicenseStatus newStatus;
+        string remarks;
+    }
+    
+    // Mapping from licenseId to License
+    mapping(uint256 => License) private licenses;
+    
+    // Mapping from department officer address to their role
+    mapping(address => DepartmentRole) public officerRoles;
+    
+    // Mapping to track if an address is authorized as a department officer
+    mapping(address => bool) public authorizedOfficers;
+    
+    // Events for tracking actions
+    event LicenseApplied(uint256 indexed licenseId, address indexed farmerAddress, LicenseType licenseType);
+    event LicenseStatusUpdated(uint256 indexed licenseId, LicenseStatus previousStatus, LicenseStatus newStatus, address indexed officerAddress);
+    event LicenseRevoked(uint256 indexed licenseId, address indexed officerAddress, string reason);
+    event OfficerAdded(address indexed officerAddress, DepartmentRole role);
+    event OfficerRemoved(address indexed officerAddress);
+    
+    // Modifiers
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can perform this action");
+        _;
+    }
+    
+    modifier onlyAuthorizedOfficer() {
+        require(authorizedOfficers[msg.sender], "Officer not authorized");
+        _;
+    }
+    
+    modifier licenseExists(uint256 _licenseId) {
+        require(licenses[_licenseId].farmerAddress != address(0), "License does not exist");
+        _;
+    }
+    
+    // Constructor
+    constructor() {
+        admin = msg.sender;
+        licenseIdCounter = 1; // Start from 1 for better tracking
+    }
+    
+    /**
+     * @dev Add a department officer
+     * @param _officerAddress Address of the officer
+     * @param _role Role assigned to the officer
+     */
+    function addDepartmentOfficer(address _officerAddress, DepartmentRole _role) public onlyAdmin {
+        require(_officerAddress != address(0), "Invalid address");
+        officerRoles[_officerAddress] = _role;
+        authorizedOfficers[_officerAddress] = true;
+        emit OfficerAdded(_officerAddress, _role);
+    }
+    
+    /**
+     * @dev Remove a department officer
+     * @param _officerAddress Address of the officer to be removed
+     */
+    function removeDepartmentOfficer(address _officerAddress) public onlyAdmin {
+        require(authorizedOfficers[_officerAddress], "Officer not found");
+        delete officerRoles[_officerAddress];
+        authorizedOfficers[_officerAddress] = false;
+        emit OfficerRemoved(_officerAddress);
+    }
+    
+    /**
+     * @dev Apply for a new seed license
+     * @param _farmerName Name of the farmer
+     * @param _farmerAadhaar Aadhaar number of the farmer
+     * @param _location Location details
+     * @param _licenseType Type of license
+     * @param _seedVariety Variety of seed
+     * @param _cropType Type of crop
+     * @param _quantity Quantity of seeds
+     * @param _qualityParameters Quality parameters
+     * @param _source Source of seeds
+     * @return licenseId ID of the newly created license
+     */
+    function applyForLicense(
+        string memory _farmerName,
+        string memory _farmerAadhaar,
+        string memory _location,
+        LicenseType _licenseType,
+        string memory _seedVariety,
+        string memory _cropType,
+        uint256 _quantity,
+        string memory _qualityParameters,
+        string memory _source
+    ) public returns (uint256) {
+        uint256 newLicenseId = licenseIdCounter++;
+        
+        License storage newLicense = licenses[newLicenseId];
+        newLicense.licenseId = newLicenseId;
+        newLicense.farmerAddress = msg.sender;
+        newLicense.farmerName = _farmerName;
+        newLicense.farmerAadhaar = _farmerAadhaar;
+        newLicense.location = _location;
+        newLicense.licenseType = _licenseType;
+        newLicense.status = LicenseStatus.APPLIED;
+        newLicense.applicationDate = block.timestamp;
+        newLicense.isActive = true;
+        
+        // Set seed details
+        newLicense.seedDetails.seedVariety = _seedVariety;
+        newLicense.seedDetails.cropType = _cropType;
+        newLicense.seedDetails.quantity = _quantity;
+        newLicense.seedDetails.qualityParameters = _qualityParameters;
+        newLicense.seedDetails.source = _source;
+        
+        // Record initial action
+        _recordAction(
+            newLicenseId, 
+            address(0), 
+            DepartmentRole.AGRICULTURE_OFFICER, 
+            LicenseStatus.APPLIED, 
+            LicenseStatus.APPLIED, 
+            "License application submitted", 
+            ""
+        );
+        
+        emit LicenseApplied(newLicenseId, msg.sender, _licenseType);
+        
+        return newLicenseId;
+    }
+    
+    /**
+     * @dev Update license status by authorized officer
+     * @param _licenseId ID of the license
+     * @param _newStatus New status to be set
+     * @param _remarks Remarks about the status change
+     * @param _attachedDocumentsHash Hash of attached documents (if any)
+     */
+    function updateLicenseStatus(
+        uint256 _licenseId,
+        LicenseStatus _newStatus,
+        string memory _remarks,
+        bytes memory _attachedDocumentsHash
+    ) public onlyAuthorizedOfficer licenseExists(_licenseId) {
+        License storage license = licenses[_licenseId];
+        require(license.isActive, "License is not active");
+        
+        LicenseStatus previousStatus = license.status;
+        license.status = _newStatus;
+        
+        // If approved, set approval date and expiry date (1 year validity)
+        if (_newStatus == LicenseStatus.APPROVED) {
+            license.approvalDate = block.timestamp;
+            license.expiryDate = block.timestamp + 365 days;
+        }
+        
+        // If rejected or revoked, set isActive to false
+        if (_newStatus == LicenseStatus.REJECTED || _newStatus == LicenseStatus.REVOKED) {
+            license.isActive = false;
+        }
+        
+        // Record action
+        _recordAction(
+            _licenseId,
+            msg.sender,
+            officerRoles[msg.sender],
+            previousStatus,
+            _newStatus,
+            _remarks,
+            _attachedDocumentsHash
+        );
+        
+        emit LicenseStatusUpdated(_licenseId, previousStatus, _newStatus, msg.sender);
+        
+        if (_newStatus == LicenseStatus.REVOKED) {
+            emit LicenseRevoked(_licenseId, msg.sender, _remarks);
+        }
+    }
+    
+    /**
+     * @dev Internal function to record actions taken on licenses
+     */
+    function _recordAction(
+        uint256 _licenseId,
+        address _officerAddress,
+        DepartmentRole _officerRole,
+        LicenseStatus _previousStatus,
+        LicenseStatus _newStatus,
+        string memory _remarks,
+        bytes memory _attachedDocumentsHash
+    ) private {
+        License storage license = licenses[_licenseId];
+        uint256 actionId = license.actionCount;
+        
+        ActionRecord storage newAction = license.actions[actionId];
+        newAction.timestamp = block.timestamp;
+        newAction.departmentOfficer = _officerAddress;
+        newAction.officerRole = _officerRole;
+        newAction.previousStatus = _previousStatus;
+        newAction.newStatus = _newStatus;
+        newAction.remarks = _remarks;
+        newAction.attachedDocumentsHash = _attachedDocumentsHash;
+        
+        license.actionCount++;
+    }
+    
+    /**
+     * @dev Get license summary details
+     * @param _licenseId ID of the license
+     * @return License summary information
+     */
+    function getLicenseSummary(uint256 _licenseId) public view licenseExists(_licenseId) returns (LicenseSummary memory) {
+        License storage license = licenses[_licenseId];
+        
+        return LicenseSummary({
+            licenseId: license.licenseId,
+            farmerAddress: license.farmerAddress,
+            farmerName: license.farmerName,
+            location: license.location,
+            licenseType: license.licenseType,
+            status: license.status,
+            applicationDate: license.applicationDate,
+            approvalDate: license.approvalDate,
+            expiryDate: license.expiryDate,
+            isActive: license.isActive,
+            seedDetails: license.seedDetails
+        });
+    }
+    
+    /**
+     * @dev Get action details for a specific action on a license
+     * @param _licenseId ID of the license
+     * @param _actionId ID of the action
+     * @return Action summary information
+     */
+    function getActionSummary(uint256 _licenseId, uint256 _actionId) 
+        public 
+        view 
+        licenseExists(_licenseId) 
+        returns (ActionSummary memory) 
+    {
+        License storage license = licenses[_licenseId];
+        require(_actionId < license.actionCount, "Action ID does not exist");
+        
+        ActionRecord storage action = license.actions[_actionId];
+        
+        return ActionSummary({
+            timestamp: action.timestamp,
+            departmentOfficer: action.departmentOfficer,
+            officerRole: action.officerRole,
+            previousStatus: action.previousStatus,
+            newStatus: action.newStatus,
+            remarks: action.remarks
+        });
+    }
+    
+    /**
+     * @dev Get number of actions recorded for a license
+     * @param _licenseId ID of the license
+     * @return Count of actions
+     */
+    function getActionCount(uint256 _licenseId) public view licenseExists(_licenseId) returns (uint256) {
+        return licenses[_licenseId].actionCount;
+    }
+    
+    /**
+     * @dev Check if a license is valid and not expired
+     * @param _licenseId ID of the license
+     * @return isValid Whether the license is valid
+     */
+    function isLicenseValid(uint256 _licenseId) public view licenseExists(_licenseId) returns (bool) {
+        License storage license = licenses[_licenseId];
+        return (
+            license.isActive && 
+            license.status == LicenseStatus.APPROVED && 
+            block.timestamp <= license.expiryDate
+        );
+    }
+    
+    /**
+     * @dev Verify certificate through blockchain - can be called by anyone
+     * @param _licenseId ID of the license to verify
+     * @return isValid Whether the certificate is valid
+     * @return licenseType Type of license
+     * @return farmerName Name of the farmer
+     * @return approvalDate Date when the license was approved
+     * @return expiryDate Expiry date of the license
+     */
+    function verifyCertificate(uint256 _licenseId) 
+        public 
+        view 
+        returns (
+            bool isValid, 
+            LicenseType licenseType, 
+            string memory farmerName, 
+            uint256 approvalDate, 
+            uint256 expiryDate
+        ) 
+    {
+        if (!licenses[_licenseId].isActive || licenses[_licenseId].farmerAddress == address(0)) {
+            return (false, LicenseType.SEED_PRODUCTION, "", 0, 0);
+        }
+        
+        License storage license = licenses[_licenseId];
+        
+        isValid = (
+            license.isActive && 
+            license.status == LicenseStatus.APPROVED && 
+            block.timestamp <= license.expiryDate
+        );
+        
+        return (
+            isValid,
+            license.licenseType,
+            license.farmerName,
+            license.approvalDate,
+            license.expiryDate
+        );
+    }
+    
+    /**
+     * @dev Generate certificate hash for QR code
+     * @param _licenseId ID of the license
+     * @return certificateHash Hash representation of certificate details
+     */
+    function generateCertificateHash(uint256 _licenseId) public view licenseExists(_licenseId) returns (bytes32) {
+        License storage license = licenses[_licenseId];
+        
+        return keccak256(
+            abi.encodePacked(
+                license.licenseId,
+                license.farmerAddress,
+                license.farmerName,
+                license.licenseType,
+                license.status,
+                license.approvalDate,
+                license.expiryDate,
+                license.seedDetails.seedVariety,
+                license.seedDetails.cropType
+            )
+        );
+    }
+    
+    /**
+     * @dev Change admin address - for administrative purposes
+     * @param _newAdmin Address of the new admin
+     */
+    function changeAdmin(address _newAdmin) public onlyAdmin {
+        require(_newAdmin != address(0), "Invalid address");
+        admin = _newAdmin;
+    }
+}
