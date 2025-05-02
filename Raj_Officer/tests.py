@@ -428,10 +428,11 @@ class RajKisanOfficerAPITests(APITestCase):
 
     def test_get_officer_detail(self):
         """Test getting details of a specific officer using query parameters."""
-        detail_url = reverse('get_raj_kisan_officer_details')  # no kwargs needed
+        detail_url = reverse('get_raj_kisan_officer_details')
         response = self.client.get(detail_url, {'id': self.test_officer.user_id})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['success'])
         self.assertEqual(response.data['data']['user_id'], self.test_officer.user_id)
 
     def test_get_officer_detail_not_found(self):

@@ -95,6 +95,7 @@ def delete_raj_kisan_officer(request):
 
     try:
         officer = RajOfficer.objects.get(user_id=officer_id)
+        logger.debug("officer details %s", officer)
         officer_data = RajasthanOfficerSerializer(officer).data
         officer.delete()
         logger.info("Officer deleted successfully: %s", officer_data.get('userId'))
