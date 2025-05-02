@@ -1,0 +1,42 @@
+# Use official Python base image
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    gcc \
+    netcat-openbsd \
+    iputils-ping \
+    curl \
+    gnupg \
+    apt-utils \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /code
+
+# Copy dependency file first
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the entire project into the container
+COPY . .
+
+# Environment variables
+ENV DJANGO_SETTINGS_MODULE=auth.settings
+ENV WEB_CONCURRENCY=3
+
+# Expose port
+EXPOSE 8000
+
+# Run migrations and start server (You can choose to move migrate to entrypoint.sh if needed)
+CMD ["sh", "-c", "python manage.py migrate && gunicorn agri_backend.wsgi:application --bind 0.0.0.0:8000"]

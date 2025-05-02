@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+  agri-backend:
+    build: .
+    ports:
+      - "8003:8004"
+#      - "${AUTH_PORT}:8003"
+
+    restart: always
+    container_name: agri-backend
+    command: gunicorn agri_backend.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      - DATABASE_URL=postgres://postgres:password@postgres:5432/agri_db
+      - REDIS_URL=redis://redis:6380
+    networks:
+      - agri-network
+
+  postgres:
+    image: postgres:latest
+    container_name: postgres_local
+    ports:
+      - "5433:5434"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=agri_db
+    restart: unless-stopped
+    networks:
+      - agri-network
+
+  redis:
+    image: redis:latest
+    container_name: redis_local
+    ports:
+      - "6380:6380"
+    volumes:
+      - redis_data:/data
+    environment:
+      - REDIS_PASSWORD=password
+    command: ["redis-server", "--requirepass", "password"]
+    restart: unless-stopped
+    networks:
+      - agri-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  agri-network:
+    driver: bridge
