@@ -138,6 +138,11 @@ docker-compose down -v
 ```
 
 ## 🔧 Local Development Setup
+# Rajasthan_Agri_Backend License Authentication System (Django Backend)
+
+A Django-based backend for managing role-based authentication of agriculture license holders in Rajasthan, supporting PostgreSQL, JWT, Redis, and secure API development.
+
+## Setup Guide (Local)
 
 ### Prerequisites
 
