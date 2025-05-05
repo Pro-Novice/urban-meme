@@ -44,7 +44,8 @@ INSTALLED_APPS = [
     'Raj_Officer',
     'rest_framework',
     'rest_framework_simplejwt',
-    'blockchain',
+    'Services',
+    'user'
 
 ]
 
@@ -152,11 +153,11 @@ DATABASES = {
         'NAME': env('POSTGRES_DB'),
         'USER': env('POSTGRES_USER'),
         'PASSWORD': env('POSTGRES_PASSWORD'),
-        'HOST': env('POSTGRES_HOST', 'localhost'),
-        'PORT': env('POSTGRES_PORT', '5432'),
+        'HOST': env('POSTGRES_HOST', default='localhost'),
+        'PORT': env('POSTGRES_PORT', default='5432'),
     }
 }
-AUTH_USER_MODEL = 'apis.AgriUser'
+AUTH_USER_MODEL = 'user.AgriUser'
 
 
 # Password validation
@@ -186,17 +187,17 @@ CACHES = {
     }
 
 # Smart contract settings
-RPC_URL = env('RPC_URL')
-CONTRACT_ADDRESS = env('CONTRACT_ADDRESS')
+RPC_URL=env('RPC_URL')
+CONTRACT_ADDRESS=env('CONTRACT_ADDRESS')
 
 # email settings
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = env('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+EMAIL_BACKEND='django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST='smtp.gmail.com'
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=env('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD=env('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL=EMAIL_HOST_USER
 
 
 # Internationalization

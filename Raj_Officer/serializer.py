@@ -1,7 +1,7 @@
 """Serializer for Rajasthan Kisan Officer Registration"""
 from rest_framework import serializers
-from user.utils.encryptions import RSAEncryption  # Correct order: third-party/custom first
 from Raj_Officer.models import RajOfficer
+from user.utlis.encryptions import RSAEncryption
 
 
 class RajasthanOfficerSerializer(serializers.ModelSerializer):

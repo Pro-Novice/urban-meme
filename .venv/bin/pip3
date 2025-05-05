@@ -1,4 +1,4 @@
-#!/home/anushka/PycharmProjects/rajasthan_agri_backend/.venv/bin/python3
+#!/home/ras/rajasthan_agri_backend/.venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys
