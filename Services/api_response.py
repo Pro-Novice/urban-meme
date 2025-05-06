@@ -1,8 +1,6 @@
 from django.http import JsonResponse
 from rest_framework import status
 
-from Services.error_messages import ErrorMessage
-
 
 class ApiResponse(JsonResponse):
     """

@@ -24,6 +24,7 @@ from .permissions import (
 
 logger = logging.getLogger(__name__)
 
+
 @api_view(['POST'])
 @parser_classes([JSONParser])
 @permission_classes([IsAuthenticated, IsFarmer])
@@ -37,14 +38,14 @@ def create_license(request):
             'farmer_name', 'farmer_aadhaar', 'location', 'license_type',
             'seed_variety', 'crop_type', 'quantity', 'quality_parameters', 'source'
         ]
-        
+
         missing_fields = [field for field in required_fields if field not in data]
         if missing_fields:
             return ValidationErrorResponse(
                 message="Missing required fields",
                 errors={'missing_fields': missing_fields}
             )
-        
+
         handler = SeedLicenseHandler()
         tx = handler.apply_for_license(
             data['farmer_name'],
@@ -58,13 +59,13 @@ def create_license(request):
             data['source'],
             request.user.blockchain_address
         )
-        
+
         return SuccessResponse(
             data={'transaction': tx},
             message="License application submitted successfully",
             status_code=status.HTTP_201_CREATED
         )
-        
+
     except BlockchainError as e:
         return ErrorResponse(
             message="Blockchain error",
@@ -77,6 +78,7 @@ def create_license(request):
             message="Internal server error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
 
 @api_view(['POST'])
 @parser_classes([JSONParser])
@@ -99,20 +101,20 @@ def update_license_status(request, license_id):
                 message="Unauthorized - Officer role required",
                 status_code=status.HTTP_403_FORBIDDEN
             )
-        
+
         data = request.data
         required_fields = ['new_status', 'remarks']
         missing_fields = [field for field in required_fields if field not in data]
-        
+
         if missing_fields:
             return ValidationErrorResponse(
                 message="Missing required fields",
                 errors={'missing_fields': missing_fields}
             )
-        
+
         # Get attached documents hash if provided
         attached_docs_hash = data.get('attached_docs_hash', b'')
-        
+
         handler = SeedLicenseHandler()
         tx = handler.update_license_status(
             int(license_id),
@@ -121,12 +123,12 @@ def update_license_status(request, license_id):
             attached_docs_hash,
             request.user.blockchain_address
         )
-        
+
         return SuccessResponse(
             data={'transaction': tx},
             message="License status updated successfully"
         )
-        
+
     except BlockchainError as e:
         return ErrorResponse(
             message="Blockchain error",
@@ -140,6 +142,7 @@ def update_license_status(request, license_id):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+
 @api_view(['GET'])
 @parser_classes([JSONParser])
 def get_license(request, license_id):
@@ -149,12 +152,12 @@ def get_license(request, license_id):
     try:
         handler = SeedLicenseHandler()
         license_data = handler.get_license_summary(int(license_id))
-        
+
         return SuccessResponse(
             data={'license': license_data},
             message="License details retrieved successfully"
         )
-        
+
     except BlockchainError as e:
         return ErrorResponse(
             message="Blockchain error",
@@ -168,6 +171,7 @@ def get_license(request, license_id):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+
 @api_view(['GET'])
 @parser_classes([JSONParser])
 def verify_license(request, license_id):
@@ -177,7 +181,7 @@ def verify_license(request, license_id):
     try:
         handler = SeedLicenseHandler()
         is_valid, license_type, farmer_name, approval_date, expiry_date = handler.verify_certificate(int(license_id))
-        
+
         return SuccessResponse(
             data={
                 'is_valid': is_valid,
@@ -188,7 +192,7 @@ def verify_license(request, license_id):
             },
             message="License verification completed"
         )
-        
+
     except BlockchainError as e:
         return ErrorResponse(
             message="Blockchain error",
@@ -202,6 +206,7 @@ def verify_license(request, license_id):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+
 @api_view(['GET'])
 @parser_classes([JSONParser])
 @permission_classes([IsAuthenticated])
@@ -212,12 +217,12 @@ def get_certificate_hash(request, license_id):
     try:
         handler = SeedLicenseHandler()
         certificate_hash = handler.generate_certificate_hash(int(license_id))
-        
+
         return SuccessResponse(
             data={'certificate_hash': certificate_hash.hex()},
             message="Certificate hash generated successfully"
         )
-        
+
     except BlockchainError as e:
         return ErrorResponse(
             message="Blockchain error",
@@ -231,6 +236,7 @@ def get_certificate_hash(request, license_id):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+
 @api_view(['POST'])
 @parser_classes([JSONParser])
 @permission_classes([IsAuthenticated, IsAdmin])
@@ -242,33 +248,33 @@ def add_officer(request):
         data = request.data
         required_fields = ['officer_address', 'role']
         missing_fields = [field for field in required_fields if field not in data]
-        
+
         if missing_fields:
             return ValidationErrorResponse(
                 message="Missing required fields",
                 errors={'missing_fields': missing_fields}
             )
-        
+
         # Validate Ethereum address
         if not Web3.is_address(data['officer_address']):
             return ValidationErrorResponse(
                 message="Invalid Ethereum address",
                 errors={'officer_address': 'Must be a valid Ethereum address'}
             )
-        
+
         handler = SeedLicenseHandler()
         tx = handler.add_department_officer(
             data['officer_address'],
             data['role'],
             request.user.blockchain_address
         )
-        
+
         return SuccessResponse(
             data={'transaction': tx},
             message="Officer added successfully",
             status_code=status.HTTP_201_CREATED
         )
-        
+
     except BlockchainError as e:
         return ErrorResponse(
             message="Blockchain error",
@@ -281,6 +287,7 @@ def add_officer(request):
             message="Internal server error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
 
 @api_view(['POST'])
 @parser_classes([JSONParser])
@@ -296,25 +303,25 @@ def remove_officer(request):
                 message="Missing required field",
                 errors={'missing_field': 'officer_address'}
             )
-        
+
         # Validate Ethereum address
         if not Web3.is_address(data['officer_address']):
             return ValidationErrorResponse(
                 message="Invalid Ethereum address",
                 errors={'officer_address': 'Must be a valid Ethereum address'}
             )
-        
+
         handler = SeedLicenseHandler()
         tx = handler.remove_department_officer(
             data['officer_address'],
             request.user.blockchain_address
         )
-        
+
         return SuccessResponse(
             data={'transaction': tx},
             message="Officer removed successfully"
         )
-        
+
     except BlockchainError as e:
         return ErrorResponse(
             message="Blockchain error",
@@ -323,7 +330,7 @@ def remove_officer(request):
         )
     except Exception as e:
         logger.error(f"Remove officer error: {str(e)}", exc_info=True)
-        return ErrorResponse(
+        return ApiResponse(
             message="Internal server error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

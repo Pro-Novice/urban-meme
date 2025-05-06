@@ -18,14 +18,14 @@ from dotenv import load_dotenv
 load_dotenv()
 import random
 from django.core.cache import cache
-from user.utlis.access_token import (
+from user.utils.access_token import (
     generate_tokens,
     blacklist_token,
     is_token_blacklisted,
     token_required,
     validate_refresh_token
 )
-from  agri_backend.services.api_response import (
+from  Services.api_response import (
     SuccessResponse,
     ErrorResponse,
     ValidationErrorResponse,
@@ -34,8 +34,8 @@ from  agri_backend.services.api_response import (
     ApiResponse
 )
 import os
-from agri_backend.services.response_messages.response_messages import ErrorMessage
-from .utlis.send_mail import send_otp_email
+from Services.response_messages import ErrorMessage
+from user.utils.send_mail import send_otp_email
 
 logger = logging.getLogger(__name__)
 

@@ -7,7 +7,7 @@ There are three braod category of the exceptions
 """
 from rest_framework import status
 
-from backend.services.response_messages.response_messages import ErrorMessage
+from Services.response_messages import ErrorMessage
 
 
 class ServerError(Exception):
