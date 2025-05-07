@@ -4,13 +4,13 @@ from rest_framework.parsers import JSONParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from web3 import Web3
-
+from Services import logger
 from .seed_license_handler import SeedLicenseHandler
-from services.api_response import BlockchainError
-from services.api_response import (
+from Services.api_response import BlockchainError
+from Services.api_response import (
     SuccessResponse,
     ErrorResponse,
-    ValidationErrorResponse
+    ValidationErrorResponse,ApiResponse
 )
 from .permissions import (
     IsFarmer,
@@ -22,7 +22,6 @@ from .permissions import (
     IsAdmin
 )
 
-logger = logging.getLogger(__name__)
 
 
 @api_view(['POST'])

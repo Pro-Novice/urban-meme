@@ -2,8 +2,6 @@ import ast
 from rest_framework.test import APITestCase
 from django.urls import reverse
 from rest_framework import status
-from agri_backend.services.response_messages.response_messages import ErrorMessage
-from .models import AgriUser
 
 
 class AuthAPITestCase(APITestCase):
