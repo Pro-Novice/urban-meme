@@ -1,8 +1,6 @@
 from enum import Enum
+
 class ErrorMessage(Enum):
-    pass
-class UserErrorMessage(Enum):
-    # Authentication errors
     INVALID_CREDENTIALS = "Invalid credentials"
     ACCOUNT_INACTIVE = "User account is inactive"
     LOGIN_NOT_ALLOWED = "Login not allowed for this user type"

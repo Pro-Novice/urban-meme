@@ -25,20 +25,12 @@ from user.utils.access_token import (
     token_required,
     validate_refresh_token
 )
-from  Services.api_response import (
-    SuccessResponse,
-    ErrorResponse,
-    ValidationErrorResponse,
-    UnauthorizedResponse,
-    ForbiddenResponse,
-    ApiResponse
-)
-import os
+from  Services.api_response import ApiResponse
+
+
 from Services.response_messages import ErrorMessage
+from Services import logger
 from user.utils.send_mail import send_otp_email
-
-logger = logging.getLogger(__name__)
-
 
 @api_view(['POST'])
 @parser_classes([JSONParser])
@@ -49,9 +41,10 @@ def register_user(request):
         missing_fields = [field for field in required_fields if field not in data]
 
         if missing_fields:
-            return ValidationErrorResponse(
-                message=ErrorMessage.MISSING_FIELDS.value,
-                errors={'missing_fields': missing_fields}
+            return ApiResponse(
+                err={ 'missing_fields': missing_fields },
+                msg=ErrorMessage.MISSING_FIELDS.value,
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         errors = {}
@@ -65,29 +58,32 @@ def register_user(request):
             errors['aadhaar_no'] = ErrorMessage.AADHAAR_EXISTS.value
 
         if errors:
-            return ValidationErrorResponse(
-                message="Validation failed",
-                errors=errors
+            return ApiResponse(
+                err=errors,
+                msg="Validation failed",
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
             user = AgriUser.objects.create_user(**data)
-            return SuccessResponse(
+            return ApiResponse(
                 data={'user': user.to_dict()},
-                message={'message': 'User registered successfully'},
-                status_code=status.HTTP_201_CREATED
+                msg="User registered successfully",
+                status=status.HTTP_201_CREATED
             )
         except ValidationError as e:
-            return ValidationErrorResponse(
-                message="Validation failed",
-                errors=str(e)
+            return ApiResponse(
+                err=str(e),
+                msg="Validation failed",
+                status=status.HTTP_400_BAD_REQUEST
             )
 
     except Exception as e:
         logger.error(f"Registration error: {str(e)}", exc_info=True)
-        return ErrorResponse(
-            message=ErrorMessage.SERVER_ERROR.value,
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        return ApiResponse(
+            err=str(e),
+            msg=ErrorMessage.SERVER_ERROR.value,
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
@@ -100,41 +96,50 @@ def login_user(request):
         password = data.get('password')
 
         if not username or not password:
-            return ValidationErrorResponse(
-                message=ErrorMessage.INVALID_CREDENTIALS.value,
-                errors={'credentials': 'Both username and password are required'}
+            return ApiResponse(
+                err={'credentials': 'Both username and password are required'},
+                msg=ErrorMessage.INVALID_CREDENTIALS.value,
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         user = authenticate(request, username=username, password=password)
         if user is None:
-            return UnauthorizedResponse(message=ErrorMessage.INVALID_CREDENTIALS.value)
+            return ApiResponse(
+                err=ErrorMessage.INVALID_CREDENTIALS.value,
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
         if not user.is_active:
-            return ForbiddenResponse(message=ErrorMessage.ACCOUNT_INACTIVE.value)
+            return ApiResponse(
+                err=ErrorMessage.ACCOUNT_INACTIVE.value,
+                status=status.HTTP_403_FORBIDDEN
+            )
 
         if user.user_type not in [UserType.USER.value, UserType.ADMIN.value]:
-            return ForbiddenResponse(
-                message=f"{ErrorMessage.LOGIN_NOT_ALLOWED.value}: {user.user_type}"
+            return ApiResponse(
+                err=f"{ErrorMessage.LOGIN_NOT_ALLOWED.value}: {user.user_type}",
+                status=status.HTTP_403_FORBIDDEN
             )
 
         tokens = generate_tokens(user)
         update_last_login(None, user)
 
-        return SuccessResponse(
+        return ApiResponse(
             data={
                 'user': user.to_dict(),
                 'tokens': tokens
             },
-            message=f"{user.user_type.capitalize()} login successful"
+            msg=f"{user.user_type.capitalize()} login successful",
+            status=status.HTTP_200_OK
         )
 
     except Exception as e:
         logger.error(f"Login error: {str(e)}", exc_info=True)
-        return ErrorResponse(
-            message=ErrorMessage.SERVER_ERROR.value,
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        return ApiResponse(
+            err=str(e),
+            msg=ErrorMessage.SERVER_ERROR.value,
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
 
 @api_view(['POST'])
 @parser_classes([JSONParser])
@@ -142,12 +147,18 @@ def refresh_token_view(request):
     try:
         refresh_token = request.data.get('refresh')
         if not refresh_token:
-            return ValidationErrorResponse(message="Refresh token is required")
+            return ApiResponse(
+                err="Refresh token is required",
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         is_blacklisted, msg = is_token_blacklisted(refresh_token)
         if is_blacklisted:
-            print("Not find user")
-            return UnauthorizedResponse(message=msg)
+            logger.warning("Refresh token is blacklisted")
+            return ApiResponse(
+                err=msg,
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
         try:
             payload = jwt.decode(
@@ -161,33 +172,51 @@ def refresh_token_view(request):
             )
 
             if payload.get('token_type') != 'refresh':
-                return UnauthorizedResponse(message=ErrorMessage.INVALID_TOKEN.value)
+                return ApiResponse(
+                    err=ErrorMessage.INVALID_TOKEN.value,
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
 
         except jwt.ExpiredSignatureError:
-            return UnauthorizedResponse(message=ErrorMessage.TOKEN_EXPIRED.value)
+            return ApiResponse(
+                err=ErrorMessage.TOKEN_EXPIRED.value,
+                status=status.HTTP_401_UNAUTHORIZED
+            )
         except jwt.InvalidTokenError as e:
-            return UnauthorizedResponse(message=ErrorMessage.INVALID_TOKEN.value)
+            return ApiResponse(
+                err=ErrorMessage.INVALID_TOKEN.value,
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
         user_id = payload.get('user_id')
         if not user_id:
-            return UnauthorizedResponse(message="Invalid token payload. User ID is missing")
+            return ApiResponse(
+                err="Invalid token payload. User ID is missing",
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
         user = AgriUser.objects.filter(id=user_id).first()
         if not user:
-            print("Not find user")
-            return UnauthorizedResponse(message="User not found")
+            logger.warning("User not found for token refresh")
+            return ApiResponse(
+                err="User not found",
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
         tokens = generate_tokens(user)
-
-        return SuccessResponse(
+        return ApiResponse(
             data={'tokens': tokens},
-            message="Token refreshed successfully"
+            msg="Token refreshed successfully",
+            status=status.HTTP_200_OK
         )
 
     except Exception as e:
         logger.error(f"Refresh token error: {str(e)}", exc_info=True)
-        return ErrorResponse(message=ErrorMessage.SERVER_ERROR.value)
-
+        return ApiResponse(
+            err=str(e),
+            msg=ErrorMessage.SERVER_ERROR.value,
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 @api_view(["POST"])
 @parser_classes([JSONParser])
@@ -197,21 +226,27 @@ def logout_user(request):
         auth_header = get_authorization_header(request).split()
 
         if not auth_header or len(auth_header) != 2:
-            return UnauthorizedResponse(message=ErrorMessage.INVALID_AUTH_HEADER.value)
+            return ApiResponse(
+                err=ErrorMessage.INVALID_AUTH_HEADER.value,
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
         token = auth_header[1].decode()
 
         # Check if token is already blacklisted
         is_blacklisted, blacklist_msg = is_token_blacklisted(token)
         if is_blacklisted:
-            return UnauthorizedResponse(message=blacklist_msg)
+            return ApiResponse(
+                err=blacklist_msg,
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
         # Blacklist the access token
         if not blacklist_token(token):
             logger.error("Failed to blacklist access token")
-            return ErrorResponse(
-                message="Failed to blacklist token - cache service may be down",
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            return ApiResponse(
+                err="Failed to blacklist token - cache service may be down",
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
         # Blacklist refresh token if provided
@@ -227,15 +262,18 @@ def logout_user(request):
                 logger.warning(f"Invalid refresh token during logout: {str(e)}")
 
         logout(request)
-        return SuccessResponse(message="Logout successful. Token blacklisted.")
+        return ApiResponse(
+            msg="Logout successful. Token blacklisted.",
+            status=status.HTTP_200_OK
+        )
 
     except Exception as e:
         logger.error(f"Logout error: {str(e)}", exc_info=True)
-        return ErrorResponse(
-            message=ErrorMessage.SERVER_ERROR.value,
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        return ApiResponse(
+            err=str(e),
+            msg=ErrorMessage.SERVER_ERROR.value,
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
 
 @api_view(['GET'])
 @parser_classes([JSONParser])
@@ -243,13 +281,18 @@ def logout_user(request):
 def get_user_profile(request):
     try:
         user = request.user
-        return SuccessResponse(
+        return ApiResponse(
             data={'user': user.to_dict()},
-            message="User profile fetched successfully"
+            msg="User profile fetched successfully",
+            status=status.HTTP_200_OK
         )
     except Exception as e:
         logger.error(f"Get profile error: {str(e)}", exc_info=True)
-        return ErrorResponse(message=ErrorMessage.SERVER_ERROR.value)
+        return ApiResponse(
+            err=str(e),
+            msg=ErrorMessage.SERVER_ERROR.value,
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(['PUT'])
@@ -266,9 +309,10 @@ def update_user_profile(request):
 
         update_fields = [field for field in allowed_fields if field in data]
         if not update_fields:
-            return ValidationErrorResponse(
-                message="No valid fields to update",
-                errors={'fields': f"Provide at least one of {', '.join(allowed_fields)}"}
+            return ApiResponse(
+                err={'fields': f"Provide at least one of {', '.join(allowed_fields)}"},
+                msg="No valid fields to update",
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         # Update fields
@@ -278,26 +322,27 @@ def update_user_profile(request):
                 validate_name(data['name'])
                 user.name = data['name']
             except ValidationError as e:
-                return ValidationErrorResponse(
-                    message="Invalid name",
-                    errors={'name': str(e)}
+                return ApiResponse(
+                    err={'name': str(e)},
+                    msg="Invalid name",
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
         if 'phone_no' in data:
             try:
                 if AgriUser.objects.filter(phone_no=data['phone_no']).exclude(id=user.id).exists():
-                    return ErrorResponse(
-                        message=ErrorMessage.PHONE_EXISTS.value,
-                        status_code=status.HTTP_400_BAD_REQUEST
+                    return ApiResponse(
+                        err=ErrorMessage.PHONE_EXISTS.value,
+                        status=status.HTTP_400_BAD_REQUEST
                     )
-
                 from .models import validate_mobile
                 validate_mobile(data['phone_no'])
                 user.phone_no = data['phone_no']
             except ValidationError as e:
-                return ValidationErrorResponse(
-                    message="Invalid phone number",
-                    errors={'phone_no': str(e)}
+                return ApiResponse(
+                    err={'phone_no': str(e)},
+                    msg="Invalid phone number",
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
         if 'address' in data:
@@ -306,25 +351,27 @@ def update_user_profile(request):
                 validate_address(data['address'])
                 user.address = data['address']
             except ValidationError as e:
-                return ValidationErrorResponse(
-                    message="Invalid address",
-                    errors={'address': str(e)}
+                return ApiResponse(
+                    err={'address': str(e)},
+                    msg="Invalid address",
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
         user.save()
 
-        return SuccessResponse(
+        return ApiResponse(
             data={'user': user.to_dict()},
-            message="Profile updated successfully"
+            msg="Profile updated successfully",
+            status=status.HTTP_200_OK
         )
 
     except Exception as e:
         logger.error(f"Update profile error: {str(e)}", exc_info=True)
-        return ErrorResponse(
-            message=ErrorMessage.SERVER_ERROR.value,
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        return ApiResponse(
+            err=str(e),
+            msg=ErrorMessage.SERVER_ERROR.value,
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
 
 @api_view(['POST'])
 @parser_classes([JSONParser])
@@ -332,23 +379,36 @@ def request_password_reset(request):
     try:
         email = request.data.get('email')
         if not email:
-            return ValidationErrorResponse(message="Email is required")
+            return ApiResponse(
+                err="Email is required",
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             user = AgriUser.objects.get(email=email)
         except AgriUser.DoesNotExist:
-            return ValidationErrorResponse(message="No user found with this email")
+            return ApiResponse(
+                err="No user found with this email",
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         otp = str(random.randint(100000, 999999))
         cache.set(f"otp_{email}", otp, timeout=300)  # OTP valid for 5 minutes
 
         send_otp_email(email, otp)
 
-        return SuccessResponse(message="OTP sent to email")
+        return ApiResponse(
+            msg="OTP sent to email",
+            status=status.HTTP_200_OK
+        )
+
     except Exception as e:
         logger.error(f"Send OTP error: {str(e)}", exc_info=True)
-        return ErrorResponse(message=ErrorMessage.SERVER_ERROR.value)
-
+        return ApiResponse(
+            err=str(e),
+            msg=ErrorMessage.SERVER_ERROR.value,
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 @api_view(['POST'])
 @parser_classes([JSONParser])
@@ -359,22 +419,39 @@ def reset_password_with_otp(request):
         new_password = request.data.get('new_password')
 
         if not all([email, otp, new_password]):
-            return ValidationErrorResponse(message="Email, OTP and new password are required")
+            return ApiResponse(
+                err="Email, OTP and new password are required",
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         cached_otp = cache.get(f"otp_{email}")
         if cached_otp != otp:
-            return ValidationErrorResponse(message="Invalid or expired OTP")
+            return ApiResponse(
+                err="Invalid or expired OTP",
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             user = AgriUser.objects.get(email=email)
         except AgriUser.DoesNotExist:
-            return ValidationErrorResponse(message="User not found")
+            return ApiResponse(
+                err="User not found",
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         user.set_password(new_password)
         user.save()
         cache.delete(f"otp_{email}")
 
-        return SuccessResponse(message="Password reset successfully")
+        return ApiResponse(
+            msg="Password reset successfully",
+            status=status.HTTP_200_OK
+        )
+
     except Exception as e:
         logger.error(f"Reset password error: {str(e)}", exc_info=True)
-        return ErrorResponse(message=ErrorMessage.SERVER_ERROR.value)
+        return ApiResponse(
+            err=str(e),
+            msg=ErrorMessage.SERVER_ERROR.value,
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
