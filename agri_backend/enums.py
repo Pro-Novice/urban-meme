@@ -27,6 +27,7 @@ class Status(Enum):
 class UserType(Enum):
     """Enum representing user types: USER and RAJKISAN_OFFICER."""
     USER = 'USER'
+    FARMER = 'FARMER'
     RAJKISAN_OFFICER = 'RAJKISAN_OFFICER'
     ADMIN = "ADMIN"
 

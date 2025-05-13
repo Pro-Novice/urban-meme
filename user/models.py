@@ -171,7 +171,12 @@ class AgriUser(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
+    is_farmer = models.BooleanField(default=False)
+    is_officer = models.BooleanField(default=False)
+    is_admin = models.BooleanField(default=False)
 
+    blockchain_address = models.CharField(max_length=66, blank=True, null=True)
+    private_key = models.TextField(blank=True, null=True)  # store securely in prod
     objects = AgriUserManager()
 
     USERNAME_FIELD = 'username'
@@ -193,7 +198,7 @@ class AgriUser(AbstractBaseUser, PermissionsMixin):
             raise ValidationError("Non-admin users cannot have is_admin=True")
 
     def to_dict(self):
-        return {
+        user_data = {
             'id': self.id,
             'username': self.username,
             'email': self.email,
@@ -206,4 +211,19 @@ class AgriUser(AbstractBaseUser, PermissionsMixin):
             'is_active': self.is_active,
             'is_admin': self.is_admin,
             'is_superuser': self.is_superuser
-        }
+    }
+
+        # Include farmer-specific data
+        if self.user_type == UserType.FARMER.value or self.is_farmer:
+            user_data.update({
+                'is_farmer': self.is_farmer,
+                'blockchain_address': self.blockchain_address,
+            })
+
+        # Include officer-specific flags
+        if self.user_type == UserType.RAJKISAN_OFFICER.value or self.is_officer:
+            user_data.update({
+                'is_officer': self.is_officer,
+            })
+
+        return user_data

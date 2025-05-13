@@ -1,20 +1,18 @@
 from django.urls import path
 from .views import (
-    create_license,
-    update_license_status,
-    get_license,
-    verify_license,
-    get_certificate_hash,
-    add_officer,
-    remove_officer
+    LicenseCreateView, LicenseDetailView, LicenseStatusUpdateView,
+    LicenseStatusView, LicenseHistoryView, LicenseCertificateDownloadView,
+    LicenseListView
 )
 
 urlpatterns = [
-    path('blockchain/licenses/create/', create_license, name='create-license'),
-    path('blockchain/licenses/<int:license_id>/update-status/', update_license_status, name='update-license-status'),
-    path('blockchain/licenses/<int:license_id>/', get_license, name='get-license'),
-    path('blockchain/licenses/<int:license_id>/verify/', verify_license, name='verify-license'),
-    path('blockchain/licenses/<int:license_id>/hash/', get_certificate_hash, name='get-certificate-hash'),
-    path('blockchain/officers/add/', add_officer, name='add-officer'),
-    path('blockchain/officers/remove/', remove_officer, name='remove-officer'),
-]
+    path('licenses/apply/', LicenseCreateView.as_view(), name="apply-license"),
+    path('licenses/', LicenseListView.as_view(), name="list-licenses"),  
+    path('licenses/<int:license_id>/', LicenseDetailView.as_view(), name="license-detail"),
+    path('licenses/<int:license_id>/update-status/', LicenseStatusUpdateView.as_view(), name="update-license-status"),
+    path('licenses/<int:license_id>/status/', LicenseStatusView.as_view(), name="license-status"),
+    path('licenses/<int:license_id>/history/', LicenseHistoryView.as_view(), name="license-history"),
+    path('licenses/<int:license_id>/certificate/', LicenseCertificateDownloadView.as_view(), name="license-certificate"),
+#     path('blockchain/transactions/<str:tx_hash>/', TransactionStatusView.as_view(), name="transaction-status"),
+#     path('blockchain/transactions/history/', TransactionHistoryView.as_view(), name="transaction-history"),
+ ]

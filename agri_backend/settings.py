@@ -9,7 +9,9 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
+import logging
 
+logger = logging.getLogger(__name__)
 from pathlib import Path
 import os
 from datetime import timedelta
@@ -184,7 +186,8 @@ CACHES = {
 }
 
 # Smart contract settings
-RPC_URL = env('RPC_URL')
+
+BLOCKCHAIN_URL = env('BLOCKCHAIN_URL', default='https://rpc-amoy.polygon.technology/')
 CONTRACT_ADDRESS = env('CONTRACT_ADDRESS')
 
 # email settings
@@ -195,6 +198,26 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = env('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+keys_dir = 'keys'
+private_key_path = os.path.join(keys_dir, 'private_key.pem')
+try:
+    with open(private_key_path, "rb") as private_key_file:
+        private_key_bytes = private_key_file.read()
+        private_key = private_key_bytes.decode().replace("\n", "")
+
+        logger.info("Private Key loaded successfully",private_key)
+except Exception as e:
+    logger.error(f"Error loading private key: {str(e)}")
+public_key_path = os.path.join(keys_dir, 'public_key.pem')
+try:
+    with open(public_key_path, "rb") as public_key_file:
+        public_key_bytes = public_key_file.read()
+        public_key = public_key_bytes.decode().replace("\n", "")
+        logger.info("Public Key loaded successfully")
+except Exception as e:
+    logger.error(f"Error loading public key: {str(e)}")
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
