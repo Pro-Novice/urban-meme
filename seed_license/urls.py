@@ -1,18 +1,18 @@
 from django.urls import path
 from .views import (
-    LicenseCreateView, LicenseDetailView, LicenseStatusUpdateView,
-    LicenseStatusView, LicenseHistoryView, LicenseCertificateDownloadView,
-    LicenseListView
+    license_create_view, license_detail_view, license_status_update_view,
+    license_status_view, license_history_view, license_certificate_download_view,
+    license_list_view, transaction_status_view, transaction_history_view
 )
 
 urlpatterns = [
-    path('licenses/apply/', LicenseCreateView.as_view(), name="apply-license"),
-    path('licenses/', LicenseListView.as_view(), name="list-licenses"),  
-    path('licenses/<int:license_id>/', LicenseDetailView.as_view(), name="license-detail"),
-    path('licenses/<int:license_id>/update-status/', LicenseStatusUpdateView.as_view(), name="update-license-status"),
-    path('licenses/<int:license_id>/status/', LicenseStatusView.as_view(), name="license-status"),
-    path('licenses/<int:license_id>/history/', LicenseHistoryView.as_view(), name="license-history"),
-    path('licenses/<int:license_id>/certificate/', LicenseCertificateDownloadView.as_view(), name="license-certificate"),
-#     path('blockchain/transactions/<str:tx_hash>/', TransactionStatusView.as_view(), name="transaction-status"),
-#     path('blockchain/transactions/history/', TransactionHistoryView.as_view(), name="transaction-history"),
- ]
+    path('licenses/apply/', license_create_view, name='license-create'),
+    path('licenses/', license_list_view, name='license-list'),
+    path('licenses/<int:license_id>/', license_detail_view, name='license-detail'),
+    path('licenses/<int:license_id>/update-status/', license_status_update_view, name='license-status-update'),
+    path('licenses/<int:license_id>/status/', license_status_view, name='license-status'),
+    path('licenses/<int:license_id>/history/', license_history_view, name='license-history'),
+    path('licenses/<int:license_id>/certificate/', license_certificate_download_view, name='license-certificate'),
+    path('blockchain/transactions/<str:tx_hash>/', transaction_status_view, name='transaction-status'),
+    path('blockchain/transactions/history/', transaction_history_view, name='transaction-history'),
+]

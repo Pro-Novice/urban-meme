@@ -19,33 +19,80 @@ from django.http import JsonResponse
 # logger
 logger = logging.getLogger(__name__)
 
-
 def generate_tokens(user):
     """
-      Generates an access token for the user.
-
-      :param user_json: Dictionary containing user details.
-      :return: JWT Access Token as a string.
-      """
+    Generate access and refresh tokens for a user
+    """
     try:
-        payload = {
-            'type': "ACCESS TOKEN",
-            'user': user,
-            'exp': datetime.utcnow() + timedelta(days=365),
-            'token': str(uuid.uuid4()),
-            'iat': dt.utcnow()
+        refresh = RefreshToken.for_user(user)
+        return {
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
         }
-
-        private_key = settings.private_key_bytes
-        algorithm = 'RS256'  # Ensure it's a single algorithm
-
-        access_token = jwt.encode(payload, private_key, algorithm=algorithm)
-
-        return access_token
     except Exception as e:
-        print("Error generating access token:", str(e))
-        raise e
-
+        logger.exception("Unable to generate tokens")
+        raise Exception("Token generation failed")
+    
+#validate access Token
+def validate_access_token(token):
+    """
+    Validate JWT access token with better error handling
+    """
+    try:
+        # Decode the token
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.SIMPLE_JWT['ALGORITHM']],
+            options={
+                'verify_exp': True,  # Verify expiration
+                'require': ['exp', 'iat', 'user_id', 'token_type']  
+            }
+        )
+        
+        # Additional validations
+        if payload.get('token_type') != 'access':
+            raise InvalidTokenError("Invalid token type")
+            
+        if is_token_blacklisted(token):
+            raise InvalidTokenError(ErrorMessage.TOKEN_BLACKLISTED.value)
+            
+        return payload
+        
+    except jwt.ExpiredSignatureError:
+        raise InvalidTokenError(ErrorMessage.TOKEN_EXPIRED.value)
+    except jwt.InvalidTokenError as e:
+        raise InvalidTokenError(ErrorMessage.INVALID_TOKEN.value)
+    except Exception as e:
+        logger.error(f"Token validation failed: {str(e)}")
+        raise InvalidTokenError(ErrorMessage.INVALID_TOKEN.value)
+    
+#validate token
+def validate_refresh_token(token):
+    """
+    Validate JWT refresh token
+    """
+    try:
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.SIMPLE_JWT['ALGORITHM']]
+        )
+        
+        if payload.get('token_type') != 'refresh':
+            raise InvalidTokenError("Invalid token type")
+            
+        if is_token_blacklisted(token):
+            raise InvalidTokenError("Token is blacklisted")
+            
+        return payload
+        
+    except jwt.ExpiredSignatureError:
+        raise InvalidTokenError("Token has expired")
+    except jwt.InvalidTokenError:
+        raise InvalidTokenError("Invalid token")
+    
+#check for if token is blacklisted
 
 def is_token_blacklisted(token):
     """
@@ -62,74 +109,6 @@ def is_token_blacklisted(token):
         logger.error(f"Cache connection error while checking token blacklist: {str(e)}")
 
         return False, None
-
-
-def validate_access_token(token):
-    """
-    Validate JWT access token with proper blacklist checking
-    """
-    try:
-        # First check if token is blacklisted
-        is_blacklisted, blacklist_msg = is_token_blacklisted(token)
-        if is_blacklisted:
-            raise InvalidTokenError(blacklist_msg)
-
-        # Then validate token normally
-        payload = jwt.decode(
-            token,
-            settings.SECRET_KEY,
-            algorithms=[settings.SIMPLE_JWT['ALGORITHM']],
-            options={
-                'verify_exp': True,
-                'require': ['exp', 'iat', 'user_id', 'token_type']
-            }
-        )
-
-        if payload.get('token_type') != 'access':
-            raise InvalidTokenError(ErrorMessage.INVALID_TOKEN.value)
-
-        return payload
-
-    except jwt.ExpiredSignatureError:
-        raise InvalidTokenError(ErrorMessage.TOKEN_EXPIRED.value)
-    except jwt.InvalidTokenError as e:
-        # Special case for blacklisted tokens
-        if str(e) == ErrorMessage.TOKEN_BLACKLISTED.value:
-            raise
-        raise InvalidTokenError(ErrorMessage.INVALID_TOKEN.value)
-    except Exception as e:
-        logger.error(f"Token validation failed: {str(e)}")
-        raise InvalidTokenError(ErrorMessage.INVALID_TOKEN.value)
-
-
-def validate_refresh_token(token):
-    try:
-        if is_token_blacklisted(token):
-            raise InvalidTokenError(ErrorMessage.TOKEN_BLACKLISTED.value)
-
-        payload = jwt.decode(
-            token,
-            settings.SECRET_KEY,
-            algorithms=[settings.SIMPLE_JWT['ALGORITHM']],
-            options={
-                'verify_exp': True,
-                'require': ['exp', 'iat', 'user_id', 'token_type']
-            }
-        )
-
-        if payload.get('token_type') != 'refresh':
-            raise InvalidTokenError(ErrorMessage.INVALID_TOKEN.value)
-
-        return payload
-
-    except jwt.ExpiredSignatureError:
-        raise InvalidTokenError(ErrorMessage.TOKEN_EXPIRED.value)
-    except jwt.InvalidTokenError:
-        raise InvalidTokenError(ErrorMessage.INVALID_TOKEN.value)
-    except Exception as e:
-        logger.error(f"Refresh token validation error: {str(e)}")
-        raise InvalidTokenError(ErrorMessage.INVALID_TOKEN.value)
-
 
 def blacklist_token(token, expiry_seconds=None):
     """
@@ -207,3 +186,4 @@ def admin_required(func):
         return func(request, *args, **kwargs)
 
     return wrapper
+

@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 import logging
 
+from web3 import Web3
+
 logger = logging.getLogger(__name__)
 from pathlib import Path
 import os
@@ -189,6 +191,8 @@ CACHES = {
 
 BLOCKCHAIN_URL = env('BLOCKCHAIN_URL', default='https://rpc-amoy.polygon.technology/')
 CONTRACT_ADDRESS = env('CONTRACT_ADDRESS')
+PRIVATE_KEY = env("PRIVATE_KEY")
+WALLET_ADDRESS = Web3().eth.account.from_key(PRIVATE_KEY).address
 
 # email settings
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -198,26 +202,6 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = env('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-
-keys_dir = 'keys'
-private_key_path = os.path.join(keys_dir, 'private_key.pem')
-try:
-    with open(private_key_path, "rb") as private_key_file:
-        private_key_bytes = private_key_file.read()
-        private_key = private_key_bytes.decode().replace("\n", "")
-
-        logger.info("Private Key loaded successfully",private_key)
-except Exception as e:
-    logger.error(f"Error loading private key: {str(e)}")
-public_key_path = os.path.join(keys_dir, 'public_key.pem')
-try:
-    with open(public_key_path, "rb") as public_key_file:
-        public_key_bytes = public_key_file.read()
-        public_key = public_key_bytes.decode().replace("\n", "")
-        logger.info("Public Key loaded successfully")
-except Exception as e:
-    logger.error(f"Error loading public key: {str(e)}")
-
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/

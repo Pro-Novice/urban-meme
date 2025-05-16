@@ -176,7 +176,6 @@ class AgriUser(AbstractBaseUser, PermissionsMixin):
     is_admin = models.BooleanField(default=False)
 
     blockchain_address = models.CharField(max_length=66, blank=True, null=True)
-    private_key = models.TextField(blank=True, null=True)  # store securely in prod
     objects = AgriUserManager()
 
     USERNAME_FIELD = 'username'
