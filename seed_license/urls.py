@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from .views import (
     license_create_view, license_detail_view, license_status_update_view,
     license_status_view, license_history_view, license_certificate_download_view,
@@ -15,4 +15,7 @@ urlpatterns = [
     path('licenses/<int:license_id>/certificate/', license_certificate_download_view, name='license-certificate'),
     path('blockchain/transactions/<str:tx_hash>/', transaction_status_view, name='transaction-status'),
     path('blockchain/transactions/history/', transaction_history_view, name='transaction-history'),
+    
+    # Blockchain Smart Contract APIs
+    path('blockchain/contract/', include('seed_license.blockchain_api.urls')),
 ]
