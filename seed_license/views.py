@@ -1,335 +1,190 @@
 import logging
-from rest_framework.decorators import api_view, parser_classes, permission_classes
-from rest_framework.parsers import JSONParser
-from rest_framework.permissions import IsAuthenticated
-from rest_framework import status
+from datetime import datetime
 from web3 import Web3
-from Services import logger
-from .seed_license_handler import SeedLicenseHandler
-from Services.api_response import BlockchainError
-from Services.api_response import (
-    SuccessResponse,
-    ErrorResponse,
-    ValidationErrorResponse,ApiResponse
-)
+from django.conf import settings
+from django.db.models import Q
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
+
+from Services.api_response import ApiResponse
+from Services.exceptions import BlockchainError
+
+from .models import License, BlockchainTransaction
 from .permissions import (
-    IsFarmer,
-    IsAgricultureOfficer,
-    IsDistrictCollector,
-    IsSeedCertificationOfficer,
-    IsSubsidyApprovalOfficer,
-    IsQualityControlOfficer,
-    IsAdmin
+    IsFarmer, IsAdmin, IsAgricultureOfficer, IsDistrictCollector,
+    IsSeedCertificationOfficer, IsSubsidyApprovalOfficer, IsQualityControlOfficer,
 )
+from .seed_license_handler import SeedLicenseHandler
 
+logger = logging.getLogger(__name__)
 
-
-@api_view(['POST'])
-@parser_classes([JSONParser])
+# ── POST /api/licenses/apply ─────────────────────────────────────────
+@api_view(["POST"])
 @permission_classes([IsAuthenticated, IsFarmer])
-def create_license(request):
-    """
-    Create a new seed license application
-    """
+def license_create_view(request):
+    required = ["name", "aadhaar", "location", "license_type", "seed_variety",
+                "crop_type", "quantity", "quality_parameters", "source"]
+    missing = [f for f in required if f not in request.data]
+    if missing:
+        return ApiResponse(err=f"Missing required fields: {', '.join(missing)}", status=400)
+
     try:
-        data = request.data
-        required_fields = [
-            'farmer_name', 'farmer_aadhaar', 'location', 'license_type',
-            'seed_variety', 'crop_type', 'quantity', 'quality_parameters', 'source'
-        ]
-
-        missing_fields = [field for field in required_fields if field not in data]
-        if missing_fields:
-            return ValidationErrorResponse(
-                message="Missing required fields",
-                errors={'missing_fields': missing_fields}
-            )
-
         handler = SeedLicenseHandler()
-        tx = handler.apply_for_license(
-            data['farmer_name'],
-            data['farmer_aadhaar'],
-            data['location'],
-            data['license_type'],
-            data['seed_variety'],
-            data['crop_type'],
-            int(data['quantity']),
-            data['quality_parameters'],
-            data['source'],
-            request.user.blockchain_address
-        )
+        lid, receipt = handler.apply_for_license(request.data, request.user)
 
-        return SuccessResponse(
-            data={'transaction': tx},
-            message="License application submitted successfully",
-            status_code=status.HTTP_201_CREATED
-        )
+        block_time = Web3().eth.get_block(receipt.blockNumber).timestamp
+        return ApiResponse(data={
+            "application_id": lid,
+            "submitted_at":   datetime.fromtimestamp(block_time).isoformat(),
+            "status":         "APPLIED",
+            "blockchain_tx_id": receipt.transactionHash.hex(),
+        }, status=201)
+    except BlockchainError as exc:
+        return ApiResponse(err=str(exc), status=400)
+    except Exception as exc:
+        logger.exception("License application error")
+        return ApiResponse(err="Internal server error", status=500)
 
-    except BlockchainError as e:
-        return ErrorResponse(
-            message="Blockchain error",
-            errors=str(e),
-            status_code=status.HTTP_400_BAD_REQUEST
-        )
-    except Exception as e:
-        logger.error(f"Create license error: {str(e)}", exc_info=True)
-        return ErrorResponse(
-            message="Internal server error",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-
-@api_view(['POST'])
-@parser_classes([JSONParser])
+# ── GET /api/licenses/{id} ───────────────────────────────────────────
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def update_license_status(request, license_id):
-    """
-    Update license status (for authorized officers)
-    """
+def license_detail_view(request, license_id):
     try:
-        # Check permissions based on role
-        if not any([
-            request.user.is_agriculture_officer,
-            request.user.is_district_collector,
-            request.user.is_seed_certification_officer,
-            request.user.is_subsidy_approval_officer,
-            request.user.is_quality_control_officer,
-            request.user.is_admin
-        ]):
-            return ErrorResponse(
-                message="Unauthorized - Officer role required",
-                status_code=status.HTTP_403_FORBIDDEN
-            )
+        summary = SeedLicenseHandler().get_license_summary(int(license_id))
+        return ApiResponse(data=summary)
+    except Exception as exc:
+        logger.exception("License detail fetch error")
+        return ApiResponse(err=str(exc), status=500)
 
-        data = request.data
-        required_fields = ['new_status', 'remarks']
-        missing_fields = [field for field in required_fields if field not in data]
-
-        if missing_fields:
-            return ValidationErrorResponse(
-                message="Missing required fields",
-                errors={'missing_fields': missing_fields}
-            )
-
-        # Get attached documents hash if provided
-        attached_docs_hash = data.get('attached_docs_hash', b'')
-
-        handler = SeedLicenseHandler()
-        tx = handler.update_license_status(
-            int(license_id),
-            data['new_status'],
-            data['remarks'],
-            attached_docs_hash,
-            request.user.blockchain_address
-        )
-
-        return SuccessResponse(
-            data={'transaction': tx},
-            message="License status updated successfully"
-        )
-
-    except BlockchainError as e:
-        return ErrorResponse(
-            message="Blockchain error",
-            errors=str(e),
-            status_code=status.HTTP_400_BAD_REQUEST
-        )
-    except Exception as e:
-        logger.error(f"Update license status error: {str(e)}", exc_info=True)
-        return ErrorResponse(
-            message="Internal server error",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-
-@api_view(['GET'])
-@parser_classes([JSONParser])
-def get_license(request, license_id):
-    """
-    Get license details (public access)
-    """
-    try:
-        handler = SeedLicenseHandler()
-        license_data = handler.get_license_summary(int(license_id))
-
-        return SuccessResponse(
-            data={'license': license_data},
-            message="License details retrieved successfully"
-        )
-
-    except BlockchainError as e:
-        return ErrorResponse(
-            message="Blockchain error",
-            errors=str(e),
-            status_code=status.HTTP_400_BAD_REQUEST
-        )
-    except Exception as e:
-        logger.error(f"Get license error: {str(e)}", exc_info=True)
-        return ErrorResponse(
-            message="Internal server error",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-
-@api_view(['GET'])
-@parser_classes([JSONParser])
-def verify_license(request, license_id):
-    """
-    Verify license validity (public access)
-    """
-    try:
-        handler = SeedLicenseHandler()
-        is_valid, license_type, farmer_name, approval_date, expiry_date = handler.verify_certificate(int(license_id))
-
-        return SuccessResponse(
-            data={
-                'is_valid': is_valid,
-                'license_type': license_type,
-                'farmer_name': farmer_name,
-                'approval_date': approval_date,
-                'expiry_date': expiry_date
-            },
-            message="License verification completed"
-        )
-
-    except BlockchainError as e:
-        return ErrorResponse(
-            message="Blockchain error",
-            errors=str(e),
-            status_code=status.HTTP_400_BAD_REQUEST
-        )
-    except Exception as e:
-        logger.error(f"Verify license error: {str(e)}", exc_info=True)
-        return ErrorResponse(
-            message="Internal server error",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-
-@api_view(['GET'])
-@parser_classes([JSONParser])
+# ── POST /api/licenses/{id}/update-status ────────────────────────────
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def get_certificate_hash(request, license_id):
-    """
-    Get certificate hash for QR code generation
-    """
+def license_status_update_view(request, license_id):
+    user = request.user
+    if not any([
+        user.is_agriculture_officer, user.is_district_collector, user.is_seed_certification_officer,
+        user.is_subsidy_approval_officer, user.is_quality_control_officer, user.is_admin,
+    ]):
+        return ApiResponse(err="Unauthorized", status=403)
+
+    new_status = request.data.get("status")
+    if new_status is None or not (0 <= new_status <= 7):
+        return ApiResponse(err="Invalid or missing 'status'", status=400)
+
+    if new_status in {5, 6} and not request.data.get("remarks"):
+        return ApiResponse(err="Remarks required for rejection/revocation", status=400)
+
+    docs_hash = request.data.get("docs_hash", b"")
+    docs_hash_b = docs_hash.encode() if isinstance(docs_hash, str) else docs_hash
+
     try:
-        handler = SeedLicenseHandler()
-        certificate_hash = handler.generate_certificate_hash(int(license_id))
+        receipt = SeedLicenseHandler().update_license_status(
+            int(license_id), new_status, request.data.get("remarks", ""), user, docs_hash_b)
+        return ApiResponse(data={
+            "id": license_id,
+            "status": new_status,
+            "blockchain_tx_id": receipt.transactionHash.hex(),
+            "updated_at": receipt.blockNumber,
+        })
+    except Exception as exc:
+        logger.exception("Status update error")
+        return ApiResponse(err=str(exc), status=500)
 
-        return SuccessResponse(
-            data={'certificate_hash': certificate_hash.hex()},
-            message="Certificate hash generated successfully"
-        )
-
-    except BlockchainError as e:
-        return ErrorResponse(
-            message="Blockchain error",
-            errors=str(e),
-            status_code=status.HTTP_400_BAD_REQUEST
-        )
-    except Exception as e:
-        logger.error(f"Get certificate hash error: {str(e)}", exc_info=True)
-        return ErrorResponse(
-            message="Internal server error",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-
-@api_view(['POST'])
-@parser_classes([JSONParser])
-@permission_classes([IsAuthenticated, IsAdmin])
-def add_officer(request):
-    """
-    Add new department officer (admin only)
-    """
+# ── GET /api/licenses/{id}/status ────────────────────────────────────
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def license_status_view(request, license_id):
     try:
-        data = request.data
-        required_fields = ['officer_address', 'role']
-        missing_fields = [field for field in required_fields if field not in data]
+        h = SeedLicenseHandler()
+        return ApiResponse(data={
+            "id": license_id,
+            "status": h.get_license_status(int(license_id)),
+            "blockchain_verified": h.is_license_valid(int(license_id)),
+        })
+    except Exception as exc:
+        return ApiResponse(err=str(exc), status=500)
 
-        if missing_fields:
-            return ValidationErrorResponse(
-                message="Missing required fields",
-                errors={'missing_fields': missing_fields}
-            )
-
-        # Validate Ethereum address
-        if not Web3.is_address(data['officer_address']):
-            return ValidationErrorResponse(
-                message="Invalid Ethereum address",
-                errors={'officer_address': 'Must be a valid Ethereum address'}
-            )
-
-        handler = SeedLicenseHandler()
-        tx = handler.add_department_officer(
-            data['officer_address'],
-            data['role'],
-            request.user.blockchain_address
-        )
-
-        return SuccessResponse(
-            data={'transaction': tx},
-            message="Officer added successfully",
-            status_code=status.HTTP_201_CREATED
-        )
-
-    except BlockchainError as e:
-        return ErrorResponse(
-            message="Blockchain error",
-            errors=str(e),
-            status_code=status.HTTP_400_BAD_REQUEST
-        )
-    except Exception as e:
-        logger.error(f"Add officer error: {str(e)}", exc_info=True)
-        return ErrorResponse(
-            message="Internal server error",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-
-@api_view(['POST'])
-@parser_classes([JSONParser])
-@permission_classes([IsAuthenticated, IsAdmin])
-def remove_officer(request):
-    """
-    Remove department officer (admin only)
-    """
+# ── GET /api/licenses/{id}/history ───────────────────────────────────
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def license_history_view(request, license_id):
     try:
-        data = request.data
-        if 'officer_address' not in data:
-            return ValidationErrorResponse(
-                message="Missing required field",
-                errors={'missing_field': 'officer_address'}
-            )
+        history = SeedLicenseHandler().get_license_history(int(license_id))
+        return ApiResponse(data={"id": license_id, "history": history})
+    except Exception as exc:
+        return ApiResponse(err=str(exc), status=500)
 
-        # Validate Ethereum address
-        if not Web3.is_address(data['officer_address']):
-            return ValidationErrorResponse(
-                message="Invalid Ethereum address",
-                errors={'officer_address': 'Must be a valid Ethereum address'}
-            )
+# ── GET /api/licenses/{id}/certificate ───────────────────────────────
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def license_certificate_download_view(request, license_id):
+    try:
+        lic = License.objects.get(license_id=license_id)
+    except License.DoesNotExist:
+        return ApiResponse(err="License not found", status=404)
 
-        handler = SeedLicenseHandler()
-        tx = handler.remove_department_officer(
-            data['officer_address'],
-            request.user.blockchain_address
-        )
+    if lic.status != "APPROVED":
+        return ApiResponse(err="Certificate not available", status=403)
 
-        return SuccessResponse(
-            data={'transaction': tx},
-            message="Officer removed successfully"
-        )
+    summary = SeedLicenseHandler().get_license_summary(int(license_id))
+    if summary.get("status") != 4:      # 4 == APPROVED in enum
+        return ApiResponse(err="Blockchain status not APPROVED", status=403)
 
-    except BlockchainError as e:
-        return ErrorResponse(
-            message="Blockchain error",
-            errors=str(e),
-            status_code=status.HTTP_400_BAD_REQUEST
-        )
-    except Exception as e:
-        logger.error(f"Remove officer error: {str(e)}", exc_info=True)
-        return ApiResponse(
-            message="Internal server error",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+    handler = SeedLicenseHandler()
+    return ApiResponse(data={
+        "certificate_url": handler.get_certificate_url(license_id),
+        "qr_code_url": f"https://rajkisan.rajasthan.gov.in/qrcodes/{license_id}.png",
+    })
+
+# ── GET /api/licenses (farmer list) ──────────────────────────────────
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsFarmer])
+def license_list_view(request):
+    qs = License.objects.filter(applicant=request.user).order_by("-submitted_at")
+
+    if t := request.query_params.get("type"):
+        qs = qs.filter(license_type=t)
+    if s := request.query_params.get("status"):
+        qs = qs.filter(status=s)
+
+    paginator = PageNumberPagination(); paginator.page_size = 10
+    page = paginator.paginate_queryset(qs, request)
+    return paginator.get_paginated_response({
+        "total": qs.count(),
+        "licenses": [{
+            "license_id":   lic.license_id,
+            "type":         lic.license_type,
+            "status":       lic.status,
+            "submitted_at": lic.submitted_at,
+            "updated_at":   lic.updated_at,
+            "blockchain_tx_id": lic.blockchain_tx_id,
+        } for lic in page]
+    })
+
+# ── GET /api/blockchain/transactions/{hash} ─────────────────────────
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def transaction_status_view(request, tx_hash):
+    info = SeedLicenseHandler().get_transaction_info(tx_hash)
+    return ApiResponse(data=info)
+
+# ── GET /api/blockchain/transactions/history ────────────────────────
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def transaction_history_view(request):
+    qs = BlockchainTransaction.objects.filter(created_by=request.user).order_by("-timestamp")
+    paginator = PageNumberPagination(); paginator.page_size = 10
+    page = paginator.paginate_queryset(qs, request)
+
+    return paginator.get_paginated_response({
+        "total": qs.count(),
+        "transactions": [{
+            "tx_hash":     tx.tx_hash,
+            "license_id":  tx.license.license_id,
+            "action_type": tx.action_type,
+            "status":      tx.status,
+            "block_number":tx.block_number,
+            "timestamp":   tx.timestamp,
+        } for tx in page]
+    })

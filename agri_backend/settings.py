@@ -9,20 +9,26 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
+import logging
 
+from web3 import Web3
+
+logger = logging.getLogger(__name__)
 from pathlib import Path
 import os
 from datetime import timedelta
 
 import environ
-
-env = environ.Env()
-environ.Env.read_env()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+# Initialize environment variables
+env = environ.Env(
+    DEBUG=(bool, False)
+)
+
+# Read .env file
+environ.Env.read_env(BASE_DIR / '.env')
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env('SECRET_KEY')
@@ -60,7 +66,12 @@ REST_FRAMEWORK = {
     'DEFAULT_PARSER_CLASSES': (
         'djangorestframework_camel_case.parser.CamelCaseJSONParser',
     ),
+}
 
+# API Keys for blockchain API access
+# Format: 'api_key': 'client_name'
+API_KEYS = {
+    env('RAJ_AGRI_API_KEY', default='test_api_key_12345'): 'Rajasthan Agriculture Department',
 }
 
 SIMPLE_JWT = {
@@ -82,6 +93,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'seed_license.blockchain_api.middleware.BlockchainAPILoggingMiddleware',
 ]
 LOGGING = {
     'version': 1,
@@ -118,6 +130,11 @@ LOGGING = {
         'apis': {
             'handlers': ['console', 'file'],
             'level': 'DEBUG',
+            'propagate': False,
+        },
+        'blockchain_api': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
             'propagate': False,
         },
     },
@@ -184,8 +201,11 @@ CACHES = {
 }
 
 # Smart contract settings
-RPC_URL = env('RPC_URL')
+
+BLOCKCHAIN_URL = env('BLOCKCHAIN_URL', default='https://rpc-amoy.polygon.technology/')
 CONTRACT_ADDRESS = env('CONTRACT_ADDRESS')
+PRIVATE_KEY = env("PRIVATE_KEY")
+WALLET_ADDRESS = Web3().eth.account.from_key(PRIVATE_KEY).address
 
 # email settings
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

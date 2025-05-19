@@ -1,0 +1,474 @@
+{
+	"info": {
+		"name": "Rajasthan Agriculture Blockchain API",
+		"description": "A collection for testing the blockchain smart contract APIs for the Rajasthan Agriculture License System",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Admin Management",
+			"description": "Endpoints for managing the smart contract admin",
+			"item": [
+				{
+					"name": "Get Admin Address",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/blockchain/contract/admin/",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"blockchain",
+								"contract",
+								"admin",
+								""
+							]
+						},
+						"description": "Get the current admin address of the smart contract"
+					},
+					"response": []
+				},
+				{
+					"name": "Change Admin Address",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"new_admin_address\": \"0x96fbfc49EEc02872B38854728cFFA57Ac8F8a1B2\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/blockchain/contract/admin/change/",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"blockchain",
+								"contract",
+								"admin",
+								"change",
+								""
+							]
+						},
+						"description": "Change the admin address"
+					},
+					"response": []
+				}
+			],
+			"auth": {
+				"type": "noauth"
+			},
+			"event": []
+		},
+		{
+			"name": "Officer Management",
+			"description": "Endpoints for managing department officers",
+			"item": [
+				{
+					"name": "Add Department Officer",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"officer_address\": \"0x5B38Da6a701c568545dCfcB03FcB875f56beddC4\",\n    \"role_id\": 0\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/blockchain/contract/officers/add/",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"blockchain",
+								"contract",
+								"officers",
+								"add",
+								""
+							]
+						},
+						"description": "Add a department officer with role\n\nRole IDs:\n0: AGRICULTURE_OFFICER\n1: DISTRICT_COLLECTOR\n2: SEED_CERTIFICATION_OFFICER\n3: SUBSIDY_APPROVAL_OFFICER\n4: QUALITY_CONTROL_OFFICER"
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Department Officer",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"officer_address\": \"0x5B38Da6a701c568545dCfcB03FcB875f56beddC4\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/blockchain/contract/officers/remove/",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"blockchain",
+								"contract",
+								"officers",
+								"remove",
+								""
+							]
+						},
+						"description": "Remove a department officer"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Officer Role",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/blockchain/contract/officers/0x5B38Da6a701c568545dCfcB03FcB875f56beddC4/role/",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"blockchain",
+								"contract",
+								"officers",
+								"0x5B38Da6a701c568545dCfcB03FcB875f56beddC4",
+								"role",
+								""
+							]
+						},
+						"description": "Get the role of a department officer"
+					},
+					"response": []
+				},
+				{
+					"name": "Check Officer Authorization",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/blockchain/contract/officers/0x5B38Da6a701c568545dCfcB03FcB875f56beddC4/is-authorized/",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"blockchain",
+								"contract",
+								"officers",
+								"0x5B38Da6a701c568545dCfcB03FcB875f56beddC4",
+								"is-authorized",
+								""
+							]
+						},
+						"description": "Check if an address is an authorized officer"
+					},
+					"response": []
+				}
+			],
+			"auth": {
+				"type": "noauth"
+			},
+			"event": []
+		},
+		{
+			"name": "Certificate Operations",
+			"description": "Endpoints for certificate operations",
+			"item": [
+				{
+					"name": "Generate Certificate Hash",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/blockchain/contract/certificates/12345/hash/",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"blockchain",
+								"contract",
+								"certificates",
+								"12345",
+								"hash",
+								""
+							]
+						},
+						"description": "Generate a certificate hash for a license"
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Certificate",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/blockchain/contract/certificates/12345/verify/",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"blockchain",
+								"contract",
+								"certificates",
+								"12345",
+								"verify",
+								""
+							]
+						},
+						"description": "Verify a certificate for a license"
+					},
+					"response": []
+				}
+			],
+			"auth": {
+				"type": "noauth"
+			},
+			"event": []
+		},
+		{
+			"name": "License Operations",
+			"description": "Endpoints for license operations",
+			"item": [
+				{
+					"name": "Apply for License",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Farmer Name\",\n    \"aadhaar\": \"123456789012\",\n    \"location\": \"Jaipur, Rajasthan\",\n    \"license_type\": \"SEED_PRODUCTION\",\n    \"seed_variety\": \"Wheat-HD2967\",\n    \"crop_type\": \"Wheat\",\n    \"quantity\": 1000,\n    \"quality_parameters\": \"Germination 85%, Purity 98%\",\n    \"source\": \"Agricultural Institute, Jaipur\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/licenses/apply/",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"licenses",
+								"apply",
+								""
+							]
+						},
+						"description": "Apply for a new seed license"
+					},
+					"response": []
+				},
+				{
+					"name": "Get License Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/licenses/12345/status/",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"licenses",
+								"12345",
+								"status",
+								""
+							]
+						},
+						"description": "Get the status of a license"
+					},
+					"response": []
+				},
+				{
+					"name": "Update License Status",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": 1,\n    \"remarks\": \"Documents verified successfully\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/licenses/12345/update-status/",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"licenses",
+								"12345",
+								"update-status",
+								""
+							]
+						},
+						"description": "Update the status of a license\n\nStatus values:\n0: APPLIED\n1: DOCUMENTS_VERIFIED\n2: FIELD_INSPECTION_COMPLETED\n3: QUALITY_VERIFIED\n4: APPROVED\n5: REJECTED\n6: REVOKED\n7: EXPIRED"
+					},
+					"response": []
+				},
+				{
+					"name": "Get License Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/licenses/12345/",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"licenses",
+								"12345",
+								""
+							]
+						},
+						"description": "Get the details of a license"
+					},
+					"response": []
+				},
+				{
+					"name": "Get License History",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/licenses/12345/history/",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"licenses",
+								"12345",
+								"history",
+								""
+							]
+						},
+						"description": "Get the status change history of a license"
+					},
+					"response": []
+				},
+				{
+					"name": "Download Certificate",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/licenses/12345/certificate/",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"licenses",
+								"12345",
+								"certificate",
+								""
+							]
+						},
+						"description": "Download the certificate for an approved license"
+					},
+					"response": []
+				}
+			],
+			"auth": {
+				"type": "noauth"
+			},
+			"event": []
+		},
+		{
+			"name": "Blockchain Transactions",
+			"description": "Endpoints for blockchain transaction history",
+			"item": [
+				{
+					"name": "Get Transaction Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/blockchain/transactions/0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef/",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"blockchain",
+								"transactions",
+								"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+								""
+							]
+						},
+						"description": "Get the status of a blockchain transaction"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Transaction History",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/blockchain/transactions/history/",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"blockchain",
+								"transactions",
+								"history",
+								""
+							]
+						},
+						"description": "Get transaction history"
+					},
+					"response": []
+				}
+			],
+			"auth": {
+				"type": "noauth"
+			},
+			"event": []
+		}
+	],
+	"event": [],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://127.0.0.1:8000",
+			"type": "string",
+			"description": "Base URL for the API"
+		}
+	]
+}

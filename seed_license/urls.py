@@ -1,20 +1,21 @@
-from django.urls import path
+from django.urls import path, include
 from .views import (
-    create_license,
-    update_license_status,
-    get_license,
-    verify_license,
-    get_certificate_hash,
-    add_officer,
-    remove_officer
+    license_create_view, license_detail_view, license_status_update_view,
+    license_status_view, license_history_view, license_certificate_download_view,
+    license_list_view, transaction_status_view, transaction_history_view
 )
 
 urlpatterns = [
-    path('blockchain/licenses/create/', create_license, name='create-license'),
-    path('blockchain/licenses/<int:license_id>/update-status/', update_license_status, name='update-license-status'),
-    path('blockchain/licenses/<int:license_id>/', get_license, name='get-license'),
-    path('blockchain/licenses/<int:license_id>/verify/', verify_license, name='verify-license'),
-    path('blockchain/licenses/<int:license_id>/hash/', get_certificate_hash, name='get-certificate-hash'),
-    path('blockchain/officers/add/', add_officer, name='add-officer'),
-    path('blockchain/officers/remove/', remove_officer, name='remove-officer'),
+    path('licenses/apply/', license_create_view, name='license-create'),
+    path('licenses/', license_list_view, name='license-list'),
+    path('licenses/<int:license_id>/', license_detail_view, name='license-detail'),
+    path('licenses/<int:license_id>/update-status/', license_status_update_view, name='license-status-update'),
+    path('licenses/<int:license_id>/status/', license_status_view, name='license-status'),
+    path('licenses/<int:license_id>/history/', license_history_view, name='license-history'),
+    path('licenses/<int:license_id>/certificate/', license_certificate_download_view, name='license-certificate'),
+    path('blockchain/transactions/<str:tx_hash>/', transaction_status_view, name='transaction-status'),
+    path('blockchain/transactions/history/', transaction_history_view, name='transaction-history'),
+    
+    # Blockchain Smart Contract APIs
+    path('blockchain/contract/', include('seed_license.blockchain_api.urls')),
 ]
