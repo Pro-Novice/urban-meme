@@ -13,7 +13,7 @@ class License(models.Model):
         ("EXPIRED",                   "Expired"),
     ]
 
-    applicant          = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    applicant          = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True)
     license_id         = models.IntegerField(unique=True)
     license_type       = models.CharField(max_length=50)
     crop_type          = models.CharField(max_length=50)
@@ -39,7 +39,7 @@ class BlockchainTransaction(models.Model):
     timestamp    = models.DateTimeField()
     action_type  = models.CharField(max_length=50)
     license      = models.ForeignKey(License, on_delete=models.CASCADE, related_name="transactions")
-    created_by   = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    created_by   = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True)
 
     def __str__(self):
         return f"TX {self.tx_hash[:10]}… for License {self.license.license_id}"

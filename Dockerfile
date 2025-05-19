@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
-WORKDIR /code
+WORKDIR /app
 
 # Copy dependency file first
 COPY requirements.txt .
@@ -32,11 +32,31 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Environment variables
-ENV DJANGO_SETTINGS_MODULE=auth.settings
+ENV DJANGO_SETTINGS_MODULE=agri_backend.settings
 ENV WEB_CONCURRENCY=3
+
+# Create a non-root user
+RUN useradd -m appuser
+RUN chown -R appuser:appuser /app
+USER appuser
 
 # Expose port
 EXPOSE 8000
 
-# Run migrations and start server (You can choose to move migrate to entrypoint.sh if needed)
-CMD ["sh", "-c", "python manage.py migrate && gunicorn agri_backend.wsgi:application --bind 0.0.0.0:8000"]
+# Create entrypoint script
+RUN echo '#!/bin/sh\n\
+echo "Waiting for postgres..."\n\
+while ! nc -z $POSTGRES_HOST $POSTGRES_PORT; do\n\
+  sleep 0.1\n\
+done\n\
+echo "PostgreSQL started"\n\
+\n\
+python manage.py migrate\n\
+python manage.py collectstatic --noinput\n\
+\n\
+exec "$@"' > /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Run with gunicorn
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["gunicorn", "agri_backend.wsgi:application", "--bind", "0.0.0.0:8000"]

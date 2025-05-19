@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 # ── POST /api/licenses/apply ─────────────────────────────────────────
 @api_view(["POST"])
-@permission_classes([IsAuthenticated, IsFarmer])
 def license_create_view(request):
     required = ["name", "aadhaar", "location", "license_type", "seed_variety",
                 "crop_type", "quantity", "quality_parameters", "source"]
@@ -31,7 +30,7 @@ def license_create_view(request):
 
     try:
         handler = SeedLicenseHandler()
-        lid, receipt = handler.apply_for_license(request.data, request.user)
+        lid, receipt = handler.apply_for_license(request.data, None)  # Changed to None instead of request.user
 
         block_time = Web3().eth.get_block(receipt.blockNumber).timestamp
         return ApiResponse(data={
@@ -48,7 +47,6 @@ def license_create_view(request):
 
 # ── GET /api/licenses/{id} ───────────────────────────────────────────
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def license_detail_view(request, license_id):
     try:
         summary = SeedLicenseHandler().get_license_summary(int(license_id))
@@ -59,15 +57,7 @@ def license_detail_view(request, license_id):
 
 # ── POST /api/licenses/{id}/update-status ────────────────────────────
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
 def license_status_update_view(request, license_id):
-    user = request.user
-    if not any([
-        user.is_agriculture_officer, user.is_district_collector, user.is_seed_certification_officer,
-        user.is_subsidy_approval_officer, user.is_quality_control_officer, user.is_admin,
-    ]):
-        return ApiResponse(err="Unauthorized", status=403)
-
     new_status = request.data.get("status")
     if new_status is None or not (0 <= new_status <= 7):
         return ApiResponse(err="Invalid or missing 'status'", status=400)
@@ -80,7 +70,7 @@ def license_status_update_view(request, license_id):
 
     try:
         receipt = SeedLicenseHandler().update_license_status(
-            int(license_id), new_status, request.data.get("remarks", ""), user, docs_hash_b)
+            int(license_id), new_status, request.data.get("remarks", ""), None, docs_hash_b)
         return ApiResponse(data={
             "id": license_id,
             "status": new_status,
@@ -93,7 +83,6 @@ def license_status_update_view(request, license_id):
 
 # ── GET /api/licenses/{id}/status ────────────────────────────────────
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def license_status_view(request, license_id):
     try:
         h = SeedLicenseHandler()
@@ -107,7 +96,6 @@ def license_status_view(request, license_id):
 
 # ── GET /api/licenses/{id}/history ───────────────────────────────────
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def license_history_view(request, license_id):
     try:
         history = SeedLicenseHandler().get_license_history(int(license_id))
@@ -117,7 +105,6 @@ def license_history_view(request, license_id):
 
 # ── GET /api/licenses/{id}/certificate ───────────────────────────────
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def license_certificate_download_view(request, license_id):
     try:
         lic = License.objects.get(license_id=license_id)
@@ -137,11 +124,11 @@ def license_certificate_download_view(request, license_id):
         "qr_code_url": f"https://rajkisan.rajasthan.gov.in/qrcodes/{license_id}.png",
     })
 
-# ── GET /api/licenses (farmer list) ──────────────────────────────────
+# ── GET /api/licenses (list) ──────────────────────────────────
 @api_view(["GET"])
-@permission_classes([IsAuthenticated, IsFarmer])
 def license_list_view(request):
-    qs = License.objects.filter(applicant=request.user).order_by("-submitted_at")
+    # Get all licenses instead of filtering by user
+    qs = License.objects.all().order_by("-submitted_at")
 
     if t := request.query_params.get("type"):
         qs = qs.filter(license_type=t)
@@ -164,16 +151,15 @@ def license_list_view(request):
 
 # ── GET /api/blockchain/transactions/{hash} ─────────────────────────
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def transaction_status_view(request, tx_hash):
     info = SeedLicenseHandler().get_transaction_info(tx_hash)
     return ApiResponse(data=info)
 
 # ── GET /api/blockchain/transactions/history ────────────────────────
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def transaction_history_view(request):
-    qs = BlockchainTransaction.objects.filter(created_by=request.user).order_by("-timestamp")
+    # Get all transactions instead of filtering by user
+    qs = BlockchainTransaction.objects.all().order_by("-timestamp")
     paginator = PageNumberPagination(); paginator.page_size = 10
     page = paginator.paginate_queryset(qs, request)
 

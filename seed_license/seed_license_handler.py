@@ -48,7 +48,7 @@ class SeedLicenseHandler:
             raise BlockchainError(str(exc))
 
     # ── public helpers ───────────────────────────────────────────────
-    def apply_for_license(self, data: dict, user):
+    def apply_for_license(self, data: dict, user=None):
         ltype_str  = data["license_type"].upper()
         ltype_enum = self.LICENSE_TYPE_MAPPING.get(ltype_str)
         if ltype_enum is None:
@@ -70,7 +70,7 @@ class SeedLicenseHandler:
         license_id = receipt.logs[0].args.licenseId
 
         lic = License.objects.create(
-            applicant          = user,
+            applicant          = user,  # This can be None now
             license_id         = license_id,
             license_type       = ltype_str,
             crop_type          = data["crop_type"],
@@ -90,11 +90,11 @@ class SeedLicenseHandler:
             timestamp    = datetime.fromtimestamp(Web3().eth.get_block(receipt.blockNumber).timestamp),
             action_type  = "LICENSE_APPLY",
             license      = lic,
-            created_by   = user,
+            created_by   = user,  # This can be None now
         )
         return license_id, receipt
 
-    def update_license_status(self, license_id: int, new_status: int, remarks: str, user, docs_hash=b""):
+    def update_license_status(self, license_id: int, new_status: int, remarks: str, user=None, docs_hash=b""):
         receipt = self._call_function(
             "updateLicenseStatus",
             license_id,
@@ -116,7 +116,7 @@ class SeedLicenseHandler:
                 timestamp    = datetime.fromtimestamp(Web3().eth.get_block(receipt.blockNumber).timestamp),
                 action_type  = "STATUS_UPDATE",
                 license      = lic,
-                created_by   = user,
+                created_by   = user,  # This can be None now
             )
         except License.DoesNotExist:
             pass
