@@ -1,30 +1,35 @@
 version: "3.8"
 
 services:
-  agri-backend:
+  web:
     build: .
-    ports:
-      - "8003:8004"
-#      - "${AUTH_PORT}:8003"
-
+    container_name: rajasthan-agri-backend
     restart: always
-    container_name: agri-backend
-    command: gunicorn agri_backend.wsgi:application --bind 0.0.0.0:8000
+    ports:
+      - "8000:8000"
     volumes:
-      - ./logs:/app/logs
+      - ./:/app
+      - static_volume:/app/static
+      - media_volume:/app/media
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env.docker
     environment:
-      - DATABASE_URL=postgres://postgres:password@postgres:5432/agri_db
-      - REDIS_URL=redis://redis:6380
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
     networks:
       - agri-network
 
-  postgres:
-    image: postgres:latest
-    container_name: postgres_local
-    ports:
-      - "5433:5434"
+  db:
+    image: postgres:14
+    container_name: rajasthan-agri-postgres
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data/
+    ports:
+      - "5432:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
@@ -34,22 +39,36 @@ services:
       - agri-network
 
   redis:
-    image: redis:latest
-    container_name: redis_local
+    image: redis:alpine
+    container_name: rajasthan-agri-redis
     ports:
-      - "6380:6380"
+      - "6379:6379"
     volumes:
       - redis_data:/data
-    environment:
-      - REDIS_PASSWORD=password
-    command: ["redis-server", "--requirepass", "password"]
     restart: unless-stopped
     networks:
       - agri-network
 
+  # Optional service for database management (uncomment if needed)
+  # pgadmin:
+  #   image: dpage/pgadmin4
+  #   container_name: rajasthan-agri-pgadmin
+  #   depends_on:
+  #     - db
+  #   ports:
+  #     - "5050:80"
+  #   environment:
+  #     - PGADMIN_DEFAULT_EMAIL=admin@example.com
+  #     - PGADMIN_DEFAULT_PASSWORD=admin
+  #   restart: unless-stopped
+  #   networks:
+  #     - agri-network
+
 volumes:
   postgres_data:
   redis_data:
+  static_volume:
+  media_volume:
 
 networks:
   agri-network:
