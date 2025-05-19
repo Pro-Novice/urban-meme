@@ -1,52 +1,22 @@
-# Rajasthan_Agri_Backend License Authentication System (Django Backend)
+# Rajasthan Agriculture Blockchain License System
 
-A Django-based backend for managing blockchain-based authentication of agriculture licenses in Rajasthan, supporting PostgreSQL, Redis, and smart contract interactions through API keys.
+A Django-based backend for managing agriculture licenses in Rajasthan using blockchain technology for authentication and verification.
 
-## Setup Guide (Local)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python](https://img.shields.io/badge/python-3.10+-brightgreen.svg)
+![Django](https://img.shields.io/badge/django-4.2+-green.svg)
 
-### Prerequisites
+## 📋 Overview
 
-- Python 3.10+
-- Django
-- PostgreSQL (local or remote instance)
-- Redis (for caching)
-- pip + virtualenv
-- Web3.py for blockchain interactions
-- Ethereum/Polygon wallet with funds for transaction fees
+This system provides a secure API-based interface for managing agricultural licenses on the blockchain. It uses:
 
-### **Project Structure**
+- **Polygon/Ethereum** for blockchain interactions
+- **API key authentication** for secure access
+- **PostgreSQL** for data storage
+- **Redis** for caching
+- **Docker** for easy deployment
 
-```plaintext
-agri_backend/
-%%% agri_backend/                   # Django project
-%%% Services/                       # Common services including blockchain
-%%% seed_license/                   # Seed license app
-%%% env/                            # Virtual env
-%%% .env                            # Credentials
-%%% manage.py                          
-%%% requirements.txt                # Dependencies                    
-```
-
-## Environment Setup
-
-### Clone the Repo
-
-- git clone https://github.com/C3I-blockchain/rajasthan_agri_backend.git
-
-### Create & Activate Virtual Environment
-- Windows
-- `python -m venv env` - To create virtual Environment
-- `source env/bin/activate` - To activate virtual Environment
-
-- macOS/Linux
-- `python3 -m venv env` - To create virtual Environment
-- `source env/bin/activate` - To activate virtual Environment
-
-### Install Required Packages
-
-- pip install -r requirements.txt
-
-## Docker Setup (Recommended)
+## 🚀 Quick Start with Docker (Recommended)
 
 The easiest way to run this application is using Docker:
 
@@ -55,125 +25,132 @@ The easiest way to run this application is using Docker:
 
 ### Running with Docker
 
-1. Clone the repository:
-   ```
+1. **Clone the repository**:
+   ```bash
    git clone https://github.com/C3I-blockchain/rajasthan_agri_backend.git
    cd rajasthan_agri_backend
    ```
 
-2. Configure environment variables:
-   ```
+2. **Configure environment variables**:
+   ```bash
    cp .env.docker .env
    ```
    
    Edit the `.env` file with your specific settings, especially:
    - Blockchain settings (BLOCKCHAIN_URL, CONTRACT_ADDRESS, PRIVATE_KEY)
-   - API keys
+   - API key configuration
 
-3. Run the application:
-   ```
+3. **Run the application**:
+   ```bash
    docker-compose up -d
    ```
    
-   This will start the following services:
+   This will start:
    - Web application (Django backend)
    - PostgreSQL database
    - Redis cache
 
-4. Create a superuser (if needed):
-   ```
+4. **Create a superuser** (if needed):
+   ```bash
    docker-compose exec web python manage.py createsuperuser
    ```
 
-5. Access the application:
+5. **Access the application**:
    - API Endpoints: http://localhost:8000/api/
    - Admin Interface: http://localhost:8000/admin/
 
-### Stopping the Application
+### Managing the Docker Application
 
-To stop the application:
+**View logs**:
+```bash
+docker-compose logs -f
 ```
+
+**Stop the application**:
+```bash
 docker-compose down
 ```
 
-To stop and remove all data (including database):
-```
+**Stop and remove all data** (including database):
+```bash
 docker-compose down -v
 ```
 
-## PostgreSQL Setup (Only for Local Development)
+## 🔧 Local Development Setup
 
-### Install PostgreSQL locally
-For macOS:
-- brew install postgresql
-- brew services start postgresql
+### Prerequisites
 
-For Linux:
-- sudo apt update
-- sudo apt install postgresql postgresql-contrib
-- sudo service postgresql start
+- Python 3.10+
+- PostgreSQL
+- Redis
+- Ethereum/Polygon wallet with funds for transaction fees
 
-Windows:
-- Download from https://www.postgresql.org/download/
-- Use pgAdmin or terminal to manage the database
-- setup your user along with password 
-### Create DB and User
-For Linux:
-- sudo -u postgres psql
+### Setup Steps
 
-In the PostgreSQL prompt:
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/C3I-blockchain/rajasthan_agri_backend.git
+   cd rajasthan_agri_backend
+   ```
 
-- CREATE DATABASE your_db_name;
-- CREATE USER your_db_user WITH PASSWORD 'your_db_password';
-- GRANT ALL ON DATABASE your_db_name TO your_db_user;
+2. **Create and activate virtual environment**:
+   ```bash
+   # macOS/Linux
+   python3 -m venv env
+   source env/bin/activate
+   
+   # Windows
+   python -m venv env
+   env\Scripts\activate
+   ```
 
-- \c your_db_name
-- GRANT ALL ON SCHEMA public TO your_db_user;
-- GRANT USAGE ON SCHEMA public TO your_db_user;
-- GRANT CREATE ON SCHEMA public TO your_db_user;
-Exit with \q
+3. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
+4. **Configure environment variables**:
+   Create a `.env` file in the root directory with:
+   ```
+   SECRET_KEY=your_secret_key
+   POSTGRES_DB=your_db_name
+   POSTGRES_USER=your_db_user
+   POSTGRES_PASSWORD=your_db_password
+   POSTGRES_HOST=localhost
+   POSTGRES_PORT=5432
+   REDIS_URL=redis://localhost:6379/0
+   EMAIL_HOST=smtp.gmail.com
+   EMAIL_PORT=587
+   EMAIL_USE_TLS=True
+   EMAIL_HOST_USER=your_email@example.com
+   EMAIL_HOST_PASSWORD=your_email_password
+   BLOCKCHAIN_URL=https://rpc-amoy.polygon.technology/
+   CONTRACT_ADDRESS=your_contract_address
+   PRIVATE_KEY=your_wallet_private_key
+   RAJ_AGRI_API_KEY=your_api_key
+   ```
 
-Windows:
-- Open pgAdmin
-- click on the your Working server and go inside you pgAdmin server which you created along with user and password
-- right click on the Databases, choose Create and then Database 
-- new pop up screen will shown up fil your db details click ok
-- see you created db inside Databases and right click on it 
-- Locate Query Tool and click on it 
+5. **Apply database migrations**:
+   ```bash
+   python manage.py makemigrations seed_license
+   python manage.py migrate
+   ```
 
-run these in query Tool:
-- GRANT ALL ON SCHEMA public TO your_db_user;
-- GRANT USAGE ON SCHEMA public TO your_db_user;
-- GRANT CREATE ON SCHEMA public TO your_db_user;
+6. **Create superuser**:
+   ```bash
+   python manage.py createsuperuser
+   ```
 
+7. **Run the development server**:
+   ```bash
+   python manage.py runserver
+   ```
 
-### Update .env
+## 🔑 API Key Authentication
 
-Create a .env file in the root:
+This system uses API key authentication instead of user-based authentication to secure all blockchain interactions.
 
-- SECRET_KEY=your_secret_key
-- POSTGRES_DB=your_db_name
-- POSTGRES_USER=your_db_user
-- POSTGRES_PASSWORD=your_db_password
-- POSTGRES_HOST=localhost
-- POSTGRES_PORT=5432
-- REDIS_URL=redis://localhost:6379/0
-- EMAIL_HOST=smtp.gmail.com
-- EMAIL_PORT=587
-- EMAIL_USE_TLS=True
-- EMAIL_HOST_USER=your_email@example.com
-- EMAIL_HOST_PASSWORD=your_email_password
-- BLOCKCHAIN_URL=https://rpc-amoy.polygon.technology/
-- CONTRACT_ADDRESS=your_contract_address
-- PRIVATE_KEY=your_wallet_private_key
-- RAJ_AGRI_API_KEY=your_api_key
-
-## API Key Authentication
-
-This system uses API key authentication instead of user-based authentication. All API endpoints, especially blockchain interactions, are secured with API keys.
-
-### How API Key Authentication Works
+### How It Works
 
 1. API keys are configured in settings.py:
    ```python
@@ -189,50 +166,75 @@ This system uses API key authentication instead of user-based authentication. Al
 
 3. The system logs API usage and validates the API key with each request.
 
-## Django Configuration (settings.py)
+## 📡 API Endpoints
 
-Ensure your `DATABASES` config uses environment variables or update settings.py as per setup for db and .env creds 
+### License Operations
 
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST   | `/api/licenses/apply/` | Apply for a new license |
+| GET    | `/api/licenses/{id}/` | Get license details |
+| POST   | `/api/licenses/{id}/update-status/` | Update license status |
+| GET    | `/api/licenses/{id}/status/` | Check license status |
+| GET    | `/api/licenses/{id}/history/` | Get license history |
+| GET    | `/api/licenses/{id}/certificate/` | Download license certificate |
+| GET    | `/api/licenses/` | List all licenses |
 
-## Run Migrations & Superuser
+### Blockchain Contract Management
 
-- python manage.py makemigrations seed_license
-- python manage.py migrate
-- python manage.py createsuperuser
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET    | `/api/blockchain/contract/admin/` | Get admin address |
+| POST   | `/api/blockchain/contract/admin/change/` | Change admin |
+| POST   | `/api/blockchain/contract/officers/add/` | Add department officer |
+| POST   | `/api/blockchain/contract/officers/remove/` | Remove department officer |
+| GET    | `/api/blockchain/contract/officers/{address}/role/` | Get officer role |
+| GET    | `/api/blockchain/contract/officers/{address}/is-authorized/` | Check if officer is authorized |
+| GET    | `/api/blockchain/contract/certificates/{id}/hash/` | Generate certificate hash |
+| GET    | `/api/blockchain/contract/certificates/{id}/verify/` | Verify certificate |
 
+### Transaction History
 
-## Test the APIs (Postman)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET    | `/api/blockchain/transactions/{hash}/` | Get transaction status |
+| GET    | `/api/blockchain/transactions/history/` | Get transaction history |
 
-- python manage.py runserver
+## 📁 Project Structure
 
-Postman collection: 
+```
+rajasthan_agri_backend/
+├── agri_backend/              # Django project settings
+├── Services/                  # Common services including blockchain
+│   ├── api_response.py
+│   ├── blockchain/
+│   │   └── contracts/         # Smart contract ABIs and addresses
+│   ├── exceptions.py
+│   └── logger.py
+├── seed_license/              # Main app for license operations
+│   ├── blockchain_api/        # Blockchain API endpoints
+│   ├── blockchain_services.py # Services for blockchain interactions
+│   ├── models.py              # Database models
+│   ├── seed_license_handler.py # Core business logic
+│   ├── urls.py                # URL routing
+│   └── views.py               # API views
+├── manage.py
+├── Dockerfile
+├── docker-compose.yaml
+└── requirements.txt
+```
 
-- [Rajasthan Agri Backend API Collection](https://api.postman.com/collections/43756014-4e680ff3-8491-4a4c-add8-67caf1c4567f?access_key=PMAT-01JRYRERX1VYS278G4YXHR03QC)
+## 📊 Testing
 
+Test the APIs using the Postman collection:
 
-## API Endpoints
+[Rajasthan Agri Backend API Collection](https://api.postman.com/collections/43756014-4e680ff3-8491-4a4c-add8-67caf1c4567f?access_key=PMAT-01JRYRERX1VYS278G4YXHR03QC)
 
-### Blockchain License APIs
+## 📄 License
 
-#### License Operations
-- POST http://127.0.0.1:8000/api/licenses/apply/ - Apply for a new license
-- GET http://127.0.0.1:8000/api/licenses/{id}/ - Get license details
-- POST http://127.0.0.1:8000/api/licenses/{id}/update-status/ - Update license status
-- GET http://127.0.0.1:8000/api/licenses/{id}/status/ - Check license status
-- GET http://127.0.0.1:8000/api/licenses/{id}/history/ - Get license history
-- GET http://127.0.0.1:8000/api/licenses/{id}/certificate/ - Download license certificate
-- GET http://127.0.0.1:8000/api/licenses/ - List all licenses
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-#### Blockchain Contract Management
-- GET http://127.0.0.1:8000/api/blockchain/contract/admin/ - Get admin address
-- POST http://127.0.0.1:8000/api/blockchain/contract/admin/change/ - Change admin
-- POST http://127.0.0.1:8000/api/blockchain/contract/officers/add/ - Add department officer
-- POST http://127.0.0.1:8000/api/blockchain/contract/officers/remove/ - Remove department officer
-- GET http://127.0.0.1:8000/api/blockchain/contract/officers/{address}/role/ - Get officer role
-- GET http://127.0.0.1:8000/api/blockchain/contract/officers/{address}/is-authorized/ - Check if officer is authorized
-- GET http://127.0.0.1:8000/api/blockchain/contract/certificates/{id}/hash/ - Generate certificate hash
-- GET http://127.0.0.1:8000/api/blockchain/contract/certificates/{id}/verify/ - Verify certificate
+## Acknowledgements
 
-#### Transaction History
-- GET http://127.0.0.1:8000/api/blockchain/transactions/{hash}/ - Get transaction status
-- GET http://127.0.0.1:8000/api/blockchain/transactions/history/ - Get transaction history
+- Rajasthan Agriculture Department
+- C3I Blockchain Team
