@@ -13,9 +13,9 @@ urlpatterns = [
     path('licenses/<int:license_id>/status/', license_status_view, name='license-status'),
     path('licenses/<int:license_id>/history/', license_history_view, name='license-history'),
     path('licenses/<int:license_id>/certificate/', license_certificate_download_view, name='license-certificate'),
+     path('blockchain/transactions/history/', transaction_history_view, name='transaction-history'),
     path('blockchain/transactions/<str:tx_hash>/', transaction_status_view, name='transaction-status'),
-    path('blockchain/transactions/history/', transaction_history_view, name='transaction-history'),
-    
+   
     # Blockchain Smart Contract APIs
     path('blockchain/contract/', include('seed_license.blockchain_api.urls')),
 ]

@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from django.utils.timezone import make_aware
 from web3 import Web3
 from django.conf import settings
 from django.db.models import Q
@@ -16,36 +17,41 @@ from .permissions import (
     IsSeedCertificationOfficer, IsSubsidyApprovalOfficer, IsQualityControlOfficer,
 )
 from .seed_license_handler import SeedLicenseHandler
-
+from .blockchain_services import w3
 logger = logging.getLogger(__name__)
 
-# ── POST /api/licenses/apply ─────────────────────────────────────────
+
 @api_view(["POST"])
 def license_create_view(request):
-    required = ["name", "aadhaar", "location", "license_type", "seed_variety",
-                "crop_type", "quantity", "quality_parameters", "source"]
-    missing = [f for f in required if f not in request.data]
-    if missing:
-        return ApiResponse(err=f"Missing required fields: {', '.join(missing)}", status=400)
-
     try:
-        handler = SeedLicenseHandler()
-        lid, receipt = handler.apply_for_license(request.data, None)  # Changed to None instead of request.user
+        required_fields = ["name", "aadhaar", "location", "license_type", 
+                         "seed_variety", "crop_type", "quantity", 
+                         "quality_parameters", "source"]
+        
+        if missing := [f for f in required_fields if f not in request.data]:
+            return ApiResponse(
+                err=f"Missing required fields: {', '.join(missing)}", 
+                status=400
+            )
 
-        block_time = Web3().eth.get_block(receipt.blockNumber).timestamp
+        handler = SeedLicenseHandler()
+        lid, receipt = handler.apply_for_license(request.data, None)
+
+        block = w3.eth.get_block(receipt.blockNumber)
         return ApiResponse(data={
             "application_id": lid,
-            "submitted_at":   datetime.fromtimestamp(block_time).isoformat(),
-            "status":         "APPLIED",
+            "submitted_at": make_aware(datetime.fromtimestamp(block.timestamp)),
+            "status": "APPLIED",
             "blockchain_tx_id": receipt.transactionHash.hex(),
         }, status=201)
+        
     except BlockchainError as exc:
+        logger.error("Blockchain error: %s", str(exc))
         return ApiResponse(err=str(exc), status=400)
     except Exception as exc:
-        logger.exception("License application error")
+        logger.exception("License application failed")
         return ApiResponse(err="Internal server error", status=500)
 
-# ── GET /api/licenses/{id} ───────────────────────────────────────────
 @api_view(["GET"])
 def license_detail_view(request, license_id):
     try:
@@ -55,7 +61,6 @@ def license_detail_view(request, license_id):
         logger.exception("License detail fetch error")
         return ApiResponse(err=str(exc), status=500)
 
-# ── POST /api/licenses/{id}/update-status ────────────────────────────
 @api_view(["POST"])
 def license_status_update_view(request, license_id):
     new_status = request.data.get("status")
@@ -81,7 +86,6 @@ def license_status_update_view(request, license_id):
         logger.exception("Status update error")
         return ApiResponse(err=str(exc), status=500)
 
-# ── GET /api/licenses/{id}/status ────────────────────────────────────
 @api_view(["GET"])
 def license_status_view(request, license_id):
     try:
@@ -94,7 +98,6 @@ def license_status_view(request, license_id):
     except Exception as exc:
         return ApiResponse(err=str(exc), status=500)
 
-# ── GET /api/licenses/{id}/history ───────────────────────────────────
 @api_view(["GET"])
 def license_history_view(request, license_id):
     try:
@@ -103,7 +106,7 @@ def license_history_view(request, license_id):
     except Exception as exc:
         return ApiResponse(err=str(exc), status=500)
 
-# ── GET /api/licenses/{id}/certificate ───────────────────────────────
+
 @api_view(["GET"])
 def license_certificate_download_view(request, license_id):
     try:
@@ -124,7 +127,6 @@ def license_certificate_download_view(request, license_id):
         "qr_code_url": f"https://rajkisan.rajasthan.gov.in/qrcodes/{license_id}.png",
     })
 
-# ── GET /api/licenses (list) ──────────────────────────────────
 @api_view(["GET"])
 def license_list_view(request):
     # Get all licenses instead of filtering by user
@@ -149,16 +151,14 @@ def license_list_view(request):
         } for lic in page]
     })
 
-# ── GET /api/blockchain/transactions/{hash} ─────────────────────────
 @api_view(["GET"])
 def transaction_status_view(request, tx_hash):
     info = SeedLicenseHandler().get_transaction_info(tx_hash)
     return ApiResponse(data=info)
 
-# ── GET /api/blockchain/transactions/history ────────────────────────
+
 @api_view(["GET"])
 def transaction_history_view(request):
-    # Get all transactions instead of filtering by user
     qs = BlockchainTransaction.objects.all().order_by("-timestamp")
     paginator = PageNumberPagination(); paginator.page_size = 10
     page = paginator.paginate_queryset(qs, request)

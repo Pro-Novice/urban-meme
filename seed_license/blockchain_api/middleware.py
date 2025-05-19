@@ -11,7 +11,7 @@ class BlockchainAPILoggingMiddleware(MiddlewareMixin):
     """
     
     def __init__(self, get_response):
-        self.get_response = get_response
+        super().__init__(get_response)
         self.logger = logging.getLogger('blockchain_api')
     
     def process_request(self, request):

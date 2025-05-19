@@ -2,11 +2,13 @@ import json, logging, os
 from django.conf import settings
 from web3 import Web3
 from web3.exceptions import ContractLogicError
+from web3.middleware import ExtraDataToPOAMiddleware
 
 logger = logging.getLogger(__name__)
 
 # ── connect ───────────────────────────────────────────────────────────
 w3 = Web3(Web3.HTTPProvider(settings.BLOCKCHAIN_URL))
+w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
 if not w3.is_connected():
     raise ConnectionError("Cannot connect to blockchain node")
 
@@ -44,7 +46,7 @@ def get_contract(contract_name: str):
 
 def _sign_and_send(tx: dict, private_key: str) -> str:
     signed = w3.eth.account.sign_transaction(tx, private_key)
-    return w3.eth.send_raw_transaction(signed.rawTransaction)
+    return w3.eth.send_raw_transaction(signed.raw_transaction)
 
 
 def call_function(function, *args, address=None, private_key=None):
