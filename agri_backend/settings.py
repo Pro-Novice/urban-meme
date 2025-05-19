@@ -46,19 +46,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'Raj_Officer',
     'rest_framework',
-    'rest_framework_simplejwt',
     'Services',
-    'user',
     'seed_license'
-
 ]
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
     'DEFAULT_RENDERER_CLASSES': (
         'djangorestframework_camel_case.render.CamelCaseJSONRenderer',
         'djangorestframework_camel_case.render.CamelCaseBrowsableAPIRenderer',
@@ -74,16 +67,7 @@ API_KEYS = {
     env('RAJ_AGRI_API_KEY', default='test_api_key_12345'): 'Rajasthan Agriculture Department',
 }
 
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
-    'ROTATE_REFRESH_TOKENS': False,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'ALGORITHM': 'HS256',
-    'SIGNING_KEY': env('SECRET_KEY'),
-    'AUTH_HEADER_TYPES': ('Bearer',),
-    'UPDATE_LAST_LOGIN': True,
-}
+# SIMPLE_JWT settings removed as we're using API key authentication
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -172,7 +156,8 @@ DATABASES = {
         'PORT': env('POSTGRES_PORT', default='5432'),
     }
 }
-AUTH_USER_MODEL = 'user.AgriUser'
+# User model is no longer used, using API key authentication instead
+# AUTH_USER_MODEL = 'user.AgriUser'
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

@@ -16,3 +16,5 @@ agri_auth.log
 
 test_config
 venv/
+
+**/.claude/settings.local.json

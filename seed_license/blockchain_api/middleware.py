@@ -16,7 +16,7 @@ class BlockchainAPILoggingMiddleware(MiddlewareMixin):
     
     def process_request(self, request):
         # Only log blockchain API endpoints
-        if '/api/blockchain/contract/' in request.path:
+        if '/api/blockchain/' in request.path:
             request.start_time = time.time()
             # Log the incoming request
             client_ip = self.get_client_ip(request)
@@ -35,7 +35,7 @@ class BlockchainAPILoggingMiddleware(MiddlewareMixin):
     
     def process_response(self, request, response):
         # Only log blockchain API endpoints
-        if '/api/blockchain/contract/' in request.path:
+        if '/api/blockchain/' in request.path:
             # Calculate request processing time
             if hasattr(request, 'start_time'):
                 processing_time = time.time() - request.start_time
