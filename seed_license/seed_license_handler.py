@@ -30,7 +30,7 @@ class SeedLicenseHandler:
         7: "EXPIRED",
     }
 
-    # ── internal wrappers ────────────────────────────────────────────
+  
     def _call_function(self, fname, *args):
         try:
             fn = getattr(self.contract.functions, fname)
@@ -45,7 +45,7 @@ class SeedLicenseHandler:
         except ContractLogicError as exc:
             raise BlockchainError(str(exc))
 
-    # ── public helpers ───────────────────────────────────────────────
+   
     def apply_for_license(self, data: dict, user=None):
         ltype_str  = data["license_type"].upper()
         ltype_enum = self.LICENSE_TYPE_MAPPING.get(ltype_str)
@@ -73,7 +73,7 @@ class SeedLicenseHandler:
                     decoded = self.contract.events.LicenseApplied().process_log(log)
                     event_logs.append(decoded)
                 except Exception:
-                    continue  # silently skip logs that aren't LicenseApplied
+                    continue 
 
         if not event_logs:
             raise BlockchainError("License application failed - no LicenseApplied event found")
@@ -81,7 +81,7 @@ class SeedLicenseHandler:
         license_id = event_logs[0]["args"]["licenseId"]
 
         lic = License.objects.create(
-            applicant          = user,  # This can be None now
+            applicant          = user, 
             license_id         = license_id,
             license_type       = ltype_str,
             crop_type          = data["crop_type"],
@@ -101,7 +101,7 @@ class SeedLicenseHandler:
             timestamp    = make_aware(datetime.fromtimestamp(block.timestamp)),
             action_type  = "LICENSE_APPLY",
             license      = lic,
-            created_by   = user,  # This can be None now
+            created_by   = user,  
         )
         return license_id, receipt
 
@@ -128,13 +128,13 @@ class SeedLicenseHandler:
                 timestamp    = make_aware(datetime.fromtimestamp(block.timestamp)),
                 action_type  = "STATUS_UPDATE",
                 license      = lic,
-                created_by   = user,  # This can be None now
+                created_by   = user, 
             )
         except License.DoesNotExist:
             pass
         return receipt
 
-    # ── read‑only helpers ────────────────────────────────────────────
+    
     def get_license_summary(self, lid):
         return self._call_view("getLicenseSummary", lid)
 

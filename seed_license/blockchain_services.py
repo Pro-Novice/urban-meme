@@ -6,20 +6,20 @@ from web3.middleware import ExtraDataToPOAMiddleware
 
 logger = logging.getLogger(__name__)
 
-# ── connect ───────────────────────────────────────────────────────────
+
 w3 = Web3(Web3.HTTPProvider(settings.BLOCKCHAIN_URL))
 w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
 if not w3.is_connected():
     raise ConnectionError("Cannot connect to blockchain node")
 
-# ── single signer (service account) ───────────────────────────────────
+
 DEFAULT_PRIVATE_KEY = settings.PRIVATE_KEY
 if not DEFAULT_PRIVATE_KEY:
     raise RuntimeError("settings.PRIVATE_KEY is missing – add it to .env")
 DEFAULT_ACCOUNT = w3.eth.account.from_key(DEFAULT_PRIVATE_KEY)
 DEFAULT_ADDRESS = DEFAULT_ACCOUNT.address
 
-# ── helpers ───────────────────────────────────────────────────────────
+
 
 BASE_DIR = settings.BASE_DIR
 CONTRACTS_DIR = os.path.join(BASE_DIR, "Services", "blockchain", "contracts")
