@@ -1,9 +1,6 @@
 import logging
 from datetime import datetime
 from django.utils.timezone import make_aware
-from web3 import Web3
-from django.conf import settings
-from django.db.models import Q
 from rest_framework.decorators import api_view, authentication_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -22,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 @api_view(["POST"])
+# @permission_classes([IsAuthenticated, IsFarmer])    
 def license_create_view(request):
     try:
         required_fields = ["name", "aadhaar", "location", "license_type", 
@@ -54,6 +52,7 @@ def license_create_view(request):
 
 
 @api_view(["GET"])
+# @permission_classes([IsAuthenticated, IsFarmer]) 
 def license_detail_view(request, license_id):
     try:
         summary = SeedLicenseHandler().get_license_summary(int(license_id))
@@ -82,6 +81,7 @@ def license_detail_view(request, license_id):
         return ApiResponse(err=str(exc), status=500)
 
 @api_view(["POST"])
+# @permission_classes([IsAuthenticated, IsFarmer]) 
 def license_status_update_view(request, license_id):
     new_status = request.data.get("status")
     if new_status is None or not (0 <= new_status <= 7):
@@ -109,6 +109,7 @@ def license_status_update_view(request, license_id):
 
 
 @api_view(["GET"])
+# @permission_classes([IsAuthenticated, IsFarmer]) 
 def license_status_view(request, license_id):
     try:
         h = SeedLicenseHandler()
@@ -122,6 +123,7 @@ def license_status_view(request, license_id):
 
 
 @api_view(["GET"])
+# @permission_classes([IsAuthenticated, IsFarmer]) 
 def license_history_view(request, license_id):
     try:
         history = SeedLicenseHandler().get_license_history(int(license_id))
@@ -133,6 +135,7 @@ def license_history_view(request, license_id):
         return ApiResponse(err=str(exc), status=500)
 
 @api_view(["GET"])
+# @permission_classes([IsAuthenticated, IsFarmer]) 
 def license_certificate_download_view(request, license_id):
     try:
         lic = License.objects.get(license_id=license_id)
@@ -154,6 +157,7 @@ def license_certificate_download_view(request, license_id):
 
 
 @api_view(["GET"])
+# @permission_classes([IsAuthenticated, IsFarmer]) 
 def license_list_view(request):
     qs = License.objects.all().order_by("-submitted_at")
 

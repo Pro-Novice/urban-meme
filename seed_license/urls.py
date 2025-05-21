@@ -16,6 +16,7 @@ urlpatterns = [
      
     # Blockchain Smart Contract APIs
     path('blockchain/contract/', include('seed_license.blockchain_api.urls')),
+    path('public/', include('seed_license.public_verify.urls')),
     path('blockchain/transactions/history/', transaction_history_view, name='transaction-history'),
     path('blockchain/transactions/<str:tx_hash>/', transaction_status_view, name='transaction-status'),
     path("blockchain/record-officer-action/", record_officer_action_view, name="record-officer-action"),
