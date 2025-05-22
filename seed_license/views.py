@@ -91,16 +91,129 @@ def license_status_update_view(request, license_id):
 # ── GET /api/licenses/{id}/status ────────────────────────────────────
 @api_view(["GET"])
 def license_status_view(request, license_id):
+    # Handle DRF Request vs Django HttpRequest
+    if hasattr(request, '_request'):
+        django_request = request._request
+    else:
+        django_request = request
     try:
+        print(f"=== Checking license ID: {license_id} ===")
         h = SeedLicenseHandler()
-        return ApiResponse(data={
+        
+        # Make sure we're calling view functions correctly
+        try:
+            print("Calling getLicenseSummary as view function...")
+            
+            # Call the contract function directly with .call() for view functions
+            contract_function = h.contract.functions.getLicenseSummary(license_id)
+            license_summary = contract_function.call()
+            
+            print(f"License summary result: {license_summary} (type: {type(license_summary)})")
+            
+            # Extract data from the LicenseSummary struct
+            if isinstance(license_summary, (list, tuple)) and len(license_summary) >= 10:
+                license_id_from_chain = license_summary[0]
+                farmer_address = license_summary[1]
+                farmer_name = license_summary[2]
+                location = license_summary[3]
+                license_type = license_summary[4]  # This is enum value (0,1,2,3,4)
+                status = license_summary[5]        # This is enum value (0,1,2,3,4,5,6,7)
+                application_date = license_summary[6]
+                approval_date = license_summary[7]
+                expiry_date = license_summary[8]
+                is_active = license_summary[9]
+                seed_details = license_summary[10]  # This is a tuple of seed details
+                
+                # Map status enum to readable string
+                status_mapping = {
+                    0: "APPLIED",
+                    1: "DOCUMENTS_VERIFIED", 
+                    2: "FIELD_INSPECTION_COMPLETED",
+                    3: "QUALITY_VERIFIED",
+                    4: "APPROVED",
+                    5: "REJECTED",
+                    6: "REVOKED",
+                    7: "EXPIRED"
+                }
+                
+                # Map license type enum to readable string
+                license_type_mapping = {
+                    0: "SEED_PRODUCTION",
+                    1: "SEED_DISTRIBUTION",
+                    2: "SEED_CERTIFICATION", 
+                    3: "HYBRID_SEED_PRODUCTION",
+                    4: "ORGANIC_SEED_PRODUCTION"
+                }
+                
+                status_str = status_mapping.get(status, f"UNKNOWN({status})")
+                license_type_str = license_type_mapping.get(license_type, f"UNKNOWN({license_type})")
+                
+                print(f"Extracted status: {status_str} (enum: {status})")
+                
+            else:
+                print(f"Unexpected license summary format: {license_summary}")
+                return ApiResponse(err="Invalid license summary format from blockchain", status=500)
+                
+        except Exception as e:
+            print(f"Error in getLicenseSummary: {e}")
+            import traceback
+            traceback.print_exc()
+            return ApiResponse(err=f"Failed to get license details: {str(e)}", status=500)
+        
+        # Check if license is valid using isLicenseValid function
+        try:
+            print("Calling isLicenseValid as view function...")
+            
+            # Call isLicenseValid directly
+            is_valid_function = h.contract.functions.isLicenseValid(license_id)
+            is_valid = is_valid_function.call()
+            
+            print(f"Valid result: {is_valid} (type: {type(is_valid)})")
+            blockchain_verified = bool(is_valid)
+            
+        except Exception as e:
+            print(f"Error in isLicenseValid: {e}")
+            blockchain_verified = False
+        
+        # Prepare response data
+        response_data = {
             "id": license_id,
-            "status": h.get_license_status(int(license_id)),
-            "blockchain_verified": h.is_license_valid(int(license_id)),
-        })
+            "status": status_str,
+            "blockchain_verified": blockchain_verified,
+            "details": {
+                "farmer_name": farmer_name,
+                "farmer_address": farmer_address,
+                "location": location,
+                "license_type": license_type_str,
+                "application_date": application_date,
+                "approval_date": approval_date if approval_date > 0 else None,
+                "expiry_date": expiry_date if expiry_date > 0 else None,
+                "is_active": is_active,
+            }
+        }
+        
+        # Add seed details if available
+        if isinstance(seed_details, (list, tuple)) and len(seed_details) >= 5:
+            response_data["details"]["seed_details"] = {
+                "seed_variety": seed_details[0],
+                "crop_type": seed_details[1], 
+                "quantity": seed_details[2],
+                "quality_parameters": seed_details[3],
+                "source": seed_details[4]
+            }
+        
+        return ApiResponse(data=response_data)
+        
     except Exception as exc:
+        print(f"Overall error: {exc}")
+        import traceback
+        traceback.print_exc()
         return ApiResponse(err=str(exc), status=500)
 
+
+
+
+    
 # ── GET /api/licenses/{id}/history ───────────────────────────────────
 @api_view(["GET"])
 def license_history_view(request, license_id):
