@@ -44,7 +44,7 @@ def get_contract(contract_name: str):
 
 def _sign_and_send(tx: dict, private_key: str) -> str:
     signed = w3.eth.account.sign_transaction(tx, private_key)
-    return w3.eth.send_raw_transaction(signed.rawTransaction)
+    return w3.eth.send_raw_transaction(signed.raw_transaction)
 
 
 def call_function(function, *args, address=None, private_key=None):
