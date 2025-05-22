@@ -66,12 +66,21 @@ class SeedLicenseHandler:
             data["quality_parameters"],
             data["source"],
         )
-
-        license_id = receipt.logs[0].args.licenseId
+        
+        print('==> Receipt logs:', receipt.logs[0])
+        
+        # Extract license ID from blockchain logs
+        # The license ID is in topics[1] as hex, convert to integer
+        if receipt.logs and len(receipt.logs[0].topics) > 1:
+            license_id_hex = receipt.logs[0].topics[1]
+            license_id = int(license_id_hex.hex(), 16)  # Convert hex to integer
+            print(f'==> Extracted License ID: {license_id}')
+        else:
+            raise BlockchainError("No license ID found in blockchain response")
 
         lic = License.objects.create(
             applicant          = user,  # This can be None now
-            license_id         = license_id,
+            license_id         = str(license_id),  # Use actual blockchain license ID
             license_type       = ltype_str,
             crop_type          = data["crop_type"],
             seed_variety       = data["seed_variety"],
@@ -87,12 +96,14 @@ class SeedLicenseHandler:
             tx_hash      = receipt.transactionHash.hex(),
             block_number = receipt.blockNumber,
             status       = "CONFIRMED",
-            timestamp    = datetime.fromtimestamp(Web3().eth.get_block(receipt.blockNumber).timestamp),
+            timestamp    = datetime.now(),
             action_type  = "LICENSE_APPLY",
             license      = lic,
             created_by   = user,  # This can be None now
         )
+        
         return license_id, receipt
+
 
     def update_license_status(self, license_id: int, new_status: int, remarks: str, user=None, docs_hash=b""):
         receipt = self._call_function(

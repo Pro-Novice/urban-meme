@@ -32,10 +32,17 @@ def license_create_view(request):
         handler = SeedLicenseHandler()
         lid, receipt = handler.apply_for_license(request.data, None)  # Changed to None instead of request.user
 
-        block_time = Web3().eth.get_block(receipt.blockNumber).timestamp
+        # Get block timestamp using the handler's web3 instance
+        try:
+            block_info = handler.w3.eth.get_block(receipt.blockNumber)
+            block_timestamp = datetime.fromtimestamp(block_info.timestamp)
+        except Exception as e:
+            logger.warning(f"Could not get block timestamp, using current time: {e}")
+            block_timestamp = datetime.now()
+
         return ApiResponse(data={
             "application_id": lid,
-            "submitted_at":   datetime.fromtimestamp(block_time).isoformat(),
+            "submitted_at":   block_timestamp.isoformat(),
             "status":         "APPLIED",
             "blockchain_tx_id": receipt.transactionHash.hex(),
         }, status=201)
