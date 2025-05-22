@@ -13,6 +13,8 @@ class BlockchainAPILoggingMiddleware(MiddlewareMixin):
     def __init__(self, get_response):
         self.get_response = get_response
         self.logger = logging.getLogger('blockchain_api')
+        # Initialize parent class properly
+        super().__init__(get_response)
     
     def process_request(self, request):
         # Only log blockchain API endpoints
@@ -31,7 +33,7 @@ class BlockchainAPILoggingMiddleware(MiddlewareMixin):
                 except Exception:
                     request_data = "Error reading request body"
             
-            logger.info(f"API Request | {request.method} {request.path} | IP: {client_ip} | API Key: {api_key} | Data: {request_data}")
+            self.logger.info(f"API Request | {request.method} {request.path} | IP: {client_ip} | API Key: {api_key} | Data: {request_data}")
     
     def process_response(self, request, response):
         # Only log blockchain API endpoints
@@ -42,14 +44,14 @@ class BlockchainAPILoggingMiddleware(MiddlewareMixin):
                 status_code = response.status_code
                 
                 # Log the response
-                logger.info(f"API Response | {request.method} {request.path} | Status: {status_code} | Time: {processing_time:.3f}s")
+                self.logger.info(f"API Response | {request.method} {request.path} | Status: {status_code} | Time: {processing_time:.3f}s")
             
         return response
     
     def get_client_ip(self, request):
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
+            ip = x_forwarded_for.split(',')[0].strip()
         else:
             ip = request.META.get('REMOTE_ADDR', 'unknown')
         return ip
