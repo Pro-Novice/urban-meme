@@ -1,7 +1,7 @@
 import re
 from django.db import models
 from django.core.exceptions import ValidationError
-from django.contrib.auth.models import BaseUserManager, AbstractBaseUser, PermissionsMixin
+from django.contrib.auth.models import BaseUserManager, AbstractBaseUser, PermissionsMixin, Group, Permission
 from django.core.validators import validate_email as django_validate_email
 from Services.logger import logger
 from agri_backend.enums import UserType
@@ -173,7 +173,21 @@ class AgriUser(AbstractBaseUser, PermissionsMixin):
     is_superuser = models.BooleanField(default=False)
     is_farmer = models.BooleanField(default=False)
     is_officer = models.BooleanField(default=False)
-    is_admin = models.BooleanField(default=False)
+    groups = models.ManyToManyField(
+        Group,
+        verbose_name='groups',
+        blank=True,
+        help_text='The groups this user belongs to.',
+        related_name='agriuser_set'  # Add this line
+    )
+
+    user_permissions = models.ManyToManyField(
+        Permission,
+        verbose_name='user permissions',
+        blank=True,
+        help_text='Specific permissions for this user.',
+        related_name='agriuser_set'  # Add this line
+    )
 
     blockchain_address = models.CharField(max_length=66, blank=True, null=True)
     objects = AgriUserManager()

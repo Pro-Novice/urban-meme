@@ -11,10 +11,11 @@ class BlockchainAPILoggingMiddleware(MiddlewareMixin):
     """
     
     def __init__(self, get_response):
+        # self.get_response = get_response
         super().__init__(get_response)
         self.logger = logging.getLogger('blockchain_api')
         super().__init__(get_response)  # Add this line
-    
+
     def process_request(self, request):
         # Only log blockchain API endpoints
         if '/api/blockchain/' in request.path or '/blockchain/' in request.path:
@@ -24,7 +25,7 @@ class BlockchainAPILoggingMiddleware(MiddlewareMixin):
             api_key = request.headers.get('X-API-Key', 'none')
             if api_key != 'none' and len(api_key) > 5:
                 api_key = api_key[:5] + '...'
-            
+
             request_data = None
             
             if request.method in ['POST', 'PUT', 'PATCH']:
@@ -34,7 +35,7 @@ class BlockchainAPILoggingMiddleware(MiddlewareMixin):
                         body = request._body
                     else:
                         body = request.body
-                    
+
                     if body:
                         request_data = json.loads(body.decode('utf-8'))
                         # Sanitize sensitive data
@@ -66,7 +67,7 @@ class BlockchainAPILoggingMiddleware(MiddlewareMixin):
                     'status': status_code,
                     'time': f"{processing_time:.3f}s"
                 }
-                
+
                 # Add error details for failed requests
                 if status_code >= 400:
                     try:
@@ -76,13 +77,13 @@ class BlockchainAPILoggingMiddleware(MiddlewareMixin):
                                 response_info['error'] = content
                     except Exception:
                         pass
-                
+
                 # Log the response
                 self.logger.info(
                     f"API Response | {request.method} {request.path} | "
                     f"Status: {status_code} | Time: {processing_time:.3f}s"
                 )
-                
+
                 # Log errors and slow requests separately
                 if status_code >= 400:
                     self.logger.error(
@@ -103,13 +104,13 @@ class BlockchainAPILoggingMiddleware(MiddlewareMixin):
             processing_time = 'unknown'
             if hasattr(request, 'start_time'):
                 processing_time = f"{time.time() - request.start_time:.3f}s"
-            
+
             self.logger.error(
                 f"API Exception | {request.method} {request.path} | "
                 f"Exception: {str(exception)} | Time: {processing_time}",
                 exc_info=True
             )
-    
+
     def get_client_ip(self, request):
         """Extract the real client IP address"""
         # Check for IP in various headers (for proxy/load balancer scenarios)
@@ -119,27 +120,27 @@ class BlockchainAPILoggingMiddleware(MiddlewareMixin):
             ip = x_forwarded_for.split(',')[0].strip()
         else:
             # Check other common headers
-            ip = (request.META.get('HTTP_X_REAL_IP') or 
-                  request.META.get('HTTP_CF_CONNECTING_IP') or 
+            ip = (request.META.get('HTTP_X_REAL_IP') or
+                  request.META.get('HTTP_CF_CONNECTING_IP') or
                   request.META.get('REMOTE_ADDR', 'unknown'))
         return ip
-    
+
     def sanitize_request_data(self, data):
         """Remove sensitive information from request data before logging"""
         if not isinstance(data, dict):
             return data
-        
+
         # List of sensitive keys to sanitize
         sensitive_keys = [
             'password', 'token', 'api_key', 'secret', 'private_key',
             'auth', 'authorization', 'credit_card', 'ssn', 'social_security'
         ]
-        
+
         sanitized = data.copy()
         for key in sanitized:
             if any(sensitive in key.lower() for sensitive in sensitive_keys):
                 sanitized[key] = "***HIDDEN***"
             elif isinstance(sanitized[key], dict):
                 sanitized[key] = self.sanitize_request_data(sanitized[key])
-        
+
         return sanitized

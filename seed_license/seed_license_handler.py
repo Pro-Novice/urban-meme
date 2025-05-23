@@ -7,6 +7,7 @@ from Services.exceptions import BlockchainError
 from .models import License, BlockchainTransaction
 logger = logging.getLogger(__name__)
 
+
 class SeedLicenseHandler:
     def __init__(self):
         self.contract = get_contract("SeedLicenseTrackingSystem")
@@ -30,7 +31,7 @@ class SeedLicenseHandler:
         7: "EXPIRED",
     }
 
-  
+
     def _call_function(self, fname, *args):
         try:
             fn = getattr(self.contract.functions, fname)
@@ -45,7 +46,7 @@ class SeedLicenseHandler:
         except ContractLogicError as exc:
             raise BlockchainError(str(exc))
 
-   
+
     def apply_for_license(self, data: dict, user=None):
         ltype_str  = data["license_type"].upper()
         ltype_enum = self.LICENSE_TYPE_MAPPING.get(ltype_str)
@@ -64,7 +65,7 @@ class SeedLicenseHandler:
             data["quality_parameters"],
             data["source"],
         )
-        
+
         event_logs = []
 
         for log in receipt["logs"]:
@@ -73,7 +74,7 @@ class SeedLicenseHandler:
                     decoded = self.contract.events.LicenseApplied().process_log(log)
                     event_logs.append(decoded)
                 except Exception:
-                    continue 
+                    continue
 
         if not event_logs:
             raise BlockchainError("License application failed - no LicenseApplied event found")
@@ -81,7 +82,7 @@ class SeedLicenseHandler:
         license_id = event_logs[0]["args"]["licenseId"]
 
         lic = License.objects.create(
-            applicant          = user, 
+            applicant          = user,
             license_id         = license_id,
             license_type       = ltype_str,
             crop_type          = data["crop_type"],
@@ -101,7 +102,7 @@ class SeedLicenseHandler:
             timestamp    = make_aware(datetime.fromtimestamp(block.timestamp)),
             action_type  = "LICENSE_APPLY",
             license      = lic,
-            created_by   = user,  
+            created_by   = user,
         )
         return license_id, receipt
 
@@ -120,7 +121,7 @@ class SeedLicenseHandler:
             lic.updated_at = datetime.now()
             lic.save()
             block = w3.eth.get_block(receipt.blockNumber)
-            
+
             BlockchainTransaction.objects.create(
                 tx_hash      = receipt.transactionHash.hex(),
                 block_number = receipt.blockNumber,
@@ -128,13 +129,13 @@ class SeedLicenseHandler:
                 timestamp    = make_aware(datetime.fromtimestamp(block.timestamp)),
                 action_type  = "STATUS_UPDATE",
                 license      = lic,
-                created_by   = user, 
+                created_by   = user,
             )
         except License.DoesNotExist:
             pass
         return receipt
 
-    
+
     def get_license_summary(self, lid):
         return self._call_view("getLicenseSummary", lid)
 

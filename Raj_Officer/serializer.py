@@ -27,6 +27,7 @@ class RajasthanOfficerSerializer(serializers.ModelSerializer):
             'role',
             'password',
             'confirm_password',
+            'blockchain_address'
         ]
         extra_kwargs = {
             'password': {'write_only': True},
