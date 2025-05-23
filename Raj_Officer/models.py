@@ -24,10 +24,10 @@ def validate_department(value):
 
 def validate_user_type(value):
     """
-    Validate the user type value to ensure it's either USER or KDA_OFFICER.
+    Validate the user type value to ensure it's either  USER, FARMER, RAJKISAN_OFFICER, or ADMIN
     """
     if not UserType.__members__.get(value.upper()):
-        raise ValidationError("Registration type must be USER or KDA_OFFICER")
+        raise ValidationError("Registration type must be USER, FARMER, RAJKISAN_OFFICER, or ADMIN ")
 
 def validate_gender(value):
     """
