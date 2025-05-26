@@ -18,3 +18,4 @@ test_config
 venv/
 
 **/.claude/settings.local.json
+node_modules/
