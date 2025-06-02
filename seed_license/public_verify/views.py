@@ -1,110 +1,61 @@
-import base64
-import json
-import logging
+import json, hashlib, logging
 from datetime import datetime
-from typing import Any, Dict
-from rest_framework.decorators import api_view
-from django.utils.timezone import make_aware, now
+from rest_framework import status
+from django.utils.timezone import make_aware
+from django_redis import get_redis_connection
+from rest_framework.decorators import api_view, authentication_classes
 from Services.api_response import ApiResponse
 from Services.exceptions import BlockchainError
-from seed_license.models import License
-from ..seed_license_handler import SeedLicenseHandler
-from django.utils.timezone import make_aware
+from seed_license.blockchain_api.authentication import APIKeyAuthentication   
+from seed_license.seed_license_handler import SeedLicenseHandler
+
 logger = logging.getLogger(__name__)
 
-_STATUS_LABELS = SeedLicenseHandler.STATUS_LABELS
-def _ts_iso(ts: int | None) -> str | None:
-    if ts and ts > 0:
-        return make_aware(datetime.utcfromtimestamp(ts)).date().isoformat()
-    return None
-
-
-def _verification_payload(license_id: int) -> Dict[str, Any]:
-    handler = SeedLicenseHandler()
-    (
-        license_id,
-        _farmer_address,  
-        _farmer_name,
-        _location,
-        _license_type_enum,
-        _status_enum,
-        _application_ts,
-        _approval_ts,
-        _expiry_ts,
-        _is_active,
-        _seed_details,
-    ) = handler.get_license_summary(license_id)
-
-    
-    is_valid = handler.is_license_valid(license_id)
-
-   
-    try:
-        db = License.objects.only("source").get(license_id=license_id)
-        firm_name: str | None = db.source 
-    except License.DoesNotExist:
-        firm_name = None
-
-   
-    status_label: str = _STATUS_LABELS.get(_status_enum, "UNKNOWN")
-    license_type_label: str = _license_type_enum if isinstance(_license_type_enum, str) else str(_license_type_enum)
-
-   
-    issue_date_raw = _approval_ts or _application_ts
-
-    return {
-        "license_id": str(license_id),
-        "valid": is_valid,
-        "status": status_label,
-        "holder_name": _farmer_name,
-        "firm_name": firm_name or _location or "",
-        "license_type": license_type_label,
-        "issue_date": _ts_iso(issue_date_raw),
-        "expiry_date": _ts_iso(_expiry_ts),
-        "verification_time": now().isoformat(),
-    }
-
-
-
 @api_view(["POST"])
-def public_verify_license_view(request, license_id: str): 
-    if "verification_code" not in request.data:
-        return ApiResponse(err="verification_code required", status=400)
+@authentication_classes([APIKeyAuthentication])
+def public_verify_license_view(request, license_id: int):
 
     try:
-        data = _verification_payload(int(license_id))
-        return ApiResponse(data=data, status=200)
+        valid, ltype, farmer, appr, exp = SeedLicenseHandler().verify_certificate(license_id)
+        return ApiResponse(data={
+            "license_id":       license_id,
+            "is_valid":         bool(valid),
+            "license_type":     ltype,
+            "farmer_name":      farmer,
+            "approval_date":    datetime.fromtimestamp(appr) if appr else None,
+            "expiry_date":      datetime.fromtimestamp(exp) if exp else None,
+        })
     except BlockchainError as exc:
-        return ApiResponse(err="License not found", code="LICENSE_NOT_FOUND", status=404)
-    except Exception as exc:
-        logger.exception("Verify by ID failed: %s", exc)
-        return ApiResponse(err="Internal server error", status=500)
+        return ApiResponse(err=str(exc), status=status.HTTP_400_BAD_REQUEST)
+    except Exception as exc:                      
+        return ApiResponse(err=str(exc), status=status.HTTP_404_NOT_FOUND)
+
 
 @api_view(["POST"])
-def public_verify_qr_view(request): 
-    raw = request.data.get("qr_data")
-    if not raw:
-        return ApiResponse(err="qr_data required", status=400)
-    license_id: int | None = None
-    if raw.isdigit():
-        license_id = int(raw)
-    else:
-        try:
-            decoded = base64.b64decode(raw).decode()
-            obj = json.loads(decoded)
-            license_id = int(obj.get("license_id"))
-        except Exception:
-            pass
+@authentication_classes([APIKeyAuthentication])
+def public_verify_qr_view(request):
 
-    if license_id is None:
-        return ApiResponse(err="Unsupported QR format", status=400)
+    redis_id = request.data.get("redis_id")
+    if not redis_id:
+        return ApiResponse(err="redis_id missing", status=status.HTTP_404_NOT_FOUND)
 
-    try:
-        data = _verification_payload(license_id)
-        return ApiResponse(data=data, status=200)
-    except BlockchainError:
-        return ApiResponse(err="License not found", code="LICENSE_NOT_FOUND", status=404)
-    except Exception as exc:
-        logger.exception("Verify via QR failed: %s", exc)
-        return ApiResponse(err="Internal server error", status=500)
+    r = get_redis_connection("default")
+    payload = r.get(redis_id)
+    if not payload:
+        return ApiResponse(err="QR credential expired or invalid", status=status.HTTP_404_NOT_FOUND)
 
+    data = json.loads(payload)
+    license_id      = data["license_id"]
+    expected_hash   = bytes.fromhex(data["certificate_hash"])
+
+    chain_hash = SeedLicenseHandler().generate_certificate_hash(license_id)
+    status_code = "VERIFIED" if chain_hash == expected_hash else "NOT_VERIFIED"
+
+    return ApiResponse(data={
+        "status":           status_code,
+        "license_id":       license_id,
+        "certificate_hash": hashlib.sha256(payload).hexdigest(),  
+        "on_chain_hash":    chain_hash.hex(),
+        "license_holder":   data["farmer_name"],
+        "issued_on":        data["approval_date"],
+    }, status=status.HTTP_201_CREATED if status_code == "VERIFIED" else 403)

@@ -1,94 +1,141 @@
-from django.test import TestCase
-from rest_framework.test import APIClient
-from django.urls import reverse
-from unittest.mock import patch
-from seed_license.models import License
-from django.utils.timezone import now
-import base64
 import json
+import hashlib
+from datetime import datetime
+from unittest.mock import patch, MagicMock
 
-TARGET_VIEW = "seed_license.public_verify.views"  
+from django.contrib.auth.models import AnonymousUser
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase, APIClient
+
+from Services.exceptions import BlockchainError
 
 
-class PublicVerificationAPITests(TestCase):
+class PublicVerifyAPITests(APITestCase):
+
     def setUp(self):
         self.client = APIClient()
+        self.license_id = 123
 
-        License.objects.create(
-            license_id=123,
-            license_type="SEED_DISTRIBUTION",
-            crop_type="Wheat",
-            seed_variety="PB-1",
-            quantity=100,
-            location="Jaipur",
-            quality_parameters="High",
-            source="AgroCorp Pvt Ltd",
-            aadhaar="000000000000",
-            blockchain_tx_id="0xabc123",
-            status="APPROVED",
+        
+        self._auth_patcher = patch(
+            "seed_license.public_verify.views.APIKeyAuthentication.authenticate",
+            return_value=(AnonymousUser(), None),
+        )
+        self._auth_patcher.start()
+
+    def tearDown(self):
+        self._auth_patcher.stop()
+
+    
+    def test_verify_license_success(self):
+        fake_result = (
+            True,
+            "SEED_PRODUCTION",
+            "Ramesh Kumar",
+            1_717_000_000,
+            1_748_536_000,
         )
 
-        self.mock_payload = {
-            "license_id": "123",
-            "valid": True,
-            "status": "APPROVED",
-            "holder_name": "Rohit Kumar",
-            "firm_name": "AgroCorp Pvt Ltd",
-            "license_type": "SEED_DISTRIBUTION",
-            "issue_date": now().date().isoformat(),
-            "expiry_date": now().date().isoformat(),
-            "verification_time": now().isoformat(),
-        }
+        with patch("seed_license.public_verify.views.SeedLicenseHandler") as mh:
+            mh.return_value.verify_certificate.return_value = fake_result
+            url = reverse("public-verify-license", args=[self.license_id])
+            resp = self.client.post(url)
 
+        body = resp.json()
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(body["data"]["is_valid"])
+        self.assertEqual(body["data"]["license_id"], self.license_id)
+        self.assertEqual(body["data"]["license_type"], "SEED_PRODUCTION")
+        self.assertIsInstance(body["data"]["approval_date"], str)
+        self.assertIsInstance(body["data"]["expiry_date"], str)
 
-    @patch(f"{TARGET_VIEW}._verification_payload")
-    def test_verify_by_id_success(self, mock_payload):
-        mock_payload.return_value = self.mock_payload
+    def test_verify_license_blockchain_error(self):
+        with patch("seed_license.public_verify.views.SeedLicenseHandler") as mh:
+            mh.return_value.verify_certificate.side_effect = BlockchainError("chain down")
+            url = reverse("public-verify-license", args=[self.license_id])
+            resp = self.client.post(url)
 
-        url = reverse("public-verify-license", kwargs={"license_id": 123})
-        res = self.client.post(url, {"verification_code": "123"}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.json()["error"], "chain down")
 
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.json()["data"]["license_id"], "123")
+    def test_verify_license_unknown_error(self):
+        with patch("seed_license.public_verify.views.SeedLicenseHandler") as mh:
+            mh.return_value.verify_certificate.side_effect = Exception("boom")
+            url = reverse("public-verify-license", args=[self.license_id])
+            resp = self.client.post(url)
 
-    def test_verify_by_id_missing_code(self):
-        url = reverse("public-verify-license", kwargs={"license_id": 123})
-        res = self.client.post(url, {}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(resp.json()["error"], "boom")
 
-        self.assertEqual(res.status_code, 400)
-        self.assertEqual(res.json()["error"], "verification_code required")
+    
+    @staticmethod
+    def _make_qr_payload(lic_id: int, cert_hash: str):
+        """Exact bytes stored in Redis."""
+        return json.dumps(
+            {
+                "license_id": lic_id,
+                "certificate_hash": cert_hash,
+                "farmer_name": "Ramesh Kumar",
+                "approval_date": datetime.utcnow().isoformat(),
+            }
+        ).encode()
 
-    @patch(f"{TARGET_VIEW}._verification_payload")
-    def test_verify_by_qr_plain_id(self, mock_payload):
-        mock_payload.return_value = self.mock_payload
-
+    def test_verify_qr_missing_redis_id(self):
         url = reverse("public-verify-qr")
-        res = self.client.post(url, {"qr_data": "123"}, format="json")
+        resp = self.client.post(url, {}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(resp.json()["error"], "redis_id missing")
 
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.json()["data"]["license_id"], "123")
+    def test_verify_qr_no_payload_in_cache(self):
+        with patch("seed_license.public_verify.views.get_redis_connection") as mr:
+            mr.return_value.get.return_value = None
+            url = reverse("public-verify-qr")
+            resp = self.client.post(url, {"redis_id": "abc"}, format="json")
 
-    @patch(f"{TARGET_VIEW}._verification_payload")
-    def test_verify_by_qr_base64_json(self, mock_payload):
-        mock_payload.return_value = self.mock_payload
-        qr_payload = base64.b64encode(json.dumps({"license_id": 123}).encode()).decode()
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(resp.json()["error"], "QR credential expired or invalid")
 
-        url = reverse("public-verify-qr")
-        res = self.client.post(url, {"qr_data": qr_payload}, format="json")
+    def test_verify_qr_hash_match_verified(self):
+        cert_hash = hashlib.sha256(b"payload").hexdigest()
+        payload = self._make_qr_payload(self.license_id, cert_hash)
 
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.json()["data"]["license_id"], "123")
+        stub_redis = MagicMock()
+        stub_redis.get.return_value = payload
 
-    def test_verify_by_qr_missing_data(self):
-        url = reverse("public-verify-qr")
-        res = self.client.post(url, {}, format="json")
+        with patch(
+            "seed_license.public_verify.views.get_redis_connection",
+            return_value=stub_redis,
+        ), patch(
+            "seed_license.public_verify.views.SeedLicenseHandler"
+        ) as mh:
+            mh.return_value.generate_certificate_hash.return_value = bytes.fromhex(cert_hash)
+            url = reverse("public-verify-qr")
+            resp = self.client.post(url, {"redis_id": "abc"}, format="json")
 
-        self.assertEqual(res.status_code, 400)
-        self.assertEqual(res.json()["error"], "qr_data required")
+        body = resp.json()
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED) 
+        self.assertEqual(body["data"]["status"], "VERIFIED")
+        self.assertEqual(body["data"]["license_id"], self.license_id)
+        self.assertEqual(body["data"]["on_chain_hash"], cert_hash)
 
-    def test_verify_by_qr_invalid_format(self):
-        url = reverse("public-verify-qr")
-        res = self.client.post(url, {"qr_data": "not-base64"}, format="json")
+    def test_verify_qr_hash_mismatch_not_verified(self):
+        cert_hash = hashlib.sha256(b"payload").hexdigest()
+        payload = self._make_qr_payload(self.license_id, cert_hash)
 
-        self.assertEqual(res.status_code, 400)
-        self.assertEqual(res.json()["error"], "Unsupported QR format")
+        stub_redis = MagicMock()
+        stub_redis.get.return_value = payload
+
+        with patch(
+            "seed_license.public_verify.views.get_redis_connection",
+            return_value=stub_redis,
+        ), patch(
+            "seed_license.public_verify.views.SeedLicenseHandler"
+        ) as mh:
+            mh.return_value.generate_certificate_hash.return_value = b"\x00" * 32
+            url = reverse("public-verify-qr")
+            resp = self.client.post(url, {"redis_id": "abc"}, format="json")
+
+        body = resp.json()
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(body["data"]["status"], "NOT_VERIFIED")

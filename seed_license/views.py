@@ -1,13 +1,13 @@
 import logging
 from datetime import datetime
 from django.utils.timezone import make_aware
-from rest_framework.decorators import api_view, authentication_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from .blockchain_api.authentication import APIKeyAuthentication
 from Services.api_response import ApiResponse
 from Services.exceptions import BlockchainError
-
+from rest_framework import status
 from .models import License, BlockchainTransaction, OfficerAction
 from .permissions import (
     IsFarmer, IsAdmin, IsAgricultureOfficer, IsDistrictCollector,
@@ -19,21 +19,25 @@ logger = logging.getLogger(__name__)
 
 
 @api_view(["POST"])
-# @permission_classes([IsAuthenticated, IsFarmer])    
+@authentication_classes([APIKeyAuthentication])
+# @permission_classes([IsFarmer])
 def license_create_view(request):
     try:
-        required_fields = ["name", "aadhaar", "location", "license_type", 
-                           "seed_variety", "crop_type", "quantity", 
-                           "quality_parameters", "source"]
-        
-        if missing := [f for f in required_fields if f not in request.data]:
+        required_fields = [
+            "name", "aadhaar", "location", "license_type",
+            "seed_variety", "crop_type", "quantity",
+            "quality_parameters", "source"
+        ]
+
+        missing = [f for f in required_fields if f not in request.data or request.data[f] in [None, ""]]
+        if missing:
             return ApiResponse(
-                err=f"Missing required fields: {', '.join(missing)}", 
-                status=400
+                err=f"Missing required fields: {', '.join(missing)}",
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         handler = SeedLicenseHandler()
-        lid, receipt = handler.apply_for_license(request.data, None)
+        lid, receipt = handler.apply_for_license(request.data, request.user)
 
         block = w3.eth.get_block(receipt.blockNumber)
         return ApiResponse(data={
@@ -41,18 +45,20 @@ def license_create_view(request):
             "submitted_at": make_aware(datetime.fromtimestamp(block.timestamp)),
             "status": "APPLIED",
             "blockchain_tx_id": receipt.transactionHash.hex(),
-        }, status=201)
-        
+        }, status=status.HTTP_201_CREATED)
+
     except BlockchainError as exc:
         logger.error("Blockchain error: %s", str(exc))
-        return ApiResponse(err=str(exc), status=400)
+        return ApiResponse(err=str(exc), status=status.HTTP_400_BAD_REQUEST)
     except Exception as exc:
         logger.exception("License application failed")
-        return ApiResponse(err="Internal server error", status=500)
+        return ApiResponse(err="Internal server error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 @api_view(["GET"])
-# @permission_classes([IsAuthenticated, IsFarmer]) 
+@authentication_classes([APIKeyAuthentication])
+# @permission_classes([IsAuthenticated, IsFarmer])
 def license_detail_view(request, license_id):
     try:
         summary = SeedLicenseHandler().get_license_summary(int(license_id))
@@ -78,52 +84,110 @@ def license_detail_view(request, license_id):
         })
     except Exception as exc:
         logger.exception("License detail fetch error")
-        return ApiResponse(err=str(exc), status=500)
+        return ApiResponse(err=str(exc), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(["POST"])
-# @permission_classes([IsAuthenticated, IsFarmer]) 
-def license_status_update_view(request, license_id):
-    new_status = request.data.get("status")
-    if new_status is None or not (0 <= new_status <= 7):
-        return ApiResponse(err="Invalid or missing 'status'", status=400)
+# @api_view(["PUT"])
+# @authentication_classes([APIKeyAuthentication])
+# @permission_classes([
+#     IsAuthenticated,
+#     IsAgricultureOfficer | IsDistrictCollector | IsSeedCertificationOfficer | IsQualityControlOfficer
+# ])
+# def license_status_update_view(request, license_id):
+#     new_status = request.data.get("status")
+#     if new_status is None or not isinstance(new_status, int) or not (0 <= new_status <= 7):
+#         return ApiResponse(err="Invalid or missing 'status'", status=status.HTTP_400_BAD_REQUEST)
 
-    if new_status in {5, 6} and not request.data.get("remarks"):
-        return ApiResponse(err="Remarks required for rejection/revocation", status=400)
+#     remarks = request.data.get("remarks", "")
+#     if new_status in {5, 6} and not remarks:
+#         return ApiResponse(err="Remarks required for rejection/revocation", status=status.HTTP_400_BAD_REQUEST)
 
-    docs_hash = request.data.get("docs_hash", b"")
-    docs_hash_b = docs_hash.encode() if isinstance(docs_hash, str) else docs_hash
+#     docs_hash = request.data.get("docs_hash", b"")
+#     docs_hash_b = docs_hash.encode() if isinstance(docs_hash, str) else docs_hash
 
-    try:
-        receipt = SeedLicenseHandler().update_license_status(
-            int(license_id), new_status, request.data.get("remarks", ""), None, docs_hash_b)
-        block = w3.eth.get_block(receipt.blockNumber)
-        return ApiResponse(data={
-            "license_id": int(license_id),
-            "status": new_status,
-            "updated_at": make_aware(datetime.fromtimestamp(block.timestamp)),
-            "blockchain_tx_id": receipt.transactionHash.hex(),
-        })
-    except Exception as exc:
-        logger.exception("Status update error")
-        return ApiResponse(err=str(exc), status=500)
+#     try:
+#         handler = SeedLicenseHandler()
+#         receipt = handler.update_license_status(
+#             int(license_id), new_status, remarks, request.user, docs_hash_b
+#         )
+#         block = w3.eth.get_block(receipt.blockNumber)
+
+#         return ApiResponse(data={
+#             "license_id": int(license_id),
+#             "status": new_status,
+#             "updated_at": make_aware(datetime.fromtimestamp(block.timestamp)),
+#             "blockchain_tx_id": receipt.transactionHash.hex(),
+#         })
+#     except Exception as exc:
+#         logger.exception("Status update error")
+#         return ApiResponse(err=str(exc), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 @api_view(["GET"])
-# @permission_classes([IsAuthenticated, IsFarmer]) 
+@authentication_classes([APIKeyAuthentication])
+# @permission_classes([IsAuthenticated, IsFarmer])
 def license_status_view(request, license_id):
     try:
         h = SeedLicenseHandler()
+        try:
+            contract_function = h.contract.functions.getLicenseSummary(int(license_id))
+            license_summary = contract_function.call()
+        except Exception as e:
+            return ApiResponse(err="License not found", status=status.HTTP_404_NOT_FOUND)
+
+        license_type_enum = license_summary[4]
+        status_enum = license_summary[5]
+
+        status_mapping = {
+            0: "APPLIED",
+            1: "DOCUMENTS_VERIFIED",
+            2: "FIELD_INSPECTION_COMPLETED",
+            3: "QUALITY_VERIFIED",
+            4: "APPROVED",
+            5: "REJECTED",
+            6: "REVOKED",
+            7: "EXPIRED"
+        }
+
+        license_type_mapping = {
+            0: "SEED_PRODUCTION",
+            1: "SEED_DISTRIBUTION",
+            2: "SEED_CERTIFICATION",
+            3: "HYBRID_SEED_PRODUCTION",
+            4: "ORGANIC_SEED_PRODUCTION"
+        }
+
+        is_valid = h.contract.functions.isLicenseValid(int(license_id)).call()
+
         return ApiResponse(data={
-            "license_id": int(license_id),
-            "status": h.get_license_status(int(license_id)),
-            "blockchain_verified": h.is_license_valid(int(license_id)),
+            "id": license_id,
+            "status": status_mapping.get(status_enum, f"UNKNOWN({status_enum})"),
+            "blockchain_verified": bool(is_valid),
+            "details": {
+                "farmer_name": license_summary[2],
+                "farmer_address": license_summary[1],
+                "location": license_summary[3],
+                "license_type": license_type_mapping.get(license_type_enum, f"UNKNOWN({license_type_enum})"),
+                "application_date": license_summary[6],
+                "approval_date": license_summary[7] if license_summary[7] > 0 else None,
+                "expiry_date": license_summary[8] if license_summary[8] > 0 else None,
+                "is_active": license_summary[9],
+                "seed_details": {
+                    "seed_variety": license_summary[10][0],
+                    "crop_type": license_summary[10][1],
+                    "quantity": license_summary[10][2],
+                    "quality_parameters": license_summary[10][3],
+                    "source": license_summary[10][4]
+                }
+            }
         })
     except Exception as exc:
-        return ApiResponse(err=str(exc), status=500)
-
+        logger.exception("Status view error")
+        return ApiResponse(err=str(exc), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(["GET"])
-# @permission_classes([IsAuthenticated, IsFarmer]) 
+@authentication_classes([APIKeyAuthentication])
+# @permission_classes([IsAuthenticated, IsFarmer])
 def license_history_view(request, license_id):
     try:
         history = SeedLicenseHandler().get_license_history(int(license_id))
@@ -132,22 +196,24 @@ def license_history_view(request, license_id):
             "history": history
         })
     except Exception as exc:
-        return ApiResponse(err=str(exc), status=500)
+        logger.exception("License history fetch error")
+        return ApiResponse(err=str(exc), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(["GET"])
-# @permission_classes([IsAuthenticated, IsFarmer]) 
+@authentication_classes([APIKeyAuthentication])
+# @permission_classes([IsAuthenticated, IsFarmer])
 def license_certificate_download_view(request, license_id):
     try:
-        lic = License.objects.get(license_id=license_id)
+        lic = License.objects.get(license_id=license_id, applicant=request.user)
     except License.DoesNotExist:
-        return ApiResponse(err="License not found", status=404)
+        return ApiResponse(err="License not found", status=status.HTTP_404_NOT_FOUND)
 
     if lic.status != "APPROVED":
-        return ApiResponse(err="Certificate not available", status=403)
+        return ApiResponse(err="Certificate not available", status=status.HTTP_403_FORBIDDEN)
 
     summary = SeedLicenseHandler().get_license_summary(int(license_id))
-    if summary[5] != 4: 
-        return ApiResponse(err="Blockchain status not APPROVED", status=403)
+    if summary[5] != 4:
+        return ApiResponse(err="Blockchain status not APPROVED", status=status.HTTP_403_FORBIDDEN)
 
     handler = SeedLicenseHandler()
     return ApiResponse(data={
@@ -156,32 +222,39 @@ def license_certificate_download_view(request, license_id):
     })
 
 
+
 @api_view(["GET"])
-# @permission_classes([IsAuthenticated, IsFarmer]) 
+@authentication_classes([APIKeyAuthentication])
+# @permission_classes([IsAuthenticated, IsFarmer])
 def license_list_view(request):
-    qs = License.objects.all().order_by("-submitted_at")
+    try:
+        qs = License.objects.filter(applicant=request.user).order_by("-submitted_at")
 
-    if t := request.query_params.get("type"):
-        qs = qs.filter(license_type=t)
-    if s := request.query_params.get("status"):
-        qs = qs.filter(status=s)
-    # if request.user.role == 'FARMER':
-    #    qs = qs.filter(applicant=request.user)
-    paginator = PageNumberPagination()
-    paginator.page_size = 10
-    page = paginator.paginate_queryset(qs, request)
+        if t := request.query_params.get("type"):
+            qs = qs.filter(license_type=t.upper())
+        if s := request.query_params.get("status"):
+            qs = qs.filter(status=s.upper())
 
-    return paginator.get_paginated_response({
-        "total": qs.count(),
-        "licenses": [{
-            "license_id": lic.license_id,
-            "license_type": lic.license_type,
-            "status": lic.status,
-            "submitted_at": lic.submitted_at,
-            "updated_at": lic.updated_at,
-            "blockchain_tx_id": lic.blockchain_tx_id,
-        } for lic in page]
-    })
+        paginator = PageNumberPagination()
+        paginator.page_size = 10
+        page = paginator.paginate_queryset(qs, request)
+
+        return paginator.get_paginated_response({
+            "total": qs.count(),
+            "licenses": [
+                {
+                    "license_id": lic.license_id,
+                    "license_type": lic.license_type,
+                    "status": lic.status,
+                    "submitted_at": lic.submitted_at,
+                    "updated_at": lic.updated_at,
+                    "blockchain_tx_id": lic.blockchain_tx_id,
+                } for lic in page
+            ]
+        })
+    except Exception as exc:
+        logger.exception("License list fetch error")
+        return ApiResponse(err=str(exc), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["GET"])
@@ -213,19 +286,23 @@ def transaction_history_view(request):
 
 @api_view(["POST"])
 @authentication_classes([APIKeyAuthentication])
+@permission_classes([
+    IsAuthenticated,
+    IsAgricultureOfficer | IsDistrictCollector | IsSeedCertificationOfficer | IsQualityControlOfficer
+])
 def record_officer_action_view(request):
     required_fields = ["license_id", "action_type", "remarks", "tx_hash"]
-    if missing := [f for f in required_fields if f not in request.data]:
-        return ApiResponse(err=f"Missing required fields: {', '.join(missing)}", status=400)
+    missing = [f for f in required_fields if f not in request.data or request.data[f] in [None, ""]]
+    if missing:
+        return ApiResponse(err=f"Missing required fields: {', '.join(missing)}", status=status.HTTP_400_BAD_REQUEST)
 
     try:
         license_id = request.data["license_id"]
         lic = License.objects.get(license_id=license_id)
 
-      
         _, officer_id = request.successful_authenticator.authenticate(request)
         if not officer_id:
-            return ApiResponse(err="Officer ID not identified from API key", status=401)
+            return ApiResponse(err="Officer ID not identified from API key", status=status.HTTP_401_UNAUTHORIZED)
 
         OfficerAction.objects.create(
             officer_id=str(officer_id),
@@ -234,26 +311,32 @@ def record_officer_action_view(request):
             remarks=request.data["remarks"],
             tx_hash=request.data["tx_hash"]
         )
-    
-        return ApiResponse(data={"message": "Officer action recorded successfully."}, status=201)
+
+        return ApiResponse(data={"message": "Officer action recorded successfully."}, status=status.HTTP_201_CREATED)
 
     except License.DoesNotExist:
-        return ApiResponse(err="License not found", status=404)
+        return ApiResponse(err="License not found", status=status.HTTP_404_NOT_FOUND)
     except Exception as exc:
-        return ApiResponse(err=str(exc), status=500)
+        logger.exception("Officer action recording failed")
+        return ApiResponse(err=str(exc), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(["GET"])
 @authentication_classes([APIKeyAuthentication])
+# @permission_classes([IsAuthenticated])
 def get_officer_actions_view(request, officer_id):
     try:
         actions = OfficerAction.objects.filter(officer_id=officer_id).order_by("-timestamp")
-        data = [{
-            "license_id": action.license.license_id,
-            "action_type": action.action_type,
-            "remarks": action.remarks,
-            "tx_hash": action.tx_hash,
-            "timestamp": action.timestamp,
-        } for action in actions]
+        data = [
+            {
+                "license_id": action.license.license_id,
+                "action_type": action.action_type,
+                "remarks": action.remarks,
+                "tx_hash": action.tx_hash,
+                "timestamp": action.timestamp,
+            } for action in actions
+        ]
         return ApiResponse(data={"officer_id": officer_id, "actions": data})
     except Exception as exc:
-        return ApiResponse(err=str(exc), status=500)
+        logger.exception("Officer actions retrieval failed")
+        return ApiResponse(err=str(exc), status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -64,7 +64,8 @@ REST_FRAMEWORK = {
 }
 
 # API Keys for blockchain API access
-# Format: 'api_key': 'client_name'
+# Format: 'a
+# pi_key': 'client_name'
 API_KEYS = {
     env('RAJ_AGRI_API_KEY', default='test_api_key_12345'): 'Rajasthan Agriculture Department',
 }

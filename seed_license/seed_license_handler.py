@@ -1,12 +1,13 @@
 import logging
 from datetime import datetime
-from django.utils.timezone import make_aware
+from web3 import Web3
 from web3.exceptions import ContractLogicError
-from .blockchain_services import get_contract, call_function, call_view_function, get_transaction_status, w3
+
+from .blockchain_services import get_contract, call_function, call_view_function, get_transaction_status
 from Services.exceptions import BlockchainError
 from .models import License, BlockchainTransaction
-logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
 
 class SeedLicenseHandler:
     def __init__(self):
@@ -65,25 +66,17 @@ class SeedLicenseHandler:
             data["quality_parameters"],
             data["source"],
         )
-
-        event_logs = []
-
-        for log in receipt["logs"]:
-            if log["address"].lower() == self.contract.address.lower():
-                try:
-                    decoded = self.contract.events.LicenseApplied().process_log(log)
-                    event_logs.append(decoded)
-                except Exception:
-                    continue
-
-        if not event_logs:
-            raise BlockchainError("License application failed - no LicenseApplied event found")
-
-        license_id = event_logs[0]["args"]["licenseId"]
+        
+     
+        if receipt.logs and len(receipt.logs[0].topics) > 1:
+            license_id_hex = receipt.logs[0].topics[1]
+            license_id = int(license_id_hex.hex(), 16) 
+        else:
+            raise BlockchainError("No license ID found")
 
         lic = License.objects.create(
-            applicant          = user,
-            license_id         = license_id,
+            applicant          = user,  
+            license_id         = str(license_id),  
             license_type       = ltype_str,
             crop_type          = data["crop_type"],
             seed_variety       = data["seed_variety"],
@@ -94,17 +87,19 @@ class SeedLicenseHandler:
             aadhaar            = data["aadhaar"],
             blockchain_tx_id   = receipt.transactionHash.hex(),
         )
-        block = w3.eth.get_block(receipt.blockNumber)
+
         BlockchainTransaction.objects.create(
             tx_hash      = receipt.transactionHash.hex(),
             block_number = receipt.blockNumber,
             status       = "CONFIRMED",
-            timestamp    = make_aware(datetime.fromtimestamp(block.timestamp)),
+            timestamp    = datetime.now(),
             action_type  = "LICENSE_APPLY",
             license      = lic,
-            created_by   = user,
+            created_by   = user,  
         )
+        
         return license_id, receipt
+
 
     def update_license_status(self, license_id: int, new_status: int, remarks: str, user=None, docs_hash=b""):
         receipt = self._call_function(
@@ -120,13 +115,12 @@ class SeedLicenseHandler:
             lic.status     = self.STATUS_LABELS.get(new_status, "UNKNOWN")
             lic.updated_at = datetime.now()
             lic.save()
-            block = w3.eth.get_block(receipt.blockNumber)
 
             BlockchainTransaction.objects.create(
                 tx_hash      = receipt.transactionHash.hex(),
                 block_number = receipt.blockNumber,
                 status       = "CONFIRMED",
-                timestamp    = make_aware(datetime.fromtimestamp(block.timestamp)),
+                timestamp    = datetime.fromtimestamp(Web3().eth.get_block(receipt.blockNumber).timestamp),
                 action_type  = "STATUS_UPDATE",
                 license      = lic,
                 created_by   = user,
@@ -140,7 +134,7 @@ class SeedLicenseHandler:
         return self._call_view("getLicenseSummary", lid)
 
     def get_license_status(self, lid):
-        return self._call_view("getLicenseSummary", lid)[9]
+        return self.get_license_summary(lid)["status"]
 
     def get_license_history(self, lid):
         count = self._call_view("getActionCount", lid)
@@ -165,3 +159,9 @@ class SeedLicenseHandler:
 
     def get_transaction_info(self, tx_hash):
         return get_transaction_status(tx_hash)
+    
+    def verify_certificate(self, lid: int):
+        return self._call_view("verifyCertificate", lid)
+
+    def generate_certificate_hash(self, lid: int) -> bytes:
+        return self._call_view("ge nerateCertificateHash", lid)
