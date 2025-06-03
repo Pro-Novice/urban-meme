@@ -1,7 +1,7 @@
 # check_deployment.py
 import json
 from web3 import Web3
-
+import os
 def check_deployment():
     """Check the status of deployed contracts"""
     with open('deployment_info.json', 'r') as f:
