@@ -6,15 +6,45 @@ A Django-based backend for managing agriculture licenses in Rajasthan using bloc
 ![Python](https://img.shields.io/badge/python-3.10+-brightgreen.svg)
 ![Django](https://img.shields.io/badge/django-4.2+-green.svg)
 
-## 📋 Overview
+## 🏗️ Smart Contract Architecture
 
-This system provides a secure API-based interface for managing agricultural licenses on the blockchain. It uses:
+The system uses UUPS (Universal Upgradeable Proxy Standard) pattern for smart contracts:
 
-- **Polygon/Ethereum** for blockchain interactions
-- **API key authentication** for secure access
-- **PostgreSQL** for data storage
-- **Redis** for caching
-- **Docker** for easy deployment
+### Smart Contract Components:
+
+1. **LicenseStorage.sol** - Storage contract with all state variables
+2. **LicenseSystemV1.sol** - Initial implementation with core functionality
+3. **LicenseSystemV2.sol** - Upgraded version with bulk operations
+4. **ERC1967Proxy.sol** - Proxy contract for upgradeability
+
+### License Categories:
+- SEED
+- FERTILIZER
+- INSECTICIDE
+
+### License Workflow States:
+- DRAFT
+- SUBMITTED
+- UNDER_REVIEW
+- DOCUMENTS_VERIFIED
+- PAYMENT_PENDING
+- PAYMENT_COMPLETED
+- INSPECTION_SCHEDULED
+- INSPECTION_COMPLETED
+- APPROVED
+- REJECTED
+- REVOKED
+- EXPIRED
+- RENEWAL_PENDING
+
+### Smart Contract Features:
+- **Multi-level Administration**: STATE, DIVISION, DISTRICT levels
+- **Document Management**: IPFS integration for document storage
+- **Payment Tracking**: Complete payment lifecycle management
+- **Inspection System**: GPS-enabled inspection reports with photo evidence
+- **Audit Trail**: Immutable action history for compliance
+- **Role-Based Access**: Officers with specific permissions
+- **Bulk Operations**: Process multiple licenses simultaneously
 
 ## 🚀 Quick Start with Docker (Recommended)
 
@@ -166,39 +196,6 @@ This system uses API key authentication instead of user-based authentication to 
 
 3. The system logs API usage and validates the API key with each request.
 
-## 📡 API Endpoints
-
-### License Operations
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST   | `/api/licenses/apply/` | Apply for a new license |
-| GET    | `/api/licenses/{id}/` | Get license details |
-| POST   | `/api/licenses/{id}/update-status/` | Update license status |
-| GET    | `/api/licenses/{id}/status/` | Check license status |
-| GET    | `/api/licenses/{id}/history/` | Get license history |
-| GET    | `/api/licenses/{id}/certificate/` | Download license certificate |
-| GET    | `/api/licenses/` | List all licenses |
-
-### Blockchain Contract Management
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET    | `/api/blockchain/contract/admin/` | Get admin address |
-| POST   | `/api/blockchain/contract/admin/change/` | Change admin |
-| POST   | `/api/blockchain/contract/officers/add/` | Add department officer |
-| POST   | `/api/blockchain/contract/officers/remove/` | Remove department officer |
-| GET    | `/api/blockchain/contract/officers/{address}/role/` | Get officer role |
-| GET    | `/api/blockchain/contract/officers/{address}/is-authorized/` | Check if officer is authorized |
-| GET    | `/api/blockchain/contract/certificates/{id}/hash/` | Generate certificate hash |
-| GET    | `/api/blockchain/contract/certificates/{id}/verify/` | Verify certificate |
-
-### Transaction History
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET    | `/api/blockchain/transactions/{hash}/` | Get transaction status |
-| GET    | `/api/blockchain/transactions/history/` | Get transaction history |
 
 ## 📁 Project Structure
 
