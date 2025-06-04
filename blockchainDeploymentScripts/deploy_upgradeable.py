@@ -9,6 +9,13 @@ from pathlib import Path
 
 # Load environment variables
 load_dotenv()
+def normalize_abi(abi):
+        for item in abi:
+            if item.get("type") == "event":
+                for input in item["inputs"]:
+                    if input["type"].startswith("enum"):
+                        input["type"] = "uint8"
+        return abi
 
 class UpgradeableContractDeployer:
     def __init__(self, rpc_url, private_key):
@@ -35,6 +42,10 @@ class UpgradeableContractDeployer:
             
         with open(artifacts_path, 'r') as f:
             self.contracts = json.load(f)
+            self.full_abis = {
+                name: contract['abi']
+                for name, contract in self.contracts.items()
+            }
         
         print(f"Loaded contracts: {list(self.contracts.keys())}")
     
@@ -52,7 +63,7 @@ class UpgradeableContractDeployer:
             bytecode = '0x' + bytecode
         
         # Create contract instance
-        Contract = self.w3.eth.contract(abi=abi, bytecode=bytecode)
+        Contract = self.w3.eth.contract(abi=normalize_abi(abi), bytecode=bytecode)
         
         # Build constructor transaction
         if constructor_args:
@@ -123,7 +134,7 @@ class UpgradeableContractDeployer:
             'deployer': self.address,
             'proxy': proxy_address,
             'implementationV1': impl_v1_address,
-            'implementationABI': impl_v1_abi
+            'implementationABI': self.full_abis['LicenseSystemV1']
         }
         
         deployment_path = Path(__file__).parent / 'deployment_info.json'
@@ -268,8 +279,8 @@ class LicenseSystemInteractor:
     def create_license(self, category, level, applicant_name, aadhaar, business_name, state, district):
         """Create a new license"""
         tx = self.contract.functions.createLicense(
-            category,  # 0=SEED, 1=FERTILIZER, 2=INSECTICIDE
-            level,     # 0=STATE, 1=DIVISION, 2=DISTRICT
+            category,
+            level,
             applicant_name,
             aadhaar,
             business_name,
@@ -277,25 +288,32 @@ class LicenseSystemInteractor:
             district
         ).build_transaction({
             'from': self.address,
-            'gas': 500000,
+            'gas': 800000,  # increased just in case
             'gasPrice': self.w3.eth.gas_price,
             'nonce': self.w3.eth.get_transaction_count(self.address),
         })
-        
+
         signed_tx = self.account.sign_transaction(tx)
-        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)  # Fixed: raw_transaction
+        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
-        
-        # Get license ID from events
-        logs = self.contract.events.LicenseCreated().process_receipt(receipt)
-        if logs:
-            license_id = logs[0]['args']['licenseId']
-            print(f"License created! ID: {license_id}, Transaction: {tx_hash.hex()}")
-            return license_id
-        else:
-            print(f"License created! Transaction: {tx_hash.hex()}")
-            return None
-    
+
+        # Decode logs from this contract only
+        for log in receipt.logs:
+            if log.address.lower() != self.contract.address.lower():
+                continue
+
+            try:
+                decoded = self.contract.events.LicenseCreated().process_log(log)
+                license_id = decoded['args']['licenseId']
+                print(f"\nLicense created! ID: {license_id}, Transaction: {tx_hash.hex()}")
+                return license_id
+            except Exception:
+                print(f"License created! Transaction: {tx_hash.hex()}")
+
+        print("\nLicenseCreated event not found")
+        return None
+
+
     def get_license_info(self, license_id):
         """Get basic license information"""
         result = self.contract.functions.getLicenseBasicInfo(license_id).call()
@@ -342,7 +360,7 @@ def main():
     interactor = LicenseSystemInteractor(
         deployer.w3,
         proxy_address,
-        deployment_info['implementationABI'],
+        normalize_abi(deployer.full_abis['LicenseSystemV1']), 
         deployer.account
     )
     

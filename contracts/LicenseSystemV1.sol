@@ -170,4 +170,34 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             }
         }
     }
+    function getLicenseBasicInfo(uint256 _licenseId) public view returns (
+        uint256,
+        string memory,
+        LicenseCategory,
+        AdminLevel,
+        LicenseStatus,
+        address,
+        string memory,
+        string memory,
+        uint256,
+        uint256,
+        uint256,
+        bool
+    ) {
+        License storage license = licenses[_licenseId];
+        return (
+            license.licenseId,
+            license.applicantName,
+            license.category,
+            license.level,
+            license.status,
+            license.applicant,
+            license.businessName,
+            license.district,
+            license.applicationDate,
+            license.approvalDate,
+            license.expiryDate,
+            license.isActive
+        );
+    }
 }
