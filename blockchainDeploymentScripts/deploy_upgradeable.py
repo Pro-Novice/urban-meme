@@ -109,7 +109,7 @@ class UpgradeableContractDeployer:
             print("ERC1967Proxy not found, using OpenZeppelin proxy bytecode...")
             proxy_address = self.deploy_openzeppelin_proxy(impl_v1_address, initializer_data)
             proxy_abi = impl_v1_abi  # Use implementation ABI for proxy
-        
+
         # Verify deployment
         print("\n=== Deployment Summary ===")
         print(f"Proxy Address: {proxy_address}")
@@ -318,7 +318,7 @@ class LicenseSystemInteractor:
 def main():
     """Main deployment function"""
     # Configuration
-    RPC_URL = os.getenv('RPC_URL', 'http://localhost:8545')  # Default to local Ganache
+    RPC_URL = os.getenv('BLOCKCHAIN_URL', 'http://localhost:8545')  # Default to local Ganache
     PRIVATE_KEY = os.getenv('PRIVATE_KEY')
     
     if not PRIVATE_KEY:

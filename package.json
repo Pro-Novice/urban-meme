@@ -2,5 +2,15 @@
   "dependencies": {
     "@openzeppelin/contracts": "^5.3.0",
     "@openzeppelin/contracts-upgradeable": "^5.3.0"
-  }
+  },
+  "name": "rajasthan_agri_backend",
+  "version": "1.0.0",
+  "description": "A Django-based backend for managing agriculture licenses in Rajasthan using blockchain technology for authentication and verification.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
