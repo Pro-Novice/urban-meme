@@ -34,7 +34,8 @@ environ.Env.read_env(BASE_DIR / '.env')
 SECRET_KEY = env('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-
+# settings.py
+EVAULT_API_URL = env('EVAULT_API_URL')
 ALLOWED_HOSTS = []
 
 # Application definition

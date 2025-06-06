@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path,include
 from . import views
 
 app_name = 'seed_license'
@@ -36,4 +36,6 @@ urlpatterns = [
     
     # Estimate gas for a method call
     path('blockchain/estimate-gas/', views.estimate_gas_view, name='estimate-gas'),
+
+    path('evault/',include('seed_license.e_vault_apis.urls'))
 ]

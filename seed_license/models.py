@@ -43,3 +43,29 @@ class BlockchainTransaction(models.Model):
 
     def __str__(self):
         return f"TX {self.tx_hash[:10]}… for License {self.license.license_id}"
+
+class DocumentUploadLog(models.Model):
+    dept_key = models.CharField(max_length=50)
+    document_type = models.CharField(max_length=100)
+    member_id = models.CharField(max_length=50, blank=True, null=True)
+    enrollment_id = models.CharField(max_length=50, blank=True, null=True)
+    certificate_id = models.CharField(max_length=50, blank=True, null=True)
+    jan_aadhaar_id = models.CharField(max_length=50, blank=True, null=True)
+    aadhaar_ref_no = models.CharField(max_length=50, blank=True, null=True)
+    full_name = models.CharField(max_length=100, blank=True, null=True)
+    request_data = models.JSONField()
+    response_data = models.JSONField()
+    evault_doc_id = models.CharField(max_length=100, blank=True, null=True)
+    status = models.CharField(max_length=20)
+    message = models.TextField()
+    incident_id = models.CharField(max_length=50, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    client_id_used = models.CharField(max_length=100, blank=True, null=True)
+    is_update = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.document_type} - {self.status}"
+
+    class Meta:
+        verbose_name = "Document Upload Log"
+        verbose_name_plural = "Document Upload Logs"

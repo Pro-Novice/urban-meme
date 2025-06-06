@@ -32,30 +32,32 @@ def get_contract(contract_name: str):
     # Check cache first
     if contract_name in _contract_cache:
         return _contract_cache[contract_name]
-    
+
     try:
         # Path to deployment info
         deployment_info_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", "deployment_info.json")
-        
+
         # Load deployment info to get contract address
         with open(deployment_info_path, "r") as fh:
             deployment_info = json.load(fh)
-        
+
         # IMPORTANT: For upgradeable contracts, we need to use the PROXY address
         # but with the IMPLEMENTATION ABI
         use_proxy = deployment_info.get("proxy") is not None
-        
+
         if use_proxy:
             # Use proxy address for all contract calls
             contract_address = deployment_info["proxy"]
             logger.info(f"Using proxy address for {contract_name}: {contract_address}")
-            
+
             # But we need the implementation ABI, not the proxy ABI
             # Try to find the implementation ABI
-            abi_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", "implementationABI", "LicenseSystemV1.json")
+            abi_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", "implementationABI",
+                                    "LicenseSystemV1.json")
             if not os.path.exists(abi_path):
                 # Try alternate paths
-                abi_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", "LicenseSystemV1ImplementationABI.json")
+                abi_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts",
+                                        "LicenseSystemV1ImplementationABI.json")
                 if not os.path.exists(abi_path):
                     abi_path = os.path.join(CONTRACTS_DIR, "abi", f"{contract_name}.json")
                     if not os.path.exists(abi_path):
@@ -69,34 +71,35 @@ def get_contract(contract_name: str):
                 "LicenseSystemV1": "implementationV1",
                 "LicenseSystemV2": "implementationV2",
             }
-            
+
             deployment_key = contract_mapping.get(contract_name, contract_name)
             contract_address = deployment_info.get(deployment_key)
-            
+
             if not contract_address:
                 raise ValueError(f"Contract address not found for {contract_name} in deployment_info.json")
-            
+
             # Standard ABI path
             abi_path = os.path.join(CONTRACTS_DIR, "abi", f"{contract_name}.json")
             if not os.path.exists(abi_path):
-                abi_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", f"{contract_name}ImplementationABI.json")
-        
+                abi_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts",
+                                        f"{contract_name}ImplementationABI.json")
+
         # Load ABI
         with open(abi_path, "r") as fh:
             abi = json.load(fh)
-        
+
         # Create contract instance
         contract = w3.eth.contract(
-            address=Web3.to_checksum_address(contract_address), 
+            address=Web3.to_checksum_address(contract_address),
             abi=abi
         )
-        
+
         # Cache the contract
         _contract_cache[contract_name] = contract
-        
+
         logger.info(f"Loaded contract {contract_name} at address {contract_address} (proxy={use_proxy})")
         return contract
-        
+
     except FileNotFoundError as e:
         logger.error(f"File not found when loading contract {contract_name}: {e}")
         raise ValueError(f"Contract files not found for {contract_name}")
@@ -137,7 +140,7 @@ def call_function(function, *args, address=None, private_key=None):
         "nonce": w3.eth.get_transaction_count(sender),
         "gasPrice": w3.eth.gas_price,
     })
-    
+
     # Estimate gas with 20% buffer
     try:
         estimated_gas = w3.eth.estimate_gas(tx)
@@ -176,35 +179,35 @@ def get_transaction_status(tx_hash: str):
 # New Methods for Universal Contract Interaction
 # ══════════════════════════════════════════════════════════════════════
 
-def write_to_contract(contract_name: str, method_name: str, params: List[Any], 
-                     address: Optional[str] = None, private_key: Optional[str] = None) -> Dict[str, Any]:
+def write_to_contract(contract_name: str, method_name: str, params: List[Any],
+                      address: Optional[str] = None, private_key: Optional[str] = None) -> Dict[str, Any]:
     """
     Universal function to write to any smart contract method
     """
     try:
         contract = get_contract(contract_name)
-        
+
         logger.info(f"Contract address being used: {contract.address}")
         logger.info(f"Attempting to call {contract_name}.{method_name} with params: {params}")
         logger.info(f"From address: {address or DEFAULT_ADDRESS}")
-        
+
         # Check if method exists
         if not hasattr(contract.functions, method_name):
             raise ValueError(f"Method '{method_name}' not found in contract '{contract_name}'")
-        
+
         # Get the function
         contract_function = getattr(contract.functions, method_name)
-        
+
         # Process parameters
         processed_params = process_params_for_abi(params, contract_function, contract)
         logger.info(f"Processed params: {processed_params}")
-        
+
         # Call the function
         receipt = call_function(contract_function, *processed_params, address=address, private_key=private_key)
-        
+
         # Parse events from receipt
         events = parse_receipt_events(receipt, contract)
-        
+
         return {
             "success": receipt.status == 1,
             "transaction_hash": receipt.transactionHash.hex(),
@@ -213,7 +216,7 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
             "events": events,
             "status": "confirmed" if receipt.status == 1 else "failed"
         }
-        
+
     except ContractLogicError as e:
         logger.error(f"Contract logic error: {e}")
         raise
@@ -228,23 +231,23 @@ def read_from_contract(contract_name: str, method_name: str, params: List[Any]) 
     """
     try:
         contract = get_contract(contract_name)
-        
+
         # Check if method exists
         if not hasattr(contract.functions, method_name):
             raise ValueError(f"Method '{method_name}' not found in contract '{contract_name}'")
-        
+
         # Get the function
         contract_function = getattr(contract.functions, method_name)
-        
+
         # Process parameters
         processed_params = process_params_for_abi(params, contract_function, contract)
-        
+
         # Call the view function
         result = call_view_function(contract_function, *processed_params)
-        
+
         # Format the result
         return format_contract_result(result, method_name, contract)
-        
+
     except ContractLogicError as e:
         logger.error(f"Contract logic error: {e}")
         raise
@@ -258,28 +261,28 @@ def process_params_for_abi(params: List[Any], contract_function: Any, contract: 
     Process parameters according to the contract ABI types
     """
     processed = []
-    
+
     # Get function ABI
     function_abi = None
     for abi_item in contract.abi:
-        if (abi_item.get('type') == 'function' and 
-            abi_item.get('name') == contract_function.fn_name):
+        if (abi_item.get('type') == 'function' and
+                abi_item.get('name') == contract_function.fn_name):
             function_abi = abi_item
             break
-    
+
     if not function_abi:
         return params
-    
+
     inputs = function_abi.get('inputs', [])
-    
+
     # Handle case where params length doesn't match inputs
     if len(params) != len(inputs):
         logger.warning(f"Parameter count mismatch: expected {len(inputs)}, got {len(params)}")
         return params
-    
+
     for i, (param, input_def) in enumerate(zip(params, inputs)):
         param_type = input_def['type']
-        
+
         try:
             if param_type == 'address':
                 processed.append(Web3.to_checksum_address(param))
@@ -324,11 +327,11 @@ def process_params_for_abi(params: List[Any], contract_function: Any, contract: 
                     processed.append(list(param))
             else:
                 processed.append(param)
-                
+
         except Exception as e:
             logger.warning(f"Error processing param {i} of type {param_type}: {e}")
             processed.append(param)
-    
+
     return processed
 
 
@@ -337,7 +340,7 @@ def parse_receipt_events(receipt: Any, contract: Any) -> List[Dict[str, Any]]:
     Parse events from transaction receipt
     """
     events = []
-    
+
     try:
         # Get contract events
         for log in receipt.logs:
@@ -358,7 +361,7 @@ def parse_receipt_events(receipt: Any, contract: Any) -> List[Dict[str, Any]]:
                         break  # Successfully decoded, move to next log
                     except:
                         continue  # Try next event type
-                        
+
             except Exception as e:
                 # If we can't decode, include raw log
                 events.append({
@@ -367,10 +370,10 @@ def parse_receipt_events(receipt: Any, contract: Any) -> List[Dict[str, Any]]:
                     "data": log.get('data', '').hex() if log.get('data') else '0x',
                     "address": log.get('address', '')
                 })
-                
+
     except Exception as e:
         logger.warning(f"Error parsing events: {e}")
-    
+
     return events
 
 
@@ -380,28 +383,28 @@ def format_contract_result(result: Any, method_name: str, contract: Any) -> Any:
     """
     if result is None:
         return None
-    
+
     # If it's a simple type, return as is
     if isinstance(result, (str, int, bool)):
         return result
-    
+
     # If it's bytes, convert to hex
     if isinstance(result, bytes):
         return '0x' + result.hex()
-    
+
     # If it's a list/tuple, try to get named outputs from ABI
     if isinstance(result, (list, tuple)):
         # Find function ABI
         function_abi = None
         for abi_item in contract.abi:
-            if (abi_item.get('type') == 'function' and 
-                abi_item.get('name') == method_name):
+            if (abi_item.get('type') == 'function' and
+                    abi_item.get('name') == method_name):
                 function_abi = abi_item
                 break
-        
+
         if function_abi:
             outputs = function_abi.get('outputs', [])
-            
+
             # If we have named outputs, create a dict
             if outputs and all(out.get('name') for out in outputs):
                 formatted = {}
@@ -409,10 +412,10 @@ def format_contract_result(result: Any, method_name: str, contract: Any) -> Any:
                     name = output['name']
                     formatted[name] = format_single_value(value, output['type'])
                 return formatted
-        
+
         # Otherwise return as list
         return [format_single_value(v, '') for v in result]
-    
+
     return result
 
 
@@ -449,27 +452,27 @@ def get_contract_address(contract_name: str) -> str:
     # For informational purposes, return the implementation address
     # But note that actual calls go through the proxy
     deployment_info_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", "deployment_info.json")
-    
+
     try:
         with open(deployment_info_path, "r") as fh:
             deployment_info = json.load(fh)
-        
+
         # Map contract names to deployment keys
         contract_mapping = {
             "seedLicenseContract": "implementationV1",
             "LicenseSystemV1": "implementationV1",
             "LicenseSystemV2": "implementationV2",
         }
-        
+
         deployment_key = contract_mapping.get(contract_name, contract_name)
         implementation_address = deployment_info.get(deployment_key)
-        
+
         if not implementation_address:
             implementation_address = deployment_info.get(contract_name)
-        
+
         # Also get proxy if it exists
         proxy_address = deployment_info.get("proxy")
-        
+
         # Return both addresses for clarity
         if proxy_address and implementation_address:
             return implementation_address  # Return implementation for the API, but note proxy is used for calls
@@ -477,7 +480,7 @@ def get_contract_address(contract_name: str) -> str:
             return implementation_address
         else:
             raise ValueError(f"Contract address not found for {contract_name}")
-            
+
     except Exception as e:
         # Fallback to getting from contract instance
         contract = get_contract(contract_name)
@@ -487,10 +490,10 @@ def get_contract_address(contract_name: str) -> str:
 def get_available_methods(contract_name: str) -> Dict[str, List[Dict]]:
     """Get all available methods for a contract with details"""
     contract = get_contract(contract_name)
-    
+
     read_methods = []
     write_methods = []
-    
+
     for abi_item in contract.abi:
         if abi_item.get('type') == 'function':
             method_info = {
@@ -504,38 +507,38 @@ def get_available_methods(contract_name: str) -> Dict[str, List[Dict]]:
                     for i, out in enumerate(abi_item.get('outputs', []))
                 ]
             }
-            
+
             if abi_item.get('stateMutability') in ['view', 'pure']:
                 read_methods.append(method_info)
             else:
                 write_methods.append(method_info)
-    
+
     return {
         "read_methods": sorted(read_methods, key=lambda x: x['name']),
         "write_methods": sorted(write_methods, key=lambda x: x['name'])
     }
 
 
-def estimate_gas_for_method(contract_name: str, method_name: str, 
-                           params: List[Any], from_address: Optional[str] = None) -> Dict[str, Any]:
+def estimate_gas_for_method(contract_name: str, method_name: str,
+                            params: List[Any], from_address: Optional[str] = None) -> Dict[str, Any]:
     """Estimate gas for a contract method call"""
     try:
         contract = get_contract(contract_name)
-        
+
         if not hasattr(contract.functions, method_name):
             raise ValueError(f"Method '{method_name}' not found")
-            
+
         contract_function = getattr(contract.functions, method_name)
         processed_params = process_params_for_abi(params, contract_function, contract)
-        
+
         tx = contract_function(*processed_params).build_transaction({
             "from": from_address or DEFAULT_ADDRESS,
             "gasPrice": w3.eth.gas_price,
         })
-        
+
         gas_estimate = w3.eth.estimate_gas(tx)
         gas_price = w3.eth.gas_price
-        
+
         return {
             "gas_estimate": gas_estimate,
             "gas_price": gas_price,
@@ -543,7 +546,7 @@ def estimate_gas_for_method(contract_name: str, method_name: str,
             "estimated_cost_wei": gas_estimate * gas_price,
             "estimated_cost_ether": float(w3.from_wei(gas_estimate * gas_price, 'ether'))
         }
-        
+
     except Exception as e:
         logger.error(f"Error estimating gas: {e}")
         raise
