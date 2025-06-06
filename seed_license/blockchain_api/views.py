@@ -5,7 +5,7 @@ from django.conf import settings
 from Services.api_response import ApiResponse
 from Services.exceptions import BlockchainError
 from .services import BlockchainAPIService
-from .authentication import APIKeyAuthentication
+from .authentication import APIKeyAuthentication, SSOAuthentication
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +108,12 @@ def get_officer_role(request, officer_address):
     except Exception as exc:
         logger.exception("Get officer role error")
         return ApiResponse(err="Internal server error", status=500)
+
+@api_view(["GET"])
+@authentication_classes([SSOAuthentication])
+def get_current_officer_view(request):
+    officer_info = request.auth  
+    return ApiResponse(data=officer_info)
 
 @api_view(["GET"])
 @authentication_classes([APIKeyAuthentication])

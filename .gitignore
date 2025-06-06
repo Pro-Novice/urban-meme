@@ -19,3 +19,4 @@ venv/
 
 **/.claude/settings.local.json
 .venv/
+documents
