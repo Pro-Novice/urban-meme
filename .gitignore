@@ -20,3 +20,4 @@ venv/
 **/.claude/settings.local.json
 node_modules/
 artifacts/compiled_contracts.json
+documents

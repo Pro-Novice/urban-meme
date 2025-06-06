@@ -2,6 +2,9 @@ from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from django.conf import settings
 import logging
+import base64
+import requests
+
 
 logger = logging.getLogger(__name__)
 
@@ -44,3 +47,50 @@ class APIKeyAuthentication(BaseAuthentication):
 
     def authenticate_header(self, request):
         return 'X-API-Key'
+    
+
+
+class SSOAuthentication(BaseAuthentication):
+    def authenticate(self, request):
+        token = request.headers.get('SSO-TOKEN')
+        if not token:
+            raise AuthenticationFailed("SSO token missing")
+
+        auth_header = base64.b64encode(
+            f"{settings.SSO_WS_USERNAME}:{settings.SSO_WS_PASSWORD}".encode()
+        ).decode()
+
+        headers = {
+            "SSO-TOKEN": token,
+            "Authorization": f"Basic {auth_header}"
+        }
+
+        try:
+            
+            token_resp = requests.get(
+                f"{settings.SSO_BASE_URL}/SSORESTNEW/TokenDetail",
+                headers=headers
+            )
+            if token_resp.status_code != 200:
+                raise AuthenticationFailed("Invalid SSO token")
+
+            token_data = token_resp.json()
+            sso_id = token_data.get("sAMAccountName")
+            roles = token_data.get("Roles", [])
+
+           
+            profile_resp = requests.get(
+                f"{settings.SSO_BASE_URL}/SSORESTNEW/Profile/{sso_id}",
+                headers=headers
+            )
+            if profile_resp.status_code != 200:
+                raise AuthenticationFailed("Failed to fetch profile")
+
+            profile = profile_resp.json()
+            profile["roles"] = roles  
+
+            return (None, profile)
+
+        except Exception as e:
+            logger.exception("SSO Auth failed")
+            raise AuthenticationFailed("SSO Auth failed")

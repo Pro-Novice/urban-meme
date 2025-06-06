@@ -201,6 +201,11 @@ EMAIL_HOST_USER = env('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
+# RAJSSO settings
+SSO_BASE_URL = env('SSO_BASE_URL', default='https://sso.rajasthan.gov.in:4443')
+SSO_WS_USERNAME = env('SSO_WS_USERNAME')
+SSO_WS_PASSWORD = env('SSO_WS_PASSWORD')
+
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 

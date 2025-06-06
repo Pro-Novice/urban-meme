@@ -446,4 +446,38 @@ contract SeedLicenseTrackingSystem {
         require(_newAdmin != address(0), "Invalid address");
         admin = _newAdmin;
     }
+     struct Document {
+        uint256 id;
+        address uploader;
+        bytes32 hash;
+        uint256 uploadedAt;
+    }
+
+    uint256 private documentCounter = 1;
+    mapping(uint256 => Document) public documents;
+
+    event DocumentStored(uint256 indexed id, address indexed uploader, bytes32 hash);
+
+    function storeDocument(bytes32 hash) public returns (uint256) {
+        uint256 id = documentCounter++;
+        documents[id] = Document({
+            id: id,
+            uploader: msg.sender,
+            hash: hash,
+            uploadedAt: block.timestamp
+        });
+        emit DocumentStored(id, msg.sender, hash);
+        return id;
+    }
+
+    function getDocumentHash(uint256 id) public view returns (bytes32) {
+        require(documents[id].id != 0, "Document not found");
+        return documents[id].hash;
+    }
+
+    function verifyDocumentHash(uint256 id, bytes32 hash) public view returns (bool) {
+        require(documents[id].id != 0, "Document not found");
+        return (documents[id].hash == hash);
+    }
+
 }

@@ -18,4 +18,7 @@ urlpatterns = [
     
     # Blockchain Smart Contract APIs
     path('blockchain/contract/', include('seed_license.blockchain_api.urls')),
+
+    # Documents APIS
+    path('documents/',include('seed_license.documents_api.urls')),
 ]
