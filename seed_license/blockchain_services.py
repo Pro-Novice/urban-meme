@@ -26,6 +26,12 @@ CONTRACTS_DIR = os.path.join(BASE_DIR, "Services", "blockchain", "contracts")
 # Cache for loaded contracts
 _contract_cache = {}
 
+def clear_contract_cache():
+    """Clear the contract cache to force reload"""
+    global _contract_cache
+    _contract_cache = {}
+    logger.info("Contract cache cleared")
+
 
 def get_contract(contract_name: str):
     """Load ABI + address and return web3 Contract."""
@@ -37,55 +43,68 @@ def get_contract(contract_name: str):
         # Path to deployment info
         deployment_info_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", "deployment_info.json")
         
-        # Load deployment info to get contract address
+        # Load deployment info
         with open(deployment_info_path, "r") as fh:
             deployment_info = json.load(fh)
         
-        # IMPORTANT: For upgradeable contracts, we need to use the PROXY address
-        # but with the IMPLEMENTATION ABI
-        use_proxy = deployment_info.get("proxy") is not None
-        
-        if use_proxy:
-            # Use proxy address for all contract calls
+        # IMPORTANT: For upgradeable contracts, ALWAYS use the PROXY address
+        if "proxy" in deployment_info and deployment_info["proxy"]:
             contract_address = deployment_info["proxy"]
             logger.info(f"Using proxy address for {contract_name}: {contract_address}")
-            
-            # But we need the implementation ABI, not the proxy ABI
-            # Try to find the implementation ABI
-            abi_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", "implementationABI", "LicenseSystemV1.json")
-            if not os.path.exists(abi_path):
-                # Try alternate paths
-                abi_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", "LicenseSystemV1ImplementationABI.json")
-                if not os.path.exists(abi_path):
-                    abi_path = os.path.join(CONTRACTS_DIR, "abi", f"{contract_name}.json")
-                    if not os.path.exists(abi_path):
-                        # Fall back to generic ABI
-                        abi_path = os.path.join(CONTRACTS_DIR, "abi", "seedLicenseContract.json")
         else:
-            # Non-upgradeable contract logic
-            # Map contract names to deployment keys
-            contract_mapping = {
-                "seedLicenseContract": "implementationV1",
-                "LicenseSystemV1": "implementationV1",
-                "LicenseSystemV2": "implementationV2",
-            }
-            
-            deployment_key = contract_mapping.get(contract_name, contract_name)
-            contract_address = deployment_info.get(deployment_key)
-            
-            if not contract_address:
-                raise ValueError(f"Contract address not found for {contract_name} in deployment_info.json")
-            
-            # Standard ABI path
-            abi_path = os.path.join(CONTRACTS_DIR, "abi", f"{contract_name}.json")
-            if not os.path.exists(abi_path):
-                abi_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", f"{contract_name}ImplementationABI.json")
+            raise ValueError(f"No proxy address found in deployment_info.json")
         
-        # Load ABI
-        with open(abi_path, "r") as fh:
-            abi = json.load(fh)
+        # Determine ABI to use
+        # Check if we have a mapping for this contract name
+        abi_found = False
+        abi = None
         
-        # Create contract instance
+        # For LicenseSystemV1, we need to check if there's an implementation ABI file
+        if contract_name in ["LicenseSystemV1", "seedLicenseContract"]:
+            # Look for the implementation ABI that was shown in your screenshot
+            possible_abi_locations = [
+                # Check in blockchainDeploymentScripts folder
+                os.path.join(BASE_DIR, "blockchainDeploymentScripts", "implementationABI", "LicenseSystemV1.json"),
+                os.path.join(BASE_DIR, "blockchainDeploymentScripts", "LicenseSystemV1ImplementationABI.json"),
+                os.path.join(BASE_DIR, "blockchainDeploymentScripts", "[ ] implementationABI.json"),
+                # Check in standard locations
+                os.path.join(CONTRACTS_DIR, "abi", "LicenseSystemV1.json"),
+                os.path.join(CONTRACTS_DIR, "abi", "seedLicenseContract.json"),
+            ]
+            
+            # Try each location
+            for abi_path in possible_abi_locations:
+                if os.path.exists(abi_path):
+                    with open(abi_path, "r") as fh:
+                        abi = json.load(fh)
+                    logger.info(f"Found ABI at: {abi_path}")
+                    abi_found = True
+                    break
+        
+        # If no ABI found yet, check if it's the other contract type
+        if not abi_found:
+            # This might be the seed license tracking contract
+            seed_abi_path = os.path.join(CONTRACTS_DIR, "abi", "seedLicenseContract.json")
+            if os.path.exists(seed_abi_path):
+                with open(seed_abi_path, "r") as fh:
+                    abi = json.load(fh)
+                logger.info(f"Using seed license ABI from: {seed_abi_path}")
+                abi_found = True
+        
+        if not abi_found or not abi:
+            # List available files for debugging
+            logger.error(f"Could not find ABI for {contract_name}")
+            logger.error(f"Checked locations: {possible_abi_locations if 'possible_abi_locations' in locals() else 'N/A'}")
+            
+            # Try to list what files are available
+            deployment_dir = os.path.join(BASE_DIR, "blockchainDeploymentScripts")
+            if os.path.exists(deployment_dir):
+                files = os.listdir(deployment_dir)
+                logger.error(f"Files in deployment directory: {files}")
+            
+            raise FileNotFoundError(f"No ABI file found for {contract_name}")
+        
+        # Create contract instance with PROXY address and IMPLEMENTATION ABI
         contract = w3.eth.contract(
             address=Web3.to_checksum_address(contract_address), 
             abi=abi
@@ -94,12 +113,12 @@ def get_contract(contract_name: str):
         # Cache the contract
         _contract_cache[contract_name] = contract
         
-        logger.info(f"Loaded contract {contract_name} at address {contract_address} (proxy={use_proxy})")
+        logger.info(f"Contract {contract_name} loaded successfully with proxy address: {contract_address}")
         return contract
         
     except FileNotFoundError as e:
         logger.error(f"File not found when loading contract {contract_name}: {e}")
-        raise ValueError(f"Contract files not found for {contract_name}")
+        raise ValueError(f"Contract configuration not found. Please ensure ABI files are in the correct location.")
     except Exception as exc:
         logger.error(f"Contract loading error for {contract_name}: {exc}")
         raise
@@ -215,11 +234,130 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
         }
         
     except ContractLogicError as e:
-        logger.error(f"Contract logic error: {e}")
-        raise
+        error_msg = str(e)
+        logger.error(f"Contract logic error: {error_msg}")
+        
+        # Parse common contract revert reasons
+        if "Contract reverted" in error_msg:
+            if "Only admin" in error_msg:
+                return {
+                    "success": False,
+                    "error": "Permission denied: Only admin can perform this action",
+                    "details": "The calling address does not have admin privileges",
+                    "solution": "Ensure you're using the admin address or grant admin role to your address"
+                }
+            elif "Already exists" in error_msg:
+                return {
+                    "success": False,
+                    "error": "License already exists",
+                    "details": "A license with similar details may already exist",
+                    "solution": "Check if the farmer already has an active license"
+                }
+            elif "Invalid status" in error_msg:
+                return {
+                    "success": False,
+                    "error": "Invalid license status transition",
+                    "details": "The requested status change is not allowed from current status",
+                    "solution": "Check the current license status and valid transitions"
+                }
+            elif "not found" in error_msg or "Does not exist" in error_msg:
+                return {
+                    "success": False,
+                    "error": "License not found",
+                    "details": "The specified license ID does not exist",
+                    "solution": "Verify the license ID is correct"
+                }
+        
+        # Generic contract revert
+        return {
+            "success": False,
+            "error": "Smart contract execution failed",
+            "details": error_msg,
+            "solution": "Check contract requirements and ensure all conditions are met"
+        }
+        
+    except ValueError as e:
+        error_msg = str(e)
+        logger.error(f"Value error: {error_msg}")
+        
+        if "Method" in error_msg and "not found" in error_msg:
+            return {
+                "success": False,
+                "error": f"Method '{method_name}' does not exist in contract",
+                "details": "The specified method name is not available in the contract ABI",
+                "solution": f"Check available methods at /api/seed-license/blockchain/contracts/{contract_name}/methods/"
+            }
+        elif "Contract files not found" in error_msg:
+            return {
+                "success": False,
+                "error": "Contract configuration not found",
+                "details": f"Unable to load ABI or address for contract '{contract_name}'",
+                "solution": "Ensure the contract is properly deployed and configuration files exist"
+            }
+            
+        return {
+            "success": False,
+            "error": "Invalid request parameters",
+            "details": error_msg,
+            "solution": "Verify all parameters are correctly formatted"
+        }
+        
     except Exception as e:
-        logger.error(f"Error writing to contract: {e}", exc_info=True)
-        raise
+        error_msg = str(e)
+        logger.error(f"Unexpected error in write_to_contract: {error_msg}", exc_info=True)
+        
+        # Parse specific Web3 errors
+        if "insufficient funds" in error_msg.lower():
+            return {
+                "success": False,
+                "error": "Insufficient funds for transaction",
+                "details": "The sending address does not have enough ETH to pay for gas",
+                "solution": "Add ETH to the sending address",
+                "sending_address": address or DEFAULT_ADDRESS
+            }
+        elif "nonce too low" in error_msg.lower():
+            return {
+                "success": False,
+                "error": "Transaction nonce error",
+                "details": "The transaction nonce is too low",
+                "solution": "Wait for pending transactions to complete or reset the nonce"
+            }
+        elif "execution reverted" in error_msg and "no data" in error_msg:
+            return {
+                "success": False,
+                "error": "Contract execution reverted without reason",
+                "details": "The contract reverted but didn't provide a specific error message",
+                "possible_causes": [
+                    "Contract may not be initialized",
+                    "Sender may lack required permissions",
+                    "Input parameters may be invalid",
+                    "Contract state may prevent this operation"
+                ],
+                "debugging_steps": [
+                    "1. Check if contract is initialized (if upgradeable)",
+                    "2. Verify sender has necessary roles/permissions",
+                    "3. Ensure all parameters match expected types",
+                    "4. Check contract's current state"
+                ],
+                "contract_address": contract.address,
+                "method": method_name,
+                "sender": address or DEFAULT_ADDRESS
+            }
+        elif "connection" in error_msg.lower() or "provider" in error_msg.lower():
+            return {
+                "success": False,
+                "error": "Blockchain connection error",
+                "details": "Unable to connect to the blockchain node",
+                "solution": "Check blockchain node URL and network connectivity"
+            }
+            
+        # Generic error
+        return {
+            "success": False,
+            "error": "Transaction failed",
+            "details": error_msg,
+            "solution": "Check logs for more detailed error information"
+        }
 
 
 def read_from_contract(contract_name: str, method_name: str, params: List[Any]) -> Any:
@@ -445,36 +583,32 @@ def get_contract_abi(contract_name: str) -> List[Dict]:
 
 
 def get_contract_address(contract_name: str) -> str:
-    """Get the address for a contract"""
-    # For informational purposes, return the implementation address
-    # But note that actual calls go through the proxy
+    """
+    Get the address for a contract
+    For upgradeable contracts, this returns the PROXY address (the main interaction point)
+    """
     deployment_info_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", "deployment_info.json")
     
     try:
         with open(deployment_info_path, "r") as fh:
             deployment_info = json.load(fh)
         
-        # Map contract names to deployment keys
+        # For upgradeable contracts, ALWAYS return the proxy address
+        if "proxy" in deployment_info and deployment_info["proxy"]:
+            return deployment_info["proxy"]
+        
+        # Fallback for non-upgradeable contracts
         contract_mapping = {
             "seedLicenseContract": "implementationV1",
-            "LicenseSystemV1": "implementationV1",
+            "LicenseSystemV1": "implementationV1", 
             "LicenseSystemV2": "implementationV2",
         }
         
         deployment_key = contract_mapping.get(contract_name, contract_name)
-        implementation_address = deployment_info.get(deployment_key)
+        contract_address = deployment_info.get(deployment_key)
         
-        if not implementation_address:
-            implementation_address = deployment_info.get(contract_name)
-        
-        # Also get proxy if it exists
-        proxy_address = deployment_info.get("proxy")
-        
-        # Return both addresses for clarity
-        if proxy_address and implementation_address:
-            return implementation_address  # Return implementation for the API, but note proxy is used for calls
-        elif implementation_address:
-            return implementation_address
+        if contract_address:
+            return contract_address
         else:
             raise ValueError(f"Contract address not found for {contract_name}")
             
