@@ -228,7 +228,7 @@ rajasthan_agri_backend/
 
 Test the APIs using the Postman collection:
 
-[Rajasthan Agri Backend API Collection](https://api.postman.com/collections/43756014-4e680ff3-8491-4a4c-add8-67caf1c4567f?access_key=PMAT-01JRYRERX1VYS278G4YXHR03QC)
+[Rajasthan Agri Backend API Collection](https://api.postman.com/collections/43756014-6f706a0f-80cb-4cf4-a2ee-9268a7a88aac?access_key=PMAT-01JXF8F2QK90FF193PPXJ9WT8G)
 
 ## 📄 License
 

@@ -1,7 +1,14 @@
 import logging
 import time
 import json
+import base64
+import requests
 from django.utils.deprecation import MiddlewareMixin
+from django.utils.deprecation import MiddlewareMixin
+from .authentication import RajSSOAuthBackend
+from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
+from django.utils.functional import SimpleLazyObject
 
 logger = logging.getLogger(__name__)
 
@@ -55,3 +62,34 @@ class BlockchainAPILoggingMiddleware(MiddlewareMixin):
         else:
             ip = request.META.get('REMOTE_ADDR', 'unknown')
         return ip
+    
+
+def get_sso_user(request):
+    sso_token = request.headers.get("SSO-TOKEN")
+    return RajSSOAuthBackend().authenticate(request, sso_token=sso_token) or AnonymousUser()
+
+class RajSSOMiddleware(MiddlewareMixin):
+    def process_request(self, request):
+        sso_token = request.headers.get("SSO-TOKEN")
+        if sso_token:
+           
+            self._extend_sso_session(sso_token)
+            request.user = SimpleLazyObject(lambda: get_sso_user(request))
+        else:
+            request.user = AnonymousUser()
+
+    def _extend_sso_session(self, sso_token):
+        try:
+            headers = {
+                "SSO-TOKEN": sso_token,
+                "Authorization": "Basic " + base64.b64encode(
+                    f"{settings.SSO_USERNAME}:{settings.SSO_PASSWORD}".encode()
+                ).decode()
+            }
+            requests.get(
+                f"{settings.SSO_BASE_URL}/SSORESTNEW/IncreaseSessionTime",
+                headers=headers,
+                timeout=2
+            )
+        except Exception as e:
+            logger.warning(f"Failed to extend SSO session: {str(e)}")

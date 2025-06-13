@@ -1,7 +1,7 @@
 import logging
-from rest_framework.decorators import api_view, authentication_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from django.conf import settings
-
+from seed_license.permissions import IsSeedCertificationOfficer
 from Services.api_response import ApiResponse
 from Services.exceptions import BlockchainError
 from .services import BlockchainAPIService
@@ -139,6 +139,7 @@ def generate_certificate_hash(request, license_id):
 
 @api_view(["GET"])
 @authentication_classes([APIKeyAuthentication])
+@permission_classes([IsSeedCertificationOfficer])
 def verify_certificate(request, license_id):
     """Verify a certificate for a license"""
     try:

@@ -1,26 +1,22 @@
 import logging
 from datetime import datetime
-from web3 import Web3
-from django.conf import settings
-from django.db.models import Q
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import IsAuthenticated
+from seed_license.blockchain_api.authentication import RajSSOAuthentication
 
 from Services.api_response import ApiResponse
 from Services.exceptions import BlockchainError
 
 from .models import License, BlockchainTransaction
-from .permissions import (
-    IsFarmer, IsAdmin, IsAgricultureOfficer, IsDistrictCollector,
-    IsSeedCertificationOfficer, IsSubsidyApprovalOfficer, IsQualityControlOfficer,
-)
+from .permissions import (IsFarmer, IsAdmin, IsAgricultureOfficer)
 from .seed_license_handler import SeedLicenseHandler
 
 logger = logging.getLogger(__name__)
 
 # ── POST /api/licenses/apply ─────────────────────────────────────────
 @api_view(["POST"])
+@authentication_classes([RajSSOAuthentication])
+@permission_classes([IsFarmer])
 def license_create_view(request):
     required = ["name", "aadhaar", "location", "license_type", "seed_variety",
                 "crop_type", "quantity", "quality_parameters", "source"]
@@ -54,6 +50,8 @@ def license_create_view(request):
 
 # ── GET /api/licenses/{id} ───────────────────────────────────────────
 @api_view(["GET"])
+@authentication_classes([RajSSOAuthentication])
+@permission_classes([IsFarmer])
 def license_detail_view(request, license_id):
     try:
         summary = SeedLicenseHandler().get_license_summary(int(license_id))
@@ -64,6 +62,8 @@ def license_detail_view(request, license_id):
 
 # ── POST /api/licenses/{id}/update-status ────────────────────────────
 @api_view(["POST"])
+@authentication_classes([RajSSOAuthentication])
+@permission_classes([IsAgricultureOfficer])
 def license_status_update_view(request, license_id):
     new_status = request.data.get("status")
     if new_status is None or not (0 <= new_status <= 7):
@@ -90,6 +90,8 @@ def license_status_update_view(request, license_id):
 
 # ── GET /api/licenses/{id}/status ────────────────────────────────────
 @api_view(["GET"])
+@authentication_classes([RajSSOAuthentication])
+@permission_classes([IsFarmer])
 def license_status_view(request, license_id):
     # Handle DRF Request vs Django HttpRequest
     if hasattr(request, '_request'):
@@ -216,6 +218,8 @@ def license_status_view(request, license_id):
     
 # ── GET /api/licenses/{id}/history ───────────────────────────────────
 @api_view(["GET"])
+@authentication_classes([RajSSOAuthentication])
+@permission_classes([IsFarmer])
 def license_history_view(request, license_id):
     try:
         history = SeedLicenseHandler().get_license_history(int(license_id))
@@ -225,6 +229,8 @@ def license_history_view(request, license_id):
 
 # ── GET /api/licenses/{id}/certificate ───────────────────────────────
 @api_view(["GET"])
+@authentication_classes([RajSSOAuthentication])
+@permission_classes([IsFarmer])
 def license_certificate_download_view(request, license_id):
     try:
         lic = License.objects.get(license_id=license_id)
@@ -246,6 +252,8 @@ def license_certificate_download_view(request, license_id):
 
 # ── GET /api/licenses (list) ──────────────────────────────────
 @api_view(["GET"])
+@authentication_classes([RajSSOAuthentication])
+@permission_classes([IsFarmer])
 def license_list_view(request):
     # Get all licenses instead of filtering by user
     qs = License.objects.all().order_by("-submitted_at")
@@ -271,12 +279,16 @@ def license_list_view(request):
 
 # ── GET /api/blockchain/transactions/{hash} ─────────────────────────
 @api_view(["GET"])
+@authentication_classes([RajSSOAuthentication])
+@permission_classes([IsAdmin])
 def transaction_status_view(request, tx_hash):
     info = SeedLicenseHandler().get_transaction_info(tx_hash)
     return ApiResponse(data=info)
 
 # ── GET /api/blockchain/transactions/history ────────────────────────
 @api_view(["GET"])
+@authentication_classes([RajSSOAuthentication])
+@permission_classes([IsAdmin])
 def transaction_history_view(request):
     # Get all transactions instead of filtering by user
     qs = BlockchainTransaction.objects.all().order_by("-timestamp")

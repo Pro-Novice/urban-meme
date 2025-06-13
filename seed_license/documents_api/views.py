@@ -3,17 +3,16 @@ from rest_framework.decorators import (
     api_view, authentication_classes, parser_classes
 )
 from rest_framework.parsers import MultiPartParser
-from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from django.utils.timezone import now
 from Services.api_response import ApiResponse
 from .utils import sha256_file
-from seed_license.blockchain_api.authentication import APIKeyAuthentication
+from seed_license.blockchain_api.authentication import RajSSOAuthentication
 logger = logging.getLogger(__name__)
 
 
 @api_view(["POST"])
-@authentication_classes([APIKeyAuthentication, IsAuthenticated])
+@authentication_classes([RajSSOAuthentication])
 @parser_classes([MultiPartParser])
 def upload_document_view(request):
     pdf_file = request.FILES.get("document")
@@ -57,7 +56,7 @@ def upload_document_view(request):
 
 
 @api_view(["POST"])
-@authentication_classes([APIKeyAuthentication, IsAuthenticated])
+@authentication_classes([RajSSOAuthentication])
 @parser_classes([MultiPartParser])
 def compare_pdf_hashes(request):
     file1 = request.FILES.get("document1")

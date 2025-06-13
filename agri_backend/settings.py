@@ -52,6 +52,9 @@ INSTALLED_APPS = [
 ]
 
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'seed_license.blockchain_api.authentication.RajSSOAuthentication',
+    ),
     'DEFAULT_RENDERER_CLASSES': (
         'djangorestframework_camel_case.render.CamelCaseJSONRenderer',
         'djangorestframework_camel_case.render.CamelCaseBrowsableAPIRenderer',
@@ -59,6 +62,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PARSER_CLASSES': (
         'djangorestframework_camel_case.parser.CamelCaseJSONParser',
     ),
+    
 }
 
 # API Keys for blockchain API access
@@ -78,6 +82,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'seed_license.blockchain_api.middleware.BlockchainAPILoggingMiddleware',
+    'seed_license.blockchain_api.middleware.RajSSOMiddleware',
+    
 ]
 LOGGING = {
     'version': 1,
@@ -158,7 +164,9 @@ DATABASES = {
 }
 # User model is no longer used, using API key authentication instead
 # AUTH_USER_MODEL = 'user.AgriUser'
-
+AUTHENTICATION_BACKENDS = [
+    'seed_license.blockchain_api.authentication.RajSSOAuthBackend',
+]
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -203,8 +211,8 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # RAJSSO settings
 SSO_BASE_URL = env('SSO_BASE_URL', default='https://sso.rajasthan.gov.in:4443')
-SSO_WS_USERNAME = env('SSO_WS_USERNAME')
-SSO_WS_PASSWORD = env('SSO_WS_PASSWORD')
+SSO_USERNAME = env('SSO_USERNAME')
+SSO_PASSWORD = env('SSO_PASSWORD')
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/

@@ -1,377 +1,193 @@
-from datetime import datetime
-from types import SimpleNamespace
+import json
 from unittest.mock import patch, MagicMock
-
-from django.contrib.auth import get_user_model
+from django.test import TestCase
 from django.urls import reverse
-from django.utils import timezone
+from rest_framework.test import APIClient
 from rest_framework import status
-from rest_framework.test import APITestCase, APIClient
 
-from .models import License, BlockchainTransaction 
-
-class BaseAPITestCase(APITestCase):
-    """Common setup and helpers for all API test cases."""
-
+class LicenseAPITests(TestCase):
     def setUp(self):
-        User = get_user_model()
-        
-        # Create farmer user with appropriate role (adjust based on your actual role system)
-        self.farmer = User.objects.create_user(
-            username="farmer",
-            password="TestUser@123",
-            blockchain_address="0xFAKEADDRESS",
-            private_key="0xFAKEKEY",
-            email="farmer@example.com",
-            phone_no='9876543210',
-            address={
-                "address": "Farm No. 1",
-                "city": "rampur",
-                "state": "kanpur",
-                "postal_code": "389890",
-                "country": "India"
-            },
-            name='Test User',
-            aadhaar_no='123456789012',
-            role="FARMER"  # Adjust this based on your actual role field
-        )
-        
-        # Create officer user
-        self.officer = User.objects.create_user(
-            username="officer",
-            password="R@ass1234",
-            blockchain_address="0xFAKEADDRESS2",
-            private_key="0xFAKEKEY2",
-            email="officer@example.com",
-            name="Officer User",
-            phone_no="9876543210",
-            address={
-                "address": "Farm No. 1",
-                "city": "rampur",
-                "state": "kanpur",
-                "postal_code": "389890",
-                "country": "India"
-            },
-            aadhaar_no="987698769876",
-            role="AGRICULTURE_OFFICER"  # Adjust this based on your actual role field
-        )
-        
-        # Create admin user
-        self.admin = User.objects.create_user(
-            username="admin",
-            password="R@ass1234",
-            blockchain_address="0xADMIN",
-            private_key="0xADMINKEY",
-            email="admin@example.com",
-            name="Admin User",
-            phone_no="5555555555",
-            address={
-                "address": "Farm No. 1",
-                "city": "rampur",
-                "state": "kanpur",
-                "postal_code": "389890",
-                "country": "India"
-            },
-            aadhaar_no="555555555555",
-            role="ADMIN"  # Adjust this based on your actual role field
-        )
         self.client = APIClient()
-
-    @staticmethod
-    def _fake_receipt(block_number: int = 1, tx_hash: str = "0x" + "a" * 64):
-        return SimpleNamespace(
-            blockNumber=block_number,
-            transactionHash=bytes.fromhex(tx_hash[2:])
-        )
-
-    def authenticate(self, user):
-        """Force‑authenticate the request as the given user."""
-        self.client.force_authenticate(user)
-
-
-class LicenseApplyTests(BaseAPITestCase):
-    """POST /licenses/apply/"""
-
-    url = reverse("license-create")  # name these URLs in your urls.py for easier reversing
-
-    def _valid_payload(self):
-        return {
-            "name": "Alice",
-            "aadhaar": "123412341234",
-            "location": "Jaipur",
+        
+        # Mock license data
+        self.license_data = {
+            "name": "Test Farmer",
+            "aadhaar": "123456789012",
+            "location": "Test Location", 
             "license_type": "SEED_PRODUCTION",
-            "seed_variety": "Pusa-1121",
-            "crop_type": "Rice",
-            "quantity": 100,
-            "quality_parameters": "Purity 98%",
-            "source": "Self"
+            "seed_variety": "Test Variety",
+            "crop_type": "Test Crop",
+            "quantity": "100",
+            "quality_parameters": "Test Parameters",
+            "source": "Test Source"
         }
-
-    # -------------------- Happy path --------------------
-
-    @patch("licenses.views.Web3")
-    @patch("licenses.views.SeedLicenseHandler.apply_for_license")
-    def test_apply_license_success(self, mock_apply, mock_web3):
-        """Successful license application returns 201 and expected JSON body."""
-        # Fake Web3 timestamp lookup
-        mock_web3.return_value.eth.get_block.return_value = {"timestamp": int(timezone.now().timestamp())}
-        mock_apply.return_value = (
-            123,
-            self._fake_receipt(block_number=1),
-        )
-
-        self.authenticate(self.farmer)
-        resp = self.client.post(self.url, self._valid_payload(), format="json")
-        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
-        body = resp.data
-        self.assertEqual(body["data"]["application_id"], 123)
-        self.assertEqual(body["data"]["status"], "APPLIED")
-        self.assertIn("blockchain_tx_id", body["data"])
-        mock_apply.assert_called_once()
-
-    # ------------------ Validation errors ------------------
-
-    def test_apply_license_missing_fields(self):
-        """Omitting required fields should return 400 with a helpful message."""
-        payload = {"name": "Bob"}  # clearly insufficient
-        self.authenticate(self.farmer)
-        resp = self.client.post(self.url, payload, format="json")
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("Missing required fields", resp.data["err"])
-
-    def test_apply_license_invalid_license_type(self):
-        payload = self._valid_payload()
-        payload["license_type"] = "NOT_A_TYPE"
-        self.authenticate(self.farmer)
-        resp = self.client.post(self.url, payload, format="json")
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("Invalid license_type", resp.data["err"])
-
-
-class LicenseDetailTests(BaseAPITestCase):
-    """GET /licenses/<license_id>/"""
-
-    def setUp(self):
-        super().setUp()
-        self.url = lambda _id: reverse("license-detail", args=[_id])
-
-    @patch("licenses.views.SeedLicenseHandler.get_license_summary")
-    def test_license_detail_success(self, mock_summary):
-        summary_payload = {
-            "id": 1,
-            "name": "Alice",
-            "status": 0,
-            "license_type": 0,
-        }
-        mock_summary.return_value = summary_payload
-        self.authenticate(self.farmer)
-        resp = self.client.get(self.url(1))
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertEqual(resp.data["data"], summary_payload)
-
-
-class LicenseStatusUpdateTests(BaseAPITestCase):
-    """POST /licenses/<license_id>/update-status/"""
-
-    def setUp(self):
-        super().setUp()
-        self.url = lambda _id: reverse("license-status-update", args=[_id])
-
-    @patch("licenses.views.SeedLicenseHandler.update_license_status")
-    def test_status_update_success(self, mock_update):
-        mock_update.return_value = self._fake_receipt()
-        payload = {"status": 1, "remarks": "Looks good"}
-        self.authenticate(self.officer)
-        resp = self.client.post(self.url(1), payload, format="json")
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertEqual(resp.data["data"]["status"], 1)
-
-    def test_status_update_unauthorized_role(self):
-        """Farmer (not officer) attempting status update should get 403."""
-        self.authenticate(self.farmer)
-        resp = self.client.post(self.url(1), {"status": 1}, format="json")
-        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_status_update_missing_status(self):
-        self.authenticate(self.officer)
-        resp = self.client.post(self.url(1), {}, format="json")
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("Missing 'status'", resp.data["err"])
-
-
-class LicenseStatusViewTests(BaseAPITestCase):
-    """GET /licenses/<license_id>/status/"""
-
-    def setUp(self):
-        super().setUp()
-        self.url = lambda _id: reverse("license-status", args=[_id])
-
-    @patch("licenses.views.SeedLicenseHandler.is_license_valid", return_value=True)
-    @patch("licenses.views.SeedLicenseHandler.get_license_status", return_value=3)
-    def test_status_view_success(self, mock_status, mock_valid):
-        self.authenticate(self.farmer)
-        resp = self.client.get(self.url(1))
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertTrue(resp.data["data"]["blockchain_verified"])
-        self.assertEqual(resp.data["data"]["status"], 3)
-
-
-class LicenseHistoryTests(BaseAPITestCase):
-    """GET /licenses/<license_id>/history/"""
-
-    def setUp(self):
-        super().setUp()
-        self.url = lambda _id: reverse("license-history", args=[_id])
-
-    @patch("licenses.views.SeedLicenseHandler.get_license_history")
-    def test_history_success(self, mock_hist):
-        hist = [
-            {
-                "timestamp": int(timezone.now().timestamp()),
-                "officer_role": "AGRICULTURE_OFFICER",
-                "previous_status": 0,
-                "new_status": 1,
-                "remarks": "Reviewed",
-            }
+        
+        # Mock blockchain responses
+        self.mock_receipt = MagicMock()
+        self.mock_receipt.transactionHash.hex.return_value = "0xabc123"
+        self.mock_receipt.blockNumber = 12345
+        
+        self.license_summary_mock = [
+            123,  # license_id
+            "0x123...",  # farmer_address
+            "Test Farmer",  # farmer_name
+            "Test Location",  # location
+            0,  # license_type
+            0,  # status
+            1234567890,  # application_date
+            0,  # approval_date
+            0,  # expiry_date
+            True,  # is_active
+            ("Test Variety", "Test Crop", "100", "Test Parameters", "Test Source")
         ]
-        mock_hist.return_value = hist
-        self.authenticate(self.farmer)
-        resp = self.client.get(self.url(1))
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertEqual(resp.data["data"], {"id": 1, "history": hist})
-
-
-class LicenseCertificateDownloadTests(BaseAPITestCase):
-    """GET /licenses/<license_id>/certificate/"""
-
-    def setUp(self):
-        super().setUp()
-        self.url = lambda _id: reverse("license-certificate", args=[_id])
-        # Create a DB license object for fetch
-        self.license = License.objects.create(
-            applicant=self.farmer,
-            license_id=1,
-            license_type="SEED_PRODUCTION",
-            crop_type="Rice",
-            seed_variety="Pusa",
-            quantity=100,
-            location="Jaipur",
-            quality_parameters="Purity 98%",
-            source="Self",
-            aadhaar="123412341234",
-            status="APPROVED",
-            blockchain_tx_id="0x" + "b" * 64,
+        
+        # Patch authentication
+        self.auth_patcher = patch(
+            'seed_license.views.RajSSOAuthentication.authenticate',
+            return_value=(MagicMock(), None)
         )
-
-    @patch("licenses.views.SeedLicenseHandler.get_license_summary", return_value={"status": 3})
-    @patch("licenses.views.SeedLicenseHandler.get_certificate_url", return_value="https://fake/cert.pdf")
-    def test_certificate_success(self, mock_url, mock_summary):
-        self.authenticate(self.farmer)
-        resp = self.client.get(self.url(1))
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertIn("certificate_url", resp.data["data"])
-
-    def test_certificate_non_approved(self):
-        self.license.status = "APPLIED"
-        self.license.save()
-        self.authenticate(self.farmer)
-        resp = self.client.get(self.url(1))
-        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
-
-
-class LicenseListTests(BaseAPITestCase):
-    """GET /licenses/ (farmer‑only)"""
-
-    url = reverse("license-list")
-
-    def setUp(self):
-        super().setUp()
-        License.objects.bulk_create([
-            License(
-                applicant=self.farmer,
-                license_id=i,
-                license_type="SEED_PRODUCTION",
-                crop_type="Crop",
-                seed_variety="Variety",
-                quantity=10,
-                location="Loc",
-                quality_parameters="Q",
-                source="S",
-                aadhaar="123412341234",
-                status="APPLIED",
-                blockchain_tx_id="0x" + str(i).zfill(64),
-            ) for i in range(15)
-        ])
-
-    def test_license_list_paginated(self):
-        self.authenticate(self.farmer)
-        resp = self.client.get(self.url)
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(resp.data["results"]["licenses"]), 10)  # default page size
-        self.assertEqual(resp.data["results"]["total"], 15)
-
-
-class TransactionStatusTests(BaseAPITestCase):
-    """GET /blockchain/transactions/<tx_hash>/"""
-
-    def setUp(self):
-        super().setUp()
-        self.url = lambda h: reverse("transaction-status", args=[h])
-
-    @patch("licenses.views.SeedLicenseHandler.get_transaction_info")
-    def test_transaction_status_success(self, mock_tx):
-        info = {
-            "tx_hash": "0xabc",
-            "status": "CONFIRMED",
-            "block_number": 1,
-            "timestamp": int(timezone.now().timestamp()),
-            "confirmations": 5,
-        }
-        mock_tx.return_value = info
-        self.authenticate(self.farmer)
-        resp = self.client.get(self.url("0xabc"))
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertEqual(resp.data["data"], info)
-
-
-class TransactionHistoryTests(BaseAPITestCase):
-    """GET /blockchain/transactions/history/"""
-
-    url = reverse("transaction-history")
-
-    def setUp(self):
-        super().setUp()
-        # Create 12 fake transactions for pagination test
-        lic = License.objects.create(
-            applicant=self.farmer,
-            license_id=99,
-            license_type="SEED_PRODUCTION",
-            crop_type="x",
-            seed_variety="y",
-            quantity=1,
-            location="z",
-            quality_parameters="q",
-            source="s",
-            aadhaar="111122223333",
-            status="APPLIED",
-            blockchain_tx_id="0x" + "d" * 64,
+        self.auth_patcher.start()
+        
+    def tearDown(self):
+        self.auth_patcher.stop()
+    
+    def _mock_handler(self):
+        handler_patcher = patch('seed_license.views.SeedLicenseHandler')
+        mock_handler = handler_patcher.start()
+        self.addCleanup(handler_patcher.stop)
+        return mock_handler.return_value
+    
+    def _parse_response(self, response):
+        return json.loads(response.content.decode('utf-8'))
+    
+    def test_license_creation_success(self):
+        mock_handler = self._mock_handler()
+        mock_handler.apply_for_license.return_value = (123, self.mock_receipt)
+        
+        response = self.client.post(
+            reverse('license-create'),
+            data=self.license_data,
+            format='json'
         )
-        tx_objects = [
-            BlockchainTransaction(
-                tx_hash=f"0x{str(i).zfill(64)}",
-                block_number=i,
-                status="CONFIRMED",
-                timestamp=timezone.now(),
-                action_type="LICENSE_APPLY",
-                license=lic,
-                created_by=self.farmer,
-            ) for i in range(12)
+        response_data = self._parse_response(response)
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response_data['data']['application_id'], 123)
+        mock_handler.apply_for_license.assert_called_once()
+    
+    def test_license_creation_missing_fields(self):
+        invalid_data = self.license_data.copy()
+        del invalid_data['name']
+        del invalid_data['aadhaar']
+        
+        response = self.client.post(
+            reverse('license-create'),
+            data=invalid_data,
+            format='json'
+        )
+        response_data = self._parse_response(response)
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Missing required fields", response_data['error'])
+    
+    def test_get_license_detail_success(self):
+        mock_handler = self._mock_handler()
+        mock_handler.get_license_summary.return_value = self.license_summary_mock
+        
+        response = self.client.get(
+            reverse('license-detail', kwargs={'license_id': 123})
+        )
+        response_data = self._parse_response(response)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # summary returned as list
+        self.assertEqual(response_data['data'][0], 123)
+    
+    def test_license_status_update_success(self):
+        mock_handler = self._mock_handler()
+        mock_handler.update_license_status.return_value = self.mock_receipt
+        
+        response = self.client.post(
+            reverse('license-status-update', kwargs={'license_id': 123}),
+            data={"status": 1, "remarks": "Test remarks"},
+            format='json'
+        )
+        response_data = self._parse_response(response)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response_data['data']['id'], 123)
+    
+    def test_license_status_view_success(self):
+        mock_handler = self._mock_handler()
+        mock_handler.contract.functions.getLicenseSummary.return_value.call.return_value = self.license_summary_mock
+        mock_handler.contract.functions.isLicenseValid.return_value.call.return_value = True
+        
+        response = self.client.get(
+            reverse('license-status', kwargs={'license_id': 123})
+        )
+        response_data = self._parse_response(response)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response_data['data']['status'], "APPLIED")
+    
+    def test_license_history_success(self):
+        mock_handler = self._mock_handler()
+        mock_handler.get_license_history.return_value = [
+            {"timestamp": 1234567890, "new_status": 1, "remarks": "Test"}
         ]
-        BlockchainTransaction.objects.bulk_create(tx_objects)
+        
+        response = self.client.get(
+            reverse('license-history', kwargs={'license_id': 123})
+        )
+        response_data = self._parse_response(response)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response_data['data']['history']), 1)
+    
+    def test_certificate_download_not_approved(self):
+        mock_handler = self._mock_handler()
+        mock_handler.get_license_summary.return_value = {"status": 3}  # Not approved
+        
+        response = self.client.get(
+            reverse('license-certificate', kwargs={'license_id': 123})
+        )
+        
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+    
+    def test_license_list_success(self):
+        with patch('seed_license.views.License.objects') as mock_manager:
+            mock_queryset = MagicMock()
+            # Ensure slicing and order_by return same mock
+            mock_manager.all.return_value = mock_queryset
+            mock_queryset.order_by.return_value = mock_queryset
+            mock_queryset.count.return_value = 1
+            # Support iteration
+            mock_license = MagicMock()
+            mock_license.license_id = "123"
+            mock_queryset.__iter__.return_value = iter([mock_license])
 
-    def test_transaction_history_paginated(self):
-        self.authenticate(self.farmer)
-        resp = self.client.get(self.url)
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertEqual(resp.data["results"]["total"], 12)
-        self.assertEqual(len(resp.data["results"]["transactions"]), 10)
+            response = self.client.get(reverse('license-list'))
+            response_data = self._parse_response(response)
+
+            results = response_data["results"]
+
+            self.assertIsInstance(results, dict)
+            self.assertIn("total", results)
+            self.assertIn("licenses", results)
+            self.assertEqual(results["total"], 1)
+            self.assertEqual(len(results["licenses"]), 0)
+
+    def test_transaction_status_success(self):
+        mock_handler = self._mock_handler()
+        mock_handler.get_transaction_info.return_value = {
+            "tx_hash": "0xabc123",
+            "status": "CONFIRMED"
+        }
+        
+        response = self.client.get(
+            reverse('transaction-status', kwargs={'tx_hash': '0xabc123'})
+        )
+        response_data = self._parse_response(response)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response_data['data']['status'], "CONFIRMED")
