@@ -582,9 +582,64 @@ def get_contract_abi(contract_name: str) -> List[Dict]:
     return contract.abi
 
 
+
+def get_all_contract_addresses() -> dict:
+    """
+    Get all deployed contract addresses
+    Returns a dictionary with contract names and their addresses
+    """
+    deployment_info_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", "deployment_info.json")
+    
+    try:
+        with open(deployment_info_path, "r") as fh:
+            deployment_info = json.load(fh)
+        
+        addresses = {}
+        
+        # Add proxy address (recommended for interactions)
+        if "proxy" in deployment_info and deployment_info["proxy"]:
+            addresses["proxy"] = deployment_info["proxy"]
+            addresses["LicenseSystemV1"] = deployment_info["proxy"]  # V1 uses proxy
+            addresses["seedLicenseContract"] = deployment_info["proxy"]  # Legacy alias
+        
+        # Add implementation addresses
+        if "implementationV1" in deployment_info:
+            addresses["implementationV1"] = deployment_info["implementationV1"]
+            addresses["LicenseSystemV1Implementation"] = deployment_info["implementationV1"]
+        
+        if "implementationV2" in deployment_info:
+            addresses["implementationV2"] = deployment_info["implementationV2"]
+            addresses["LicenseSystemV2Implementation"] = deployment_info["implementationV2"]
+            addresses["LicenseSystemV2"] = deployment_info["implementationV2"]
+        
+        # Add any other contract addresses found in deployment_info
+        excluded_keys = {"network", "networkName", "deploymentTime", "deploymentTimeFormatted", 
+                        "deployer", "implementationABI", "gasUsed", "verification"}
+        
+        for key, value in deployment_info.items():
+            if key not in excluded_keys and isinstance(value, str) and value.startswith("0x"):
+                if key not in addresses:
+                    addresses[key] = value
+        
+        return {
+            "addresses": addresses,
+            "total_contracts": len(addresses),
+            "recommended_address": deployment_info.get("proxy"),
+            "network": deployment_info.get("network"),
+            "deployer": deployment_info.get("deployer")
+        }
+        
+    except Exception as e:
+        logger.error(f"Error reading deployment info: {e}")
+        return {
+            "error": f"Failed to read deployment info: {str(e)}",
+            "addresses": {}
+        }
+
+
 def get_contract_address(contract_name: str) -> str:
     """
-    Get the address for a contract
+    Get the address for a specific contract
     For upgradeable contracts, this returns the PROXY address (the main interaction point)
     """
     deployment_info_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", "deployment_info.json")
@@ -593,18 +648,26 @@ def get_contract_address(contract_name: str) -> str:
         with open(deployment_info_path, "r") as fh:
             deployment_info = json.load(fh)
         
-        # For upgradeable contracts, ALWAYS return the proxy address
-        if "proxy" in deployment_info and deployment_info["proxy"]:
-            return deployment_info["proxy"]
-        
-        # Fallback for non-upgradeable contracts
+        # Contract name to deployment key mapping
         contract_mapping = {
-            "seedLicenseContract": "implementationV1",
-            "LicenseSystemV1": "implementationV1", 
-            "LicenseSystemV2": "implementationV2",
+            # Proxy addresses (recommended for interaction)
+            "LicenseSystemV1": "proxy",
+            "LicenseSystemV2": "proxy", 
+            "seedLicenseContract": "proxy",
+            "proxy": "proxy",
+            "ERC1967Proxy": "proxy",
+            
+            # Implementation addresses (for direct access)
+            "LicenseSystemV1Implementation": "implementationV1",
+            "LicenseSystemV2Implementation": "implementationV2",
+            "implementationV1": "implementationV1",
+            "implementationV2": "implementationV2",
         }
         
+        # Get deployment key for the contract name
         deployment_key = contract_mapping.get(contract_name, contract_name)
+        
+        # Get address from deployment info
         contract_address = deployment_info.get(deployment_key)
         
         if contract_address:
@@ -613,9 +676,15 @@ def get_contract_address(contract_name: str) -> str:
             raise ValueError(f"Contract address not found for {contract_name}")
             
     except Exception as e:
+        logger.error(f"Error getting contract address for {contract_name}: {e}")
         # Fallback to getting from contract instance
-        contract = get_contract(contract_name)
-        return contract.address
+        try:
+            contract = get_contract(contract_name)
+            return contract.address
+        except:
+            raise ValueError(f"Contract address not found for {contract_name}: {str(e)}")
+        
+
 
 
 def get_available_methods(contract_name: str) -> Dict[str, List[Dict]]:

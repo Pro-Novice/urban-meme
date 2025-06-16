@@ -9,7 +9,9 @@ from .blockchain_services import (
     get_available_methods,
     get_contract_abi,
     get_contract_address,
-    estimate_gas_for_method
+    estimate_gas_for_method,
+    get_all_contract_addresses
+    
 )
 
 logger = logging.getLogger(__name__)
@@ -133,9 +135,15 @@ def contract_abi_view(request, contract_name):
 
 @api_view(["GET"])
 def contract_address_view(request, contract_name):
-    """Get contract address"""
+    """Get contract address(es) - supports 'all' to return all addresses"""
     try:
-        address = get_contract_address(contract_name)
+        # Special case: return all contract addresses
+        if contract_name.lower() == 'all':
+            all_addresses = get_all_contract_addresses()
+            return ApiResponse(data=all_addresses, status=200)
+        
+        # Return specific contract address
+        address = get_all_contract_addresses(contract_name)
         return ApiResponse(data={"address": address}, status=200)
     except Exception as e:
         logger.exception("Contract address error")
