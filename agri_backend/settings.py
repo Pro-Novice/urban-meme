@@ -187,8 +187,7 @@ CACHES = {
 
 # Smart contract settings
 
-BLOCKCHAIN_URL = env('BLOCKCHAIN_URL', default='https://rpc-amoy.polygon.technology/')
-CONTRACT_ADDRESS = env('CONTRACT_ADDRESS')
+BLOCKCHAIN_URL = env('RPC_URL', default='http://127.0.0.1:8545/')
 PRIVATE_KEY = env("PRIVATE_KEY")
 WALLET_ADDRESS = Web3().eth.account.from_key(PRIVATE_KEY).address
 

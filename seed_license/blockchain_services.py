@@ -128,18 +128,33 @@ def _sign_and_send(tx: dict, private_key: str) -> str:
     signed = w3.eth.account.sign_transaction(tx, private_key)
     return w3.eth.send_raw_transaction(signed.raw_transaction)
 
-
 def call_function(function, *args, address=None, private_key=None):
-    """Build, sign & send a state‑changing transaction and wait for receipt."""
+    """Build, sign & send a state-changing transaction and wait for receipt."""
     sender = address or DEFAULT_ADDRESS
     key = private_key or DEFAULT_PRIVATE_KEY
-
+    
+    logger.info(f"🔍 TRANSACTION DEBUG - Starting call_function")
+    logger.info(f"From address: {sender}")
+    logger.info(f"Function: {function}")
+    logger.info(f"Args: {args}")
+    
+    # Check account balance first
+    try:
+        balance_wei = w3.eth.get_balance(sender)
+        balance_eth = w3.from_wei(balance_wei, 'ether')
+        logger.info(f"💰 Account balance: {balance_eth} ETH")
+        
+        if balance_eth < 0.01:  # Less than 0.01 ETH
+            raise ValueError(f"Insufficient balance: {balance_eth} ETH. Need at least 0.01 ETH for transactions.")
+    except Exception as e:
+        logger.error(f"Failed to check balance: {e}")
+        
     # First, try to call the function to check for revert reasons
     try:
         result = function(*args).call({"from": sender})
-        logger.info(f"Dry run successful, result: {result}")
+        logger.info(f"✅ Dry run successful, result: {result}")
     except Exception as e:
-        logger.error(f"Dry run failed with error: {e}")
+        logger.error(f"❌ Dry run failed with error: {e}")
         # Extract revert reason if available
         error_str = str(e)
         if "execution reverted" in error_str:
@@ -150,24 +165,145 @@ def call_function(function, *args, address=None, private_key=None):
             else:
                 raise ContractLogicError(f"Contract reverted: {error_str}")
         # Continue anyway for some edge cases
-
-    tx = function(*args).build_transaction({
-        "from": sender,
-        "nonce": w3.eth.get_transaction_count(sender),
-        "gasPrice": w3.eth.gas_price,
-    })
     
-    # Estimate gas with 20% buffer
+    # Get current network info for gas optimization
+    chain_id = w3.eth.chain_id
+    logger.info(f"🌐 Chain ID: {chain_id}")
+    
+    # Build initial transaction
     try:
-        estimated_gas = w3.eth.estimate_gas(tx)
-        tx["gas"] = int(estimated_gas * 1.2)
+        nonce = w3.eth.get_transaction_count(sender, 'pending')
+        logger.info(f"📋 Using nonce: {nonce}")
+        
+        # Get base gas price
+        base_gas_price = w3.eth.gas_price
+        logger.info(f"⛽ Base gas price: {w3.from_wei(base_gas_price, 'gwei')} gwei")
+        
+        # Optimize gas price based on network
+        if chain_id == 31337:  # Hardhat Network
+            # Use minimal gas price for local development
+            gas_price = max(base_gas_price, 1000000000)  # At least 1 gwei
+            logger.info(f"🔧 Hardhat detected - using minimal gas price: {w3.from_wei(gas_price, 'gwei')} gwei")
+        elif chain_id == 1337:  # Ganache
+            gas_price = base_gas_price
+            logger.info(f"🔧 Ganache detected - using base gas price: {w3.from_wei(gas_price, 'gwei')} gwei")
+        else:
+            # Real networks need premium for faster confirmation
+            gas_price = int(base_gas_price * 1.2)  # 20% premium
+            logger.info(f"🌐 Real network - using premium gas price: {w3.from_wei(gas_price, 'gwei')} gwei")
+        
+        tx = function(*args).build_transaction({
+            "from": sender,
+            "nonce": nonce,
+            "gasPrice": gas_price,
+        })
+        
+        logger.info(f"📝 Initial transaction built successfully")
+        
     except Exception as e:
-        logger.error(f"Gas estimation failed: {e}")
-        # Use a default high gas limit
-        tx["gas"] = 3000000
+        logger.error(f"❌ Failed to build transaction: {e}")
+        raise ValueError(f"Transaction building failed: {e}")
+    
+    # Estimate gas with safety buffer
+    try:
+        logger.info(f"🔍 Estimating gas...")
+        estimated_gas = w3.eth.estimate_gas(tx)
+        logger.info(f"📊 Gas estimate: {estimated_gas:,}")
+        
+        # Apply appropriate buffer based on network
+        if chain_id in [31337, 1337]:  # Local networks
+            buffer_multiplier = 1.5  # 50% buffer for local testing
+        else:
+            buffer_multiplier = 1.2  # 20% buffer for real networks
+            
+        gas_limit = int(estimated_gas * buffer_multiplier)
+        
+        # Cap gas limit to prevent excessive costs
+        max_gas_limit = 1000000  # 1M gas max
+        if gas_limit > max_gas_limit:
+            logger.warning(f"⚠️ Gas limit {gas_limit:,} exceeds max {max_gas_limit:,}, capping")
+            gas_limit = max_gas_limit
+            
+        tx["gas"] = gas_limit
+        logger.info(f"⛽ Using gas limit: {gas_limit:,} (estimate: {estimated_gas:,}, buffer: {buffer_multiplier}x)")
+        
+    except Exception as e:
+        logger.error(f"❌ Gas estimation failed: {e}")
+        # Use conservative default based on network
+        if chain_id in [31337, 1337]:
+            default_gas = 500000  # 500k for local networks
+        else:
+            default_gas = 300000  # 300k for real networks
+            
+        tx["gas"] = default_gas
+        logger.warning(f"🔄 Using fallback gas limit: {default_gas:,}")
+    
+    # Calculate and validate transaction cost
+    try:
+        total_gas_cost_wei = tx["gas"] * tx["gasPrice"]
+        total_gas_cost_eth = w3.from_wei(total_gas_cost_wei, 'ether')
+        
+        logger.info(f"💸 Transaction cost breakdown:")
+        logger.info(f"   Gas limit: {tx['gas']:,}")
+        logger.info(f"   Gas price: {w3.from_wei(tx['gasPrice'], 'gwei')} gwei")
+        logger.info(f"   Max cost: {total_gas_cost_eth:.6f} ETH")
+        
+        # Check if account can afford the transaction
+        balance_wei = w3.eth.get_balance(sender)
+        if total_gas_cost_wei >= balance_wei:
+            balance_eth = w3.from_wei(balance_wei, 'ether')
+            raise ValueError(
+                f"Insufficient funds for transaction. "
+                f"Need: {total_gas_cost_eth:.6f} ETH, "
+                f"Have: {balance_eth:.6f} ETH"
+            )
+            
+        # Warn if transaction cost is high relative to balance
+        if total_gas_cost_wei > balance_wei * 0.1:  # More than 10% of balance
+            balance_eth = w3.from_wei(balance_wei, 'ether')
+            logger.warning(f"⚠️ High transaction cost: {total_gas_cost_eth:.6f} ETH ({total_gas_cost_wei/balance_wei*100:.1f}% of balance)")
+            
+    except Exception as e:
+        logger.error(f"❌ Failed to calculate transaction cost: {e}")
+        # Continue anyway - might be a calculation error
+    
+    # Sign and send transaction
+    try:
+        logger.info(f"🔍 Signing and sending transaction...")
+        tx_hash = _sign_and_send(tx, key)
+        logger.info(f"📡 Transaction sent: {tx_hash.hex()}")
+        
+        # Wait for confirmation with timeout
+        logger.info(f"⏳ Waiting for confirmation...")
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
+        
+        if receipt.status == 1:
+            logger.info(f"✅ Transaction confirmed in block {receipt.blockNumber}")
+            logger.info(f"⛽ Gas used: {receipt.gasUsed:,} / {tx['gas']:,} ({receipt.gasUsed/tx['gas']*100:.1f}%)")
+        else:
+            logger.error(f"❌ Transaction failed in block {receipt.blockNumber}")
+            
+        return receipt
+        
+    except Exception as e:
+        logger.error(f"❌ Transaction failed: {e}")
+        
+        # Handle specific Web3 errors
+        error_msg = str(e).lower()
+        
+        if "insufficient funds" in error_msg:
+            raise ValueError(f"Insufficient funds for transaction: {e}")
+        elif "nonce too low" in error_msg:
+            raise ValueError(f"Nonce too low - transaction ordering issue: {e}")
+        elif "already known" in error_msg:
+            raise ValueError(f"Transaction already in mempool: {e}")
+        elif "underpriced" in error_msg:
+            raise ValueError(f"Gas price too low: {e}")
+        elif "intrinsic gas too low" in error_msg:
+            raise ValueError(f"Gas limit too low: {e}")
+        else:
+            raise ValueError(f"Transaction failed: {e}")
 
-    tx_hash = _sign_and_send(tx, key)
-    return w3.eth.wait_for_transaction_receipt(tx_hash)
 
 
 def call_view_function(function, *args):
@@ -195,17 +331,72 @@ def get_transaction_status(tx_hash: str):
 # New Methods for Universal Contract Interaction
 # ══════════════════════════════════════════════════════════════════════
 
+
+
 def write_to_contract(contract_name: str, method_name: str, params: List[Any], 
                      address: Optional[str] = None, private_key: Optional[str] = None) -> Dict[str, Any]:
     """
     Universal function to write to any smart contract method
     """
     try:
+        # =============== NETWORK DEBUGGING INFORMATION ===============
+        logger.info(f"🌐 NETWORK CONNECTION DEBUG:")
+        logger.info(f"   RPC URL: {w3.provider.endpoint_uri}")
+        
+        try:
+            chain_id = w3.eth.chain_id
+            latest_block = w3.eth.block_number
+            logger.info(f"   Chain ID: {chain_id}")
+            logger.info(f"   Latest block: {latest_block}")
+            
+            # Map chain IDs to network names
+            network_names = {
+                1: "Ethereum Mainnet",
+                56: "BSC Mainnet",
+                97: "BSC Testnet", 
+                137: "Polygon Mainnet",
+                80001: "Polygon Mumbai",
+                1337: "Ganache",
+                31337: "Hardhat Network",
+                11155111: "Sepolia",
+                5: "Goerli"
+            }
+            network_name = network_names.get(chain_id, f"Unknown Network (ID: {chain_id})")
+            logger.info(f"   Network: {network_name}")
+            
+            # Check if connected properly
+            if not w3.is_connected():
+                logger.error(f"❌ Web3 connection failed!")
+            else:
+                logger.info(f"✅ Web3 connected successfully")
+                
+        except Exception as net_error:
+            logger.error(f"❌ Failed to get network info: {net_error}")
+        
+        # =============== ACCOUNT BALANCE CHECK ===============
+        sender_address = address or DEFAULT_ADDRESS
+        try:
+            balance_wei = w3.eth.get_balance(sender_address)
+            balance_eth = w3.from_wei(balance_wei, 'ether')
+            logger.info(f"💰 Account balance check:")
+            logger.info(f"   Address: {sender_address}")
+            logger.info(f"   Balance: {balance_eth:.6f} ETH")
+            
+            if balance_eth < 0.001:
+                logger.warning(f"⚠️ Low balance detected: {balance_eth:.6f} ETH")
+                
+        except Exception as balance_error:
+            logger.error(f"❌ Failed to check account balance: {balance_error}")
+        
+        # =============== CONTRACT INFORMATION ===============
         contract = get_contract(contract_name)
         
-        logger.info(f"Contract address being used: {contract.address}")
-        logger.info(f"Attempting to call {contract_name}.{method_name} with params: {params}")
-        logger.info(f"From address: {address or DEFAULT_ADDRESS}")
+        logger.info(f"📋 CONTRACT DEBUG:")
+        logger.info(f"   Contract name: {contract_name}")
+        logger.info(f"   Contract address: {contract.address}")
+        logger.info(f"   Method: {method_name}")
+        logger.info(f"   Params: {params}")
+        logger.info(f"   From address: {sender_address}")
         
         # Check if method exists
         if not hasattr(contract.functions, method_name):
@@ -216,7 +407,41 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
         
         # Process parameters
         processed_params = process_params_for_abi(params, contract_function, contract)
-        logger.info(f"Processed params: {processed_params}")
+        logger.info(f"   Processed params: {processed_params}")
+        
+        # =============== GAS ESTIMATION DEBUG ===============
+        try:
+            # Build a test transaction for gas estimation
+            test_tx = contract_function(*processed_params).build_transaction({
+                'from': sender_address,
+                'nonce': w3.eth.get_transaction_count(sender_address, 'pending'),
+                'gasPrice': w3.eth.gas_price,
+            })
+            
+            # Estimate gas
+            estimated_gas = w3.eth.estimate_gas(test_tx)
+            gas_price = w3.eth.gas_price
+            estimated_cost_wei = estimated_gas * gas_price
+            estimated_cost_eth = w3.from_wei(estimated_cost_wei, 'ether')
+            
+            logger.info(f"⛽ GAS ESTIMATION:")
+            logger.info(f"   Estimated gas: {estimated_gas:,}")
+            logger.info(f"   Gas price: {w3.from_wei(gas_price, 'gwei')} gwei")
+            logger.info(f"   Estimated cost: {estimated_cost_eth:.6f} ETH")
+            
+            # Check if account can afford the transaction
+            balance_wei = w3.eth.get_balance(sender_address)
+            if estimated_cost_wei > balance_wei:
+                logger.error(f"❌ INSUFFICIENT FUNDS:")
+                logger.error(f"   Need: {estimated_cost_eth:.6f} ETH")
+                logger.error(f"   Have: {w3.from_wei(balance_wei, 'ether'):.6f} ETH")
+                logger.error(f"   Shortfall: {w3.from_wei(estimated_cost_wei - balance_wei, 'ether'):.6f} ETH")
+                
+        except Exception as gas_error:
+            logger.error(f"❌ Gas estimation failed: {gas_error}")
+        
+        # =============== EXECUTE TRANSACTION ===============
+        logger.info(f"🚀 Executing transaction...")
         
         # Call the function
         receipt = call_function(contract_function, *processed_params, address=address, private_key=private_key)
@@ -224,13 +449,26 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
         # Parse events from receipt
         events = parse_receipt_events(receipt, contract)
         
+        logger.info(f"✅ Transaction completed:")
+        logger.info(f"   Status: {'Success' if receipt.status == 1 else 'Failed'}")
+        logger.info(f"   Transaction hash: {receipt.transactionHash.hex()}")
+        logger.info(f"   Block number: {receipt.blockNumber}")
+        logger.info(f"   Gas used: {receipt.gasUsed:,}")
+        
         return {
             "success": receipt.status == 1,
             "transaction_hash": receipt.transactionHash.hex(),
             "block_number": receipt.blockNumber,
             "gas_used": receipt.gasUsed,
             "events": events,
-            "status": "confirmed" if receipt.status == 1 else "failed"
+            "status": "confirmed" if receipt.status == 1 else "failed",
+            # Add network info to response
+            "network_info": {
+                "rpc_url": str(w3.provider.endpoint_uri),
+                "chain_id": w3.eth.chain_id,
+                "network_name": network_names.get(w3.eth.chain_id, f"Unknown (ID: {w3.eth.chain_id})"),
+                "sender_address": sender_address
+            }
         }
         
     except ContractLogicError as e:
@@ -244,28 +482,32 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
                     "success": False,
                     "error": "Permission denied: Only admin can perform this action",
                     "details": "The calling address does not have admin privileges",
-                    "solution": "Ensure you're using the admin address or grant admin role to your address"
+                    "solution": "Ensure you're using the admin address or grant admin role to your address",
+                    "network_info": _get_network_info()
                 }
             elif "Already exists" in error_msg:
                 return {
                     "success": False,
                     "error": "License already exists",
                     "details": "A license with similar details may already exist",
-                    "solution": "Check if the farmer already has an active license"
+                    "solution": "Check if the farmer already has an active license",
+                    "network_info": _get_network_info()
                 }
             elif "Invalid status" in error_msg:
                 return {
                     "success": False,
                     "error": "Invalid license status transition",
                     "details": "The requested status change is not allowed from current status",
-                    "solution": "Check the current license status and valid transitions"
+                    "solution": "Check the current license status and valid transitions",
+                    "network_info": _get_network_info()
                 }
             elif "not found" in error_msg or "Does not exist" in error_msg:
                 return {
                     "success": False,
                     "error": "License not found",
                     "details": "The specified license ID does not exist",
-                    "solution": "Verify the license ID is correct"
+                    "solution": "Verify the license ID is correct",
+                    "network_info": _get_network_info()
                 }
         
         # Generic contract revert
@@ -273,7 +515,8 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
             "success": False,
             "error": "Smart contract execution failed",
             "details": error_msg,
-            "solution": "Check contract requirements and ensure all conditions are met"
+            "solution": "Check contract requirements and ensure all conditions are met",
+            "network_info": _get_network_info()
         }
         
     except ValueError as e:
@@ -285,21 +528,24 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
                 "success": False,
                 "error": f"Method '{method_name}' does not exist in contract",
                 "details": "The specified method name is not available in the contract ABI",
-                "solution": f"Check available methods at /api/seed-license/blockchain/contracts/{contract_name}/methods/"
+                "solution": f"Check available methods at /api/seed-license/blockchain/contracts/{contract_name}/methods/",
+                "network_info": _get_network_info()
             }
         elif "Contract files not found" in error_msg:
             return {
                 "success": False,
                 "error": "Contract configuration not found",
                 "details": f"Unable to load ABI or address for contract '{contract_name}'",
-                "solution": "Ensure the contract is properly deployed and configuration files exist"
+                "solution": "Ensure the contract is properly deployed and configuration files exist",
+                "network_info": _get_network_info()
             }
             
         return {
             "success": False,
             "error": "Invalid request parameters",
             "details": error_msg,
-            "solution": "Verify all parameters are correctly formatted"
+            "solution": "Verify all parameters are correctly formatted",
+            "network_info": _get_network_info()
         }
         
     except Exception as e:
@@ -313,14 +559,16 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
                 "error": "Insufficient funds for transaction",
                 "details": "The sending address does not have enough ETH to pay for gas",
                 "solution": "Add ETH to the sending address",
-                "sending_address": address or DEFAULT_ADDRESS
+                "sending_address": address or DEFAULT_ADDRESS,
+                "network_info": _get_network_info()
             }
         elif "nonce too low" in error_msg.lower():
             return {
                 "success": False,
                 "error": "Transaction nonce error",
                 "details": "The transaction nonce is too low",
-                "solution": "Wait for pending transactions to complete or reset the nonce"
+                "solution": "Wait for pending transactions to complete or reset the nonce",
+                "network_info": _get_network_info()
             }
         elif "execution reverted" in error_msg and "no data" in error_msg:
             return {
@@ -339,16 +587,18 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
                     "3. Ensure all parameters match expected types",
                     "4. Check contract's current state"
                 ],
-                "contract_address": contract.address,
+                "contract_address": getattr(contract, 'address', 'unknown'),
                 "method": method_name,
-                "sender": address or DEFAULT_ADDRESS
+                "sender": address or DEFAULT_ADDRESS,
+                "network_info": _get_network_info()
             }
         elif "connection" in error_msg.lower() or "provider" in error_msg.lower():
             return {
                 "success": False,
                 "error": "Blockchain connection error",
                 "details": "Unable to connect to the blockchain node",
-                "solution": "Check blockchain node URL and network connectivity"
+                "solution": "Check blockchain node URL and network connectivity",
+                "network_info": _get_network_info()
             }
             
         # Generic error
@@ -356,8 +606,40 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
             "success": False,
             "error": "Transaction failed",
             "details": error_msg,
-            "solution": "Check logs for more detailed error information"
+            "solution": "Check logs for more detailed error information",
+            "network_info": _get_network_info()
         }
+
+def _get_network_info():
+    """Helper function to get network information for error responses"""
+    try:
+        network_names = {
+            1: "Ethereum Mainnet",
+            56: "BSC Mainnet",
+            97: "BSC Testnet", 
+            137: "Polygon Mainnet",
+            80001: "Polygon Mumbai",
+            1337: "Ganache",
+            31337: "Hardhat Network",
+            11155111: "Sepolia",
+            5: "Goerli"
+        }
+        
+        return {
+            "rpc_url": str(w3.provider.endpoint_uri) if hasattr(w3.provider, 'endpoint_uri') else "unknown",
+            "chain_id": w3.eth.chain_id if w3.is_connected() else "unknown",
+            "network_name": network_names.get(w3.eth.chain_id, f"Unknown (ID: {w3.eth.chain_id})") if w3.is_connected() else "unknown",
+            "connected": w3.is_connected()
+        }
+    except Exception:
+        return {
+            "rpc_url": "error",
+            "chain_id": "error", 
+            "network_name": "error",
+            "connected": False
+        }
+    
+
 
 
 def read_from_contract(contract_name: str, method_name: str, params: List[Any]) -> Any:
