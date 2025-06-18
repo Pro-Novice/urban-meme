@@ -6,6 +6,37 @@ A Django-based backend for managing agriculture licenses in Rajasthan using bloc
 ![Python](https://img.shields.io/badge/python-3.10+-brightgreen.svg)
 ![Django](https://img.shields.io/badge/django-4.2+-green.svg)
 
+## Running Local Blockchain Node
+1. Check current node version with below command
+```
+node --version
+npm --version  
+```
+
+2. Create a new folder for initilizing the dummy project for running hardhat
+
+
+# Create project directory
+mkdir my-hardhat-project
+cd my-hardhat-project
+
+# Initialize npm project
+npm init -y
+
+# Install Hardhat
+npm install --save-dev hardhat
+
+# Initialize Hardhat project
+npx hardhat init project
+
+3. Run Hardhat node in a new terminal
+```
+npx hardhat node
+```
+
+4.After this you should be able to deploy contracts on the local blockchain
+
+
 ## 🏗️ Smart Contract Architecture
 
 The system uses UUPS (Universal Upgradeable Proxy Standard) pattern for smart contracts:
