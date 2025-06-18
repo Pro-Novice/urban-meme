@@ -1,5 +1,5 @@
 import json, logging, os
-from typing import Any, List, Dict, Union, Optional
+from typing import Any, List, Dict, Union, Optional, Tuple
 from django.conf import settings
 from web3 import Web3
 from web3.exceptions import ContractLogicError
@@ -128,8 +128,11 @@ def _sign_and_send(tx: dict, private_key: str) -> str:
     signed = w3.eth.account.sign_transaction(tx, private_key)
     return w3.eth.send_raw_transaction(signed.raw_transaction)
 
-def call_function(function, *args, address=None, private_key=None):
-    """Build, sign & send a state-changing transaction and wait for receipt."""
+def call_function(function, *args, address=None, private_key=None) -> Tuple[Any, Any]:
+    """
+    Enhanced function to build, sign & send a state-changing transaction and wait for receipt.
+    Now returns both receipt and return value.
+    """
     sender = address or DEFAULT_ADDRESS
     key = private_key or DEFAULT_PRIVATE_KEY
     
@@ -148,13 +151,16 @@ def call_function(function, *args, address=None, private_key=None):
             raise ValueError(f"Insufficient balance: {balance_eth} ETH. Need at least 0.01 ETH for transactions.")
     except Exception as e:
         logger.error(f"Failed to check balance: {e}")
-        
-    # First, try to call the function to check for revert reasons
+    
+    # ===== CAPTURE RETURN VALUE BEFORE TRANSACTION =====
+    return_value = None
     try:
-        result = function(*args).call({"from": sender})
-        logger.info(f"✅ Dry run successful, result: {result}")
+        # For functions that return values, we need to simulate the call first
+        # This gives us the return value that would be returned
+        return_value = function(*args).call({"from": sender})
+        logger.info(f"✅ Function call simulation successful, return value: {return_value}")
     except Exception as e:
-        logger.error(f"❌ Dry run failed with error: {e}")
+        logger.error(f"❌ Function call simulation failed: {e}")
         # Extract revert reason if available
         error_str = str(e)
         if "execution reverted" in error_str:
@@ -276,14 +282,19 @@ def call_function(function, *args, address=None, private_key=None):
         # Wait for confirmation with timeout
         logger.info(f"⏳ Waiting for confirmation...")
         receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
-        
+       
+       
+        print(f"   Status ==>>>>: {receipt}")
+       
         if receipt.status == 1:
             logger.info(f"✅ Transaction confirmed in block {receipt.blockNumber}")
             logger.info(f"⛽ Gas used: {receipt.gasUsed:,} / {tx['gas']:,} ({receipt.gasUsed/tx['gas']*100:.1f}%)")
         else:
             logger.error(f"❌ Transaction failed in block {receipt.blockNumber}")
-            
-        return receipt
+        
+        # ===== RETURN BOTH RECEIPT AND RETURN VALUE =====
+        logger.info(f"📤 Returning receipt and return value: {return_value}")
+        return receipt, return_value
         
     except Exception as e:
         logger.error(f"❌ Transaction failed: {e}")
@@ -303,7 +314,6 @@ def call_function(function, *args, address=None, private_key=None):
             raise ValueError(f"Gas limit too low: {e}")
         else:
             raise ValueError(f"Transaction failed: {e}")
-
 
 
 def call_view_function(function, *args):
@@ -328,15 +338,169 @@ def get_transaction_status(tx_hash: str):
 
 
 # ══════════════════════════════════════════════════════════════════════
-# New Methods for Universal Contract Interaction
+# Enhanced Event Parsing
 # ══════════════════════════════════════════════════════════════════════
 
+def parse_receipt_events(receipt: Any, contract: Any) -> List[Dict[str, Any]]:
+    """
+    Enhanced event parsing to extract license IDs and other important data
+    """
+    events = []
+    
+    try:
+        # Get all events from the contract ABI
+        contract_events = {}
+        
+        # Dynamically get all event names from contract ABI
+        for abi_item in contract.abi:
+            if abi_item.get('type') == 'event':
+                event_name = abi_item['name']
+                try:
+                    contract_events[event_name] = getattr(contract.events, event_name)
+                except AttributeError:
+                    logger.warning(f"Event {event_name} not found in contract.events")
+        
+        logger.info(f"Found {len(contract_events)} events in contract: {list(contract_events.keys())}")
+        
+        for log in receipt.logs:
+            event_parsed = False
+            for event_name, event_filter in contract_events.items():
+                try:
+                    decoded_log = event_filter().processLog(log)
+                    
+                    # Base event data
+                    event_data = {
+                        "event": event_name,
+                        "block_number": decoded_log.blockNumber,
+                        "transaction_hash": decoded_log.transactionHash.hex(),
+                        "log_index": decoded_log.logIndex,
+                        "address": decoded_log.address
+                    }
+                    
+                    # Parse specific events with their arguments
+                    if event_name == 'LicenseApplied':
+                        event_data.update({
+                            "license_id": decoded_log.args.licenseId,
+                            "farmer_address": decoded_log.args.farmerAddress,
+                            "license_type": decoded_log.args.licenseType
+                        })
+                    elif event_name == 'LicenseStatusUpdated':
+                        event_data.update({
+                            "license_id": decoded_log.args.licenseId,
+                            "previous_status": decoded_log.args.previousStatus,
+                            "new_status": decoded_log.args.newStatus,
+                            "officer_address": decoded_log.args.officerAddress
+                        })
+                    elif event_name == 'LicenseRevoked':
+                        event_data.update({
+                            "license_id": decoded_log.args.licenseId,
+                            "officer_address": decoded_log.args.officerAddress,
+                            "reason": decoded_log.args.reason
+                        })
+                    elif event_name == 'OfficerAdded':
+                        event_data.update({
+                            "officer_address": decoded_log.args.officerAddress,
+                            "role": decoded_log.args.role
+                        })
+                    elif event_name == 'OfficerRemoved':
+                        event_data.update({
+                            "officer_address": decoded_log.args.officerAddress
+                        })
+                    else:
+                        # Generic event parsing - add all arguments
+                        event_data["args"] = dict(decoded_log.args)
+                    
+                    events.append(event_data)
+                    logger.info(f"Parsed event: {event_name} - {event_data}")
+                    event_parsed = True
+                    break  # Successfully parsed, move to next log
+                    
+                except Exception as parse_error:
+                    # This log doesn't match this event type, continue to next
+                    continue
+            
+            # If no event matched, add raw log data
+            if not event_parsed:
+                try:
+                    events.append({
+                        "event": "Unknown",
+                        "topics": [topic.hex() for topic in log.get('topics', [])],
+                        "data": log.get('data', '').hex() if log.get('data') else '0x',
+                        "address": log.get('address', ''),
+                        "block_number": log.get('blockNumber'),
+                        "log_index": log.get('logIndex')
+                    })
+                except Exception as e:
+                    logger.warning(f"Could not parse unknown log: {e}")
+                    
+    except Exception as e:
+        logger.warning(f"Could not parse events: {e}")
+    
+    return events
 
+
+def extract_license_id_from_events(events: List[Dict[str, Any]], method_name: str) -> Optional[int]:
+    """
+    Extract license ID from events based on the method called
+    """
+    try:
+        if method_name == "applyForLicense":
+            for event in events:
+                if event.get("event") == "LicenseApplied" and "license_id" in event:
+                    return event["license_id"]
+        elif method_name == "updateLicenseStatus":
+            for event in events:
+                if event.get("event") == "LicenseStatusUpdated" and "license_id" in event:
+                    return event["license_id"]
+        elif method_name in ["revokeLicense"]:  # If you have this method
+            for event in events:
+                if event.get("event") == "LicenseRevoked" and "license_id" in event:
+                    return event["license_id"]
+    except Exception as e:
+        logger.warning(f"Could not extract license ID from events: {e}")
+    
+    return None
+
+
+def _get_network_info():
+    """Helper function to get network information for error responses"""
+    try:
+        network_names = {
+            1: "Ethereum Mainnet",
+            56: "BSC Mainnet",
+            97: "BSC Testnet", 
+            137: "Polygon Mainnet",
+            80001: "Polygon Mumbai",
+            1337: "Ganache",
+            31337: "Hardhat Network",
+            11155111: "Sepolia",
+            5: "Goerli"
+        }
+        
+        return {
+            "rpc_url": str(w3.provider.endpoint_uri) if hasattr(w3.provider, 'endpoint_uri') else "unknown",
+            "chain_id": w3.eth.chain_id if w3.is_connected() else "unknown",
+            "network_name": network_names.get(w3.eth.chain_id, f"Unknown (ID: {w3.eth.chain_id})") if w3.is_connected() else "unknown",
+            "connected": w3.is_connected()
+        }
+    except Exception:
+        return {
+            "rpc_url": "error",
+            "chain_id": "error", 
+            "network_name": "error",
+            "connected": False
+        }
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Enhanced Write to Contract Function
+# ══════════════════════════════════════════════════════════════════════
 
 def write_to_contract(contract_name: str, method_name: str, params: List[Any], 
                      address: Optional[str] = None, private_key: Optional[str] = None) -> Dict[str, Any]:
     """
     Universal function to write to any smart contract method
+    Enhanced to capture return values and license IDs
     """
     try:
         # =============== NETWORK DEBUGGING INFORMATION ===============
@@ -443,8 +607,8 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
         # =============== EXECUTE TRANSACTION ===============
         logger.info(f"🚀 Executing transaction...")
         
-        # Call the function
-        receipt = call_function(contract_function, *processed_params, address=address, private_key=private_key)
+        # Call the function - NOW RETURNS BOTH RECEIPT AND RETURN VALUE
+        receipt, return_value = call_function(contract_function, *processed_params, address=address, private_key=private_key)
         
         # Parse events from receipt
         events = parse_receipt_events(receipt, contract)
@@ -454,15 +618,17 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
         logger.info(f"   Transaction hash: {receipt.transactionHash.hex()}")
         logger.info(f"   Block number: {receipt.blockNumber}")
         logger.info(f"   Gas used: {receipt.gasUsed:,}")
+        if return_value is not None:
+            logger.info(f"   Return value: {return_value}")
         
-        return {
+        # =============== BUILD RESPONSE ===============
+        response = {
             "success": receipt.status == 1,
             "transaction_hash": receipt.transactionHash.hex(),
             "block_number": receipt.blockNumber,
             "gas_used": receipt.gasUsed,
             "events": events,
             "status": "confirmed" if receipt.status == 1 else "failed",
-            # Add network info to response
             "network_info": {
                 "rpc_url": str(w3.provider.endpoint_uri),
                 "chain_id": w3.eth.chain_id,
@@ -470,6 +636,37 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
                 "sender_address": sender_address
             }
         }
+        
+        # =============== ADD RETURN VALUE IF PRESENT ===============
+        if return_value is not None:
+            response["return_value"] = return_value
+            
+            # For specific methods, add convenience fields
+            if method_name == "applyForLicense" and isinstance(return_value, int):
+                response["license_id"] = return_value
+                logger.info(f"📋 License created with ID: {return_value}")
+        
+        # =============== EXTRACT LICENSE ID FROM EVENTS ===============
+        # If no return value, try to get license ID from events
+        if "license_id" not in response:
+            event_license_id = extract_license_id_from_events(events, method_name)
+            if event_license_id is not None:
+                response["license_id"] = event_license_id
+                logger.info(f"📋 License ID extracted from events: {event_license_id}")
+        
+        # =============== ADD ADDITIONAL METADATA ===============
+        if method_name == "applyForLicense":
+            response["message"] = "License application submitted successfully"
+            if "license_id" in response:
+                response["message"] += f" with ID: {response['license_id']}"
+        elif method_name == "updateLicenseStatus":
+            response["message"] = "License status updated successfully"
+        elif method_name == "addDepartmentOfficer":
+            response["message"] = "Department officer added successfully"
+        elif method_name == "removeDepartmentOfficer":
+            response["message"] = "Department officer removed successfully"
+        
+        return response
         
     except ContractLogicError as e:
         error_msg = str(e)
@@ -610,37 +807,6 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
             "network_info": _get_network_info()
         }
 
-def _get_network_info():
-    """Helper function to get network information for error responses"""
-    try:
-        network_names = {
-            1: "Ethereum Mainnet",
-            56: "BSC Mainnet",
-            97: "BSC Testnet", 
-            137: "Polygon Mainnet",
-            80001: "Polygon Mumbai",
-            1337: "Ganache",
-            31337: "Hardhat Network",
-            11155111: "Sepolia",
-            5: "Goerli"
-        }
-        
-        return {
-            "rpc_url": str(w3.provider.endpoint_uri) if hasattr(w3.provider, 'endpoint_uri') else "unknown",
-            "chain_id": w3.eth.chain_id if w3.is_connected() else "unknown",
-            "network_name": network_names.get(w3.eth.chain_id, f"Unknown (ID: {w3.eth.chain_id})") if w3.is_connected() else "unknown",
-            "connected": w3.is_connected()
-        }
-    except Exception:
-        return {
-            "rpc_url": "error",
-            "chain_id": "error", 
-            "network_name": "error",
-            "connected": False
-        }
-    
-
-
 
 def read_from_contract(contract_name: str, method_name: str, params: List[Any]) -> Any:
     """
@@ -752,48 +918,6 @@ def process_params_for_abi(params: List[Any], contract_function: Any, contract: 
     return processed
 
 
-def parse_receipt_events(receipt: Any, contract: Any) -> List[Dict[str, Any]]:
-    """
-    Parse events from transaction receipt
-    """
-    events = []
-    
-    try:
-        # Get contract events
-        for log in receipt.logs:
-            try:
-                # Try to parse each log
-                for event_name in contract.events:
-                    event = getattr(contract.events, event_name)
-                    try:
-                        decoded = event().process_log(log)
-                        events.append({
-                            "name": event_name,
-                            "args": dict(decoded['args']),
-                            "address": log['address'],
-                            "block_number": log['blockNumber'],
-                            "transaction_index": log['transactionIndex'],
-                            "log_index": log['logIndex']
-                        })
-                        break  # Successfully decoded, move to next log
-                    except:
-                        continue  # Try next event type
-                        
-            except Exception as e:
-                # If we can't decode, include raw log
-                events.append({
-                    "name": "Unknown",
-                    "topics": [topic.hex() for topic in log.get('topics', [])],
-                    "data": log.get('data', '').hex() if log.get('data') else '0x',
-                    "address": log.get('address', '')
-                })
-                
-    except Exception as e:
-        logger.warning(f"Error parsing events: {e}")
-    
-    return events
-
-
 def format_contract_result(result: Any, method_name: str, contract: Any) -> Any:
     """
     Format the result based on the method's return type
@@ -862,7 +986,6 @@ def get_contract_abi(contract_name: str) -> List[Dict]:
     """Get the ABI for a contract"""
     contract = get_contract(contract_name)
     return contract.abi
-
 
 
 def get_all_contract_addresses() -> dict:
@@ -965,8 +1088,6 @@ def get_contract_address(contract_name: str) -> str:
             return contract.address
         except:
             raise ValueError(f"Contract address not found for {contract_name}: {str(e)}")
-        
-
 
 
 def get_available_methods(contract_name: str) -> Dict[str, List[Dict]]:
