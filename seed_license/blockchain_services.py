@@ -665,7 +665,22 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
             response["message"] = "Department officer added successfully"
         elif method_name == "removeDepartmentOfficer":
             response["message"] = "Department officer removed successfully"
-        
+            
+        response["receipt"] = {
+            "transactionHash": receipt.transactionHash.hex(),
+            "blockHash": receipt.blockHash.hex(),
+            "blockNumber": receipt.blockNumber,
+            "from": receipt["from"],
+            "to": receipt["to"],
+            "gasUsed": receipt.gasUsed,
+            "cumulativeGasUsed": receipt.cumulativeGasUsed,
+            "status": receipt.status,
+            "contractAddress": receipt.contractAddress,
+            "logs": [dict(log) for log in receipt.logs],
+            "type": receipt.type,
+            "effectiveGasPrice": receipt.effectiveGasPrice,
+            "transactionIndex": receipt.transactionIndex
+        }
         return response
         
     except ContractLogicError as e:
@@ -1074,6 +1089,7 @@ def get_contract_address(contract_name: str) -> str:
         
         # Get address from deployment info
         contract_address = deployment_info.get(deployment_key)
+        w3.eth.get_code(contract_address)
         
         if contract_address:
             return contract_address

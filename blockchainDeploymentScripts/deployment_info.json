@@ -1,9 +1,11 @@
 {
-  "network": 80002,
-  "deploymentTime": 1748953897,
-  "deployer": "0xf5cAdDF18B4E8CC9687C1d0F7F18b5122b3769BD",
-  "proxy": "0x6A4092bf40ee22FDa92319E20d81bEAAf6B1D305",
-  "implementationV1": "0x58cb20B9eaBc2c82f35F1d67a942DF85443DB2a9",
+  "network": 31337,
+  "networkName": "Hardhat Network",
+  "deploymentTime": 1750245912,
+  "deploymentTimeFormatted": "2025-06-18 16:55:12",
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "proxy": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+  "implementationV1": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
   "implementationABI": [
     {
       "inputs": [],
@@ -544,5 +546,13 @@
       "stateMutability": "payable",
       "type": "function"
     }
-  ]
+  ],
+  "gasUsed": {
+    "implementation": "See transaction details",
+    "proxy": "See transaction details"
+  },
+  "verification": {
+    "success": true,
+    "timestamp": 1750245912
+  }
 }

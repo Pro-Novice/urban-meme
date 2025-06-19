@@ -21,3 +21,4 @@ venv/
 node_modules/
 
 artifacts/
+my-hardhat-project/
