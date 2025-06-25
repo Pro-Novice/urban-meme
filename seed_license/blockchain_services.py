@@ -438,30 +438,6 @@ def parse_receipt_events(receipt: Any, contract: Any) -> List[Dict[str, Any]]:
     
     return events
 
-
-def extract_license_id_from_events(events: List[Dict[str, Any]], method_name: str) -> Optional[int]:
-    """
-    Extract license ID from events based on the method called
-    """
-    try:
-        if method_name == "applyForLicense":
-            for event in events:
-                if event.get("event") == "LicenseApplied" and "license_id" in event:
-                    return event["license_id"]
-        elif method_name == "updateLicenseStatus":
-            for event in events:
-                if event.get("event") == "LicenseStatusUpdated" and "license_id" in event:
-                    return event["license_id"]
-        elif method_name in ["revokeLicense"]:  # If you have this method
-            for event in events:
-                if event.get("event") == "LicenseRevoked" and "license_id" in event:
-                    return event["license_id"]
-    except Exception as e:
-        logger.warning(f"Could not extract license ID from events: {e}")
-    
-    return None
-
-
 def _get_network_info():
     """Helper function to get network information for error responses"""
     try:
@@ -497,330 +473,246 @@ def _get_network_info():
 # ══════════════════════════════════════════════════════════════════════
 
 def write_to_contract(contract_name: str, method_name: str, params: List[Any], 
-                     address: Optional[str] = None, private_key: Optional[str] = None) -> Dict[str, Any]:
+                               address: Optional[str] = None, private_key: Optional[str] = None) -> Dict[str, Any]:
     """
-    Universal function to write to any smart contract method
-    Enhanced to capture return values and license IDs
+    Optimized function to write to smart contract
+    - Validates method and parameters against ABI from deployment_info.json
+    - Executes transaction with minimal overhead
+    - Returns clean response
     """
     try:
-        # =============== NETWORK DEBUGGING INFORMATION ===============
-        logger.info(f"🌐 NETWORK CONNECTION DEBUG:")
-        logger.info(f"   RPC URL: {w3.provider.endpoint_uri}")
+        # =============== LOAD CONTRACT FROM DEPLOYMENT INFO ===============
+        deployment_info_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", "deployment_info.json")
         
-        try:
-            chain_id = w3.eth.chain_id
-            latest_block = w3.eth.block_number
-            logger.info(f"   Chain ID: {chain_id}")
-            logger.info(f"   Latest block: {latest_block}")
-            
-            # Map chain IDs to network names
-            network_names = {
-                1: "Ethereum Mainnet",
-                56: "BSC Mainnet",
-                97: "BSC Testnet", 
-                137: "Polygon Mainnet",
-                80001: "Polygon Mumbai",
-                1337: "Ganache",
-                31337: "Hardhat Network",
-                11155111: "Sepolia",
-                5: "Goerli"
+        if not os.path.exists(deployment_info_path):
+            return {
+                "success": False,
+                "error": "Deployment info not found",
+                "details": f"File not found: {deployment_info_path}"
             }
-            network_name = network_names.get(chain_id, f"Unknown Network (ID: {chain_id})")
-            logger.info(f"   Network: {network_name}")
-            
-            # Check if connected properly
-            if not w3.is_connected():
-                logger.error(f"❌ Web3 connection failed!")
-            else:
-                logger.info(f"✅ Web3 connected successfully")
-                
-        except Exception as net_error:
-            logger.error(f"❌ Failed to get network info: {net_error}")
         
-        # =============== ACCOUNT BALANCE CHECK ===============
-        sender_address = address or DEFAULT_ADDRESS
-        try:
-            balance_wei = w3.eth.get_balance(sender_address)
-            balance_eth = w3.from_wei(balance_wei, 'ether')
-            logger.info(f"💰 Account balance check:")
-            logger.info(f"   Address: {sender_address}")
-            logger.info(f"   Balance: {balance_eth:.6f} ETH")
-            
-            if balance_eth < 0.001:
-                logger.warning(f"⚠️ Low balance detected: {balance_eth:.6f} ETH")
-                
-        except Exception as balance_error:
-            logger.error(f"❌ Failed to check account balance: {balance_error}")
+        with open(deployment_info_path, "r") as fh:
+            deployment_info = json.load(fh)
         
-        # =============== CONTRACT INFORMATION ===============
-        contract = get_contract(contract_name)
+        # Get contract address (always use proxy for upgradeable contracts)
+        contract_address = deployment_info.get("proxy")
+        if not contract_address:
+            return {
+                "success": False,
+                "error": "Contract address not found",
+                "details": "No proxy address in deployment_info.json"
+            }
         
-        logger.info(f"📋 CONTRACT DEBUG:")
-        logger.info(f"   Contract name: {contract_name}")
-        logger.info(f"   Contract address: {contract.address}")
-        logger.info(f"   Method: {method_name}")
-        logger.info(f"   Params: {params}")
-        logger.info(f"   From address: {sender_address}")
+        # Get ABI
+        abi = deployment_info.get("implementationABI")
+        if not abi:
+            return {
+                "success": False,
+                "error": "Contract ABI not found",
+                "details": "No implementationABI in deployment_info.json"
+            }
         
-        # Check if method exists
-        if not hasattr(contract.functions, method_name):
-            raise ValueError(f"Method '{method_name}' not found in contract '{contract_name}'")
+        # =============== VALIDATE METHOD EXISTS IN ABI ===============
+        method_abi = None
+        for abi_item in abi:
+            if (abi_item.get('type') == 'function' and 
+                abi_item.get('name') == method_name):
+                method_abi = abi_item
+                break
+        
+        if not method_abi:
+            # Get available methods for helpful error
+            available_methods = [item['name'] for item in abi if item.get('type') == 'function']
+            return {
+                "success": False,
+                "error": f"Method '{method_name}' not found in contract '{contract_name}'",
+                "available_methods": available_methods
+            }
+        
+        # =============== VALIDATE PARAMETERS ===============
+        expected_inputs = method_abi.get('inputs', [])
+        
+        if len(params) != len(expected_inputs):
+            return {
+                "success": False,
+                "error": "Parameter count mismatch",
+                "details": f"Expected {len(expected_inputs)} parameters, got {len(params)}",
+                "expected_params": [
+                    {"name": inp.get('name', f'param{i}'), "type": inp['type']} 
+                    for i, inp in enumerate(expected_inputs)
+                ]
+            }
+        
+        # Check if method is payable (state-changing)
+        if method_abi.get('stateMutability') in ['view', 'pure']:
+            return {
+                "success": False,
+                "error": "Cannot write to view/pure function",
+                "details": f"Method '{method_name}' is read-only. Use read_from_contract instead."
+            }
+        
+        # =============== CREATE CONTRACT INSTANCE ===============
+        contract = w3.eth.contract(
+            address=Web3.to_checksum_address(contract_address),
+            abi=abi
+        )
         
         # Get the function
         contract_function = getattr(contract.functions, method_name)
         
-        # Process parameters
+        # Process parameters for ABI types
         processed_params = process_params_for_abi(params, contract_function, contract)
-        logger.info(f"   Processed params: {processed_params}")
-        
-        # =============== GAS ESTIMATION DEBUG ===============
-        try:
-            # Build a test transaction for gas estimation
-            test_tx = contract_function(*processed_params).build_transaction({
-                'from': sender_address,
-                'nonce': w3.eth.get_transaction_count(sender_address, 'pending'),
-                'gasPrice': w3.eth.gas_price,
-            })
-            
-            # Estimate gas
-            estimated_gas = w3.eth.estimate_gas(test_tx)
-            gas_price = w3.eth.gas_price
-            estimated_cost_wei = estimated_gas * gas_price
-            estimated_cost_eth = w3.from_wei(estimated_cost_wei, 'ether')
-            
-            logger.info(f"⛽ GAS ESTIMATION:")
-            logger.info(f"   Estimated gas: {estimated_gas:,}")
-            logger.info(f"   Gas price: {w3.from_wei(gas_price, 'gwei')} gwei")
-            logger.info(f"   Estimated cost: {estimated_cost_eth:.6f} ETH")
-            
-            # Check if account can afford the transaction
-            balance_wei = w3.eth.get_balance(sender_address)
-            if estimated_cost_wei > balance_wei:
-                logger.error(f"❌ INSUFFICIENT FUNDS:")
-                logger.error(f"   Need: {estimated_cost_eth:.6f} ETH")
-                logger.error(f"   Have: {w3.from_wei(balance_wei, 'ether'):.6f} ETH")
-                logger.error(f"   Shortfall: {w3.from_wei(estimated_cost_wei - balance_wei, 'ether'):.6f} ETH")
-                
-        except Exception as gas_error:
-            logger.error(f"❌ Gas estimation failed: {gas_error}")
         
         # =============== EXECUTE TRANSACTION ===============
-        logger.info(f"🚀 Executing transaction...")
+        sender_address = address or DEFAULT_ADDRESS
+        sender_private_key = private_key or DEFAULT_PRIVATE_KEY
         
-        # Call the function - NOW RETURNS BOTH RECEIPT AND RETURN VALUE
-        receipt, return_value = call_function(contract_function, *processed_params, address=address, private_key=private_key)
+        # Build transaction
+        nonce = w3.eth.get_transaction_count(sender_address, 'pending')
         
-        # Parse events from receipt
-        events = parse_receipt_events(receipt, contract)
+        # Estimate gas
+        try:
+            test_tx = contract_function(*processed_params).build_transaction({
+                'from': sender_address,
+                'nonce': nonce,
+                'gasPrice': w3.eth.gas_price,
+            })
+            gas_estimate = w3.eth.estimate_gas(test_tx)
+            gas_limit = int(gas_estimate * 1.2)  # 20% buffer
+        except Exception as gas_error:
+            return {
+                "success": False,
+                "error": "Gas estimation failed",
+                "details": str(gas_error),
+                "possible_causes": [
+                    "Invalid parameters",
+                    "Contract state prevents operation", 
+                    "Insufficient permissions",
+                    "Contract not initialized"
+                ]
+            }
         
-        logger.info(f"✅ Transaction completed:")
-        logger.info(f"   Status: {'Success' if receipt.status == 1 else 'Failed'}")
-        logger.info(f"   Transaction hash: {receipt.transactionHash.hex()}")
-        logger.info(f"   Block number: {receipt.blockNumber}")
-        logger.info(f"   Gas used: {receipt.gasUsed:,}")
-        if return_value is not None:
-            logger.info(f"   Return value: {return_value}")
+        # Build final transaction
+        transaction = contract_function(*processed_params).build_transaction({
+            'from': sender_address,
+            'gas': gas_limit,
+            'gasPrice': w3.eth.gas_price,
+            'nonce': nonce,
+            'chainId': w3.eth.chain_id
+        })
         
-        # =============== BUILD RESPONSE ===============
+        # Sign and send
+        signed_tx = w3.eth.account.sign_transaction(transaction, sender_private_key)
+        tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+        
+        # Wait for confirmation
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
+        
+        # =============== PARSE EVENTS FOR LICENSE ID ===============
+        license_id = None
+        events = []
+        
+        try:
+            for log in receipt.logs:
+                if log.address.lower() == contract_address.lower():
+                    # Try to parse known events
+                    try:
+                        if len(log.topics) > 0:
+                            # LicenseCreated event has license ID in first indexed parameter
+                            decoded_log = contract.events.LicenseCreated().process_log(log)
+                            license_id = decoded_log.args.licenseId
+                            events.append({
+                                "event": "LicenseCreated",
+                                "license_id": license_id,
+                                "applicant": decoded_log.args.applicant,
+                                "category": decoded_log.args.category
+                            })
+                            break
+                    except:
+                        # Try other events
+                        try:
+                            decoded_log = contract.events.StatusChanged().process_log(log)
+                            events.append({
+                                "event": "StatusChanged", 
+                                "license_id": decoded_log.args.licenseId,
+                                "old_status": decoded_log.args.oldStatus,
+                                "new_status": decoded_log.args.newStatus,
+                                "changed_by": decoded_log.args.changedBy
+                            })
+                        except:
+                            continue
+        except Exception as e:
+            logger.warning(f"Could not parse events: {e}")
+        
+        # =============== BUILD CLEAN RESPONSE ===============
         response = {
             "success": receipt.status == 1,
             "transaction_hash": receipt.transactionHash.hex(),
             "block_number": receipt.blockNumber,
             "gas_used": receipt.gasUsed,
-            "events": events,
-            "status": "confirmed" if receipt.status == 1 else "failed",
-            "network_info": {
-                "rpc_url": str(w3.provider.endpoint_uri),
-                "chain_id": w3.eth.chain_id,
-                "network_name": network_names.get(w3.eth.chain_id, f"Unknown (ID: {w3.eth.chain_id})"),
-                "sender_address": sender_address
-            }
+            "gas_limit": gas_limit,
+            "contract_address": contract_address,
+            "method": method_name,
+            "status": "confirmed" if receipt.status == 1 else "failed"
         }
         
-        # =============== ADD RETURN VALUE IF PRESENT ===============
-        if return_value is not None:
-            response["return_value"] = return_value
-            
-            # For specific methods, add convenience fields
-            if method_name == "applyForLicense" and isinstance(return_value, int):
-                response["license_id"] = return_value
-                logger.info(f"📋 License created with ID: {return_value}")
+        # Add license ID if found
+        if license_id is not None:
+            response["license_id"] = license_id
         
-        # =============== EXTRACT LICENSE ID FROM EVENTS ===============
-        # If no return value, try to get license ID from events
-        if "license_id" not in response:
-            event_license_id = extract_license_id_from_events(events, method_name)
-            if event_license_id is not None:
-                response["license_id"] = event_license_id
-                logger.info(f"📋 License ID extracted from events: {event_license_id}")
+        # Add events if any
+        if events:
+            response["events"] = events
         
-        # =============== ADD ADDITIONAL METADATA ===============
-        if method_name == "applyForLicense":
-            response["message"] = "License application submitted successfully"
-            if "license_id" in response:
-                response["message"] += f" with ID: {response['license_id']}"
-        elif method_name == "updateLicenseStatus":
-            response["message"] = "License status updated successfully"
-        elif method_name == "addDepartmentOfficer":
-            response["message"] = "Department officer added successfully"
-        elif method_name == "removeDepartmentOfficer":
-            response["message"] = "Department officer removed successfully"
-            
-        response["receipt"] = {
-            "transactionHash": receipt.transactionHash.hex(),
-            "blockHash": receipt.blockHash.hex(),
-            "blockNumber": receipt.blockNumber,
-            "from": receipt["from"],
-            "to": receipt["to"],
-            "gasUsed": receipt.gasUsed,
-            "cumulativeGasUsed": receipt.cumulativeGasUsed,
-            "status": receipt.status,
-            "contractAddress": receipt.contractAddress,
-            "logs": [dict(log) for log in receipt.logs],
-            "type": receipt.type,
-            "effectiveGasPrice": receipt.effectiveGasPrice,
-            "transactionIndex": receipt.transactionIndex
-        }
+        # Add method-specific messages
+        if receipt.status == 1:
+            if method_name == "createLicense":
+                response["message"] = f"License created successfully" + (f" with ID: {license_id}" if license_id else "")
+            elif method_name == "updateStatus":
+                response["message"] = "License status updated successfully"
+            elif method_name == "addOfficer":
+                response["message"] = "Officer added successfully"
+            else:
+                response["message"] = f"Method '{method_name}' executed successfully"
+        
         return response
-        
-    except ContractLogicError as e:
-        error_msg = str(e)
-        logger.error(f"Contract logic error: {error_msg}")
-        
-        # Parse common contract revert reasons
-        if "Contract reverted" in error_msg:
-            if "Only admin" in error_msg:
-                return {
-                    "success": False,
-                    "error": "Permission denied: Only admin can perform this action",
-                    "details": "The calling address does not have admin privileges",
-                    "solution": "Ensure you're using the admin address or grant admin role to your address",
-                    "network_info": _get_network_info()
-                }
-            elif "Already exists" in error_msg:
-                return {
-                    "success": False,
-                    "error": "License already exists",
-                    "details": "A license with similar details may already exist",
-                    "solution": "Check if the farmer already has an active license",
-                    "network_info": _get_network_info()
-                }
-            elif "Invalid status" in error_msg:
-                return {
-                    "success": False,
-                    "error": "Invalid license status transition",
-                    "details": "The requested status change is not allowed from current status",
-                    "solution": "Check the current license status and valid transitions",
-                    "network_info": _get_network_info()
-                }
-            elif "not found" in error_msg or "Does not exist" in error_msg:
-                return {
-                    "success": False,
-                    "error": "License not found",
-                    "details": "The specified license ID does not exist",
-                    "solution": "Verify the license ID is correct",
-                    "network_info": _get_network_info()
-                }
-        
-        # Generic contract revert
-        return {
-            "success": False,
-            "error": "Smart contract execution failed",
-            "details": error_msg,
-            "solution": "Check contract requirements and ensure all conditions are met",
-            "network_info": _get_network_info()
-        }
-        
-    except ValueError as e:
-        error_msg = str(e)
-        logger.error(f"Value error: {error_msg}")
-        
-        if "Method" in error_msg and "not found" in error_msg:
-            return {
-                "success": False,
-                "error": f"Method '{method_name}' does not exist in contract",
-                "details": "The specified method name is not available in the contract ABI",
-                "solution": f"Check available methods at /api/seed-license/blockchain/contracts/{contract_name}/methods/",
-                "network_info": _get_network_info()
-            }
-        elif "Contract files not found" in error_msg:
-            return {
-                "success": False,
-                "error": "Contract configuration not found",
-                "details": f"Unable to load ABI or address for contract '{contract_name}'",
-                "solution": "Ensure the contract is properly deployed and configuration files exist",
-                "network_info": _get_network_info()
-            }
-            
-        return {
-            "success": False,
-            "error": "Invalid request parameters",
-            "details": error_msg,
-            "solution": "Verify all parameters are correctly formatted",
-            "network_info": _get_network_info()
-        }
         
     except Exception as e:
         error_msg = str(e)
-        logger.error(f"Unexpected error in write_to_contract: {error_msg}", exc_info=True)
         
-        # Parse specific Web3 errors
+        # Handle common errors
         if "insufficient funds" in error_msg.lower():
             return {
                 "success": False,
-                "error": "Insufficient funds for transaction",
-                "details": "The sending address does not have enough ETH to pay for gas",
-                "solution": "Add ETH to the sending address",
-                "sending_address": address or DEFAULT_ADDRESS,
-                "network_info": _get_network_info()
+                "error": "Insufficient funds",
+                "details": "Not enough ETH for gas fees"
             }
         elif "nonce too low" in error_msg.lower():
             return {
                 "success": False,
-                "error": "Transaction nonce error",
-                "details": "The transaction nonce is too low",
-                "solution": "Wait for pending transactions to complete or reset the nonce",
-                "network_info": _get_network_info()
+                "error": "Nonce error", 
+                "details": "Transaction ordering issue"
             }
-        elif "execution reverted" in error_msg and "no data" in error_msg:
+        elif "execution reverted" in error_msg.lower():
             return {
                 "success": False,
-                "error": "Contract execution reverted without reason",
-                "details": "The contract reverted but didn't provide a specific error message",
-                "possible_causes": [
-                    "Contract may not be initialized",
-                    "Sender may lack required permissions",
-                    "Input parameters may be invalid",
-                    "Contract state may prevent this operation"
-                ],
-                "debugging_steps": [
-                    "1. Check if contract is initialized (if upgradeable)",
-                    "2. Verify sender has necessary roles/permissions",
-                    "3. Ensure all parameters match expected types",
-                    "4. Check contract's current state"
-                ],
-                "contract_address": getattr(contract, 'address', 'unknown'),
-                "method": method_name,
-                "sender": address or DEFAULT_ADDRESS,
-                "network_info": _get_network_info()
+                "error": "Transaction reverted",
+                "details": "Contract rejected the transaction",
+                "possible_solutions": [
+                    "Check if contract is initialized",
+                    "Verify sender has required permissions",
+                    "Ensure parameters are valid",
+                    "Check contract state allows this operation"
+                ]
             }
-        elif "connection" in error_msg.lower() or "provider" in error_msg.lower():
+        else:
             return {
                 "success": False,
-                "error": "Blockchain connection error",
-                "details": "Unable to connect to the blockchain node",
-                "solution": "Check blockchain node URL and network connectivity",
-                "network_info": _get_network_info()
+                "error": "Transaction failed",
+                "details": error_msg
             }
-            
-        # Generic error
-        return {
-            "success": False,
-            "error": "Transaction failed",
-            "details": error_msg,
-            "solution": "Check logs for more detailed error information",
-            "network_info": _get_network_info()
-        }
+
+
 
 
 def read_from_contract(contract_name: str, method_name: str, params: List[Any]) -> Any:
