@@ -1,11 +1,11 @@
 {
   "network": 31337,
   "networkName": "Hardhat Network",
-  "deploymentTime": 1750842900,
-  "deploymentTimeFormatted": "2025-06-25 14:45:00",
-  "deployer": "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199",
-  "proxy": "0xB581C9264f59BF0289fA76D61B2D0746dCE3C30D",
-  "implementationV1": "0x73511669fd4dE447feD18BB79bAFeAC93aB7F31f",
+  "deploymentTime": 1750935549,
+  "deploymentTimeFormatted": "2025-06-26 16:29:09",
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "proxy": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+  "implementationV1": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
   "implementationABI": [
     {
       "inputs": [],
@@ -440,6 +440,79 @@
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_officer",
+          "type": "address"
+        }
+      ],
+      "name": "getOfficerDetails",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "employeeId",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "role",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "department",
+          "type": "string"
+        },
+        {
+          "internalType": "enum LicenseStorage.AdminLevel",
+          "name": "level",
+          "type": "uint8"
+        },
+        {
+          "internalType": "string",
+          "name": "jurisdiction",
+          "type": "string"
+        },
+        {
+          "internalType": "bool",
+          "name": "isActive",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "addedDate",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_officer",
+          "type": "address"
+        }
+      ],
+      "name": "getOfficerRole",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "initialize",
       "outputs": [],
@@ -457,6 +530,19 @@
         }
       ],
       "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "listAllFunctions",
+      "outputs": [
+        {
+          "internalType": "string[]",
+          "name": "",
+          "type": "string[]"
+        }
+      ],
+      "stateMutability": "pure",
       "type": "function"
     },
     {
@@ -553,6 +639,6 @@
   },
   "verification": {
     "success": true,
-    "timestamp": 1750842900
+    "timestamp": 1750935549
   }
 }

@@ -46,7 +46,7 @@ def get_contract(contract_name: str):
         # Load deployment info
         with open(deployment_info_path, "r") as fh:
             deployment_info = json.load(fh)
-        
+
         # IMPORTANT: For upgradeable contracts, ALWAYS use the PROXY address
         if "proxy" in deployment_info and deployment_info["proxy"]:
             contract_address = deployment_info["proxy"]
@@ -90,7 +90,12 @@ def get_contract(contract_name: str):
                     abi = json.load(fh)
                 logger.info(f"Using seed license ABI from: {seed_abi_path}")
                 abi_found = True
-        
+        if contract_name == "LicenseSystemV1":
+            abi = deployment_info.get("implementationABI")
+            contract_address = deployment_info.get("proxy")
+
+        if not abi or not contract_address:
+            raise ValueError(f"ABI or address not found for contract: {contract_name}")
         if not abi_found or not abi:
             # List available files for debugging
             logger.error(f"Could not find ABI for {contract_name}")
