@@ -116,8 +116,9 @@ def get_contract(contract_name: str):
         if not abi_found:
             abi_locations = [
                 os.path.join(BASE_DIR, "blockchainDeploymentScripts", "implementationABI", f"{contract_name}.json"),
+                os.path.join(BASE_DIR, "blockchainDeploymentScripts", f"{contract_name}ImplementationABI.json"),
                 os.path.join(CONTRACTS_DIR, "abi", f"{contract_name}.json"),
-                os.path.join(CONTRACTS_DIR, "abi", "seedLicenseContract.json")
+                os.path.join(CONTRACTS_DIR, "abi", "seedLicenseContract.json"),  # for legacy support
             ]
             for path in abi_locations:
                 if os.path.exists(path):
