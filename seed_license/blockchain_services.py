@@ -5,8 +5,6 @@ from web3 import Web3
 from web3.exceptions import ContractLogicError
 from datetime import datetime
 
-from seed_license.enums import OfficerRole, DivisionEnum
-
 logger = logging.getLogger(__name__)
 
 # ── connect ───────────────────────────────────────────────────────────
@@ -29,13 +27,6 @@ CONTRACTS_DIR = os.path.join(BASE_DIR, "Services", "blockchain", "contracts")
 # Matches LicenseCategory enum in smart contract
 LICENSE_CATEGORIES = ["SEED", "FERTILIZER", "INSECTICIDE"]
 
-ACTION_TYPES = [
-    "CREATED", "SUBMITTED", "DOCUMENT_UPLOADED", "DOCUMENT_VERIFIED",
-    "PAYMENT_RECORDED", "INSPECTION_SCHEDULED", "INSPECTION_COMPLETED",
-    "STATUS_UPDATED", "APPROVED", "REJECTED", "REVOKED", "RENEWED",
-    "COMMENT_ADDED", "OFFICER_ASSIGNED"
-]
-
 #Admin levels as per smart contract
 ADMIN_LEVELS = ["STATE", "DIVISION", "DISTRICT"]
 
@@ -47,175 +38,39 @@ LICENSE_STATUSES = [
     "EXPIRED", "RENEWAL_PENDING"
 ]
 
-FEEDBACK_TYPES = ["None", "Satisfactory", "Unsatisfactory", "Needs Reinspection"]
+# Transform raw license data into a structured format
+# This function assumes the raw data is a list with specific indices for each field
+def transform_license_basic_info(raw: list) -> dict:
+    if not isinstance(raw, (list, tuple)) or len(raw) < 12:
+        return {"error": "Unexpected data format", "raw": raw}
 
-# generic transform map for contract methods
-# This map defines how to transform raw data from contract methods into a more usable format.
-def generic_transform(method_name: str, raw_data: Any) -> Any:
-    if isinstance(raw_data, (list, tuple)) and all(isinstance(item, (list, tuple)) for item in raw_data):
-        # Handle array responses
-        return [generic_transform(method_name, item) for item in raw_data]
+    return {
+        "licenseId": raw[0],
+        "applicantName": raw[1],
+        "category": LICENSE_CATEGORIES[raw[2]] if raw[2] < len(LICENSE_CATEGORIES) else "UNKNOWN",
+        "level": ADMIN_LEVELS[raw[3]] if raw[3] < len(ADMIN_LEVELS) else "UNKNOWN",
+        "status": LICENSE_STATUSES[raw[4]] if raw[4] < len(LICENSE_STATUSES) else "UNKNOWN",
+        "applicant": raw[5],
+        "businessName": raw[6],
+        "district": raw[7],
+        "applicationDate": format_unix_timestamp(raw[8]),
+        "approvalDate": format_unix_timestamp(raw[9]),
+        "expiryDate": format_unix_timestamp(raw[10]),
+        "isActive": raw[11],
+    }
 
-    config = GENERIC_TRANSFORM_MAP.get(method_name)
-    if not config or not config.get("fields"):
-        return raw_data
-
-    fields = config.get("fields", [])
-    enum_mappings = config.get("enum_mappings", {})
-    timestamp_fields = set(config.get("timestamp_fields", []))
-
-    transformed = {}
-    status_str = None
-
-    for i, field in enumerate(fields):
-        value = None
-        if isinstance(raw_data, dict):
-            value = raw_data.get(field)
-        elif isinstance(raw_data, (list, tuple)) and i < len(raw_data):
-            value = raw_data[i]
-
-        if field == "status":
-            # Save string version of status to apply conditional filters later
-            if field in enum_mappings:
-                enum_list = enum_mappings[field]
-                status_str = enum_list[value] if isinstance(value, int) and value < len(enum_list) else "UNKNOWN"
-            else:
-                status_str = value
-
-        if field in enum_mappings:
-            enum_list = enum_mappings[field]
-            transformed[field] = enum_list[value] if isinstance(value, int) and value < len(enum_list) else "UNKNOWN"
-        elif field in timestamp_fields and value:
-            transformed[field] = format_unix_timestamp(value)
-        else:
-            transformed[field] = value
-
-    # 🌟 Remove irrelevant date fields based on status
-    if status_str != "APPROVED":
-       transformed.pop("approvalDate", None)
-
-    if status_str not in {"APPROVED", "EXPIRED"}:
-        transformed.pop("expiryDate", None)
-
-    if status_str != "REJECTED":
-        transformed.pop("rejectionDate", None)
-
-    if status_str != "REVOKED":
-        transformed.pop("revokedDate", None)
-
-    if status_str not in {"RENEWAL_PENDING", "RENEWED"}:
-        transformed.pop("renewalDate", None)
-
-    return transformed
-
+# Map of contract response transformers
+# This allows us to apply specific transformations based on the method called
+CONTRACT_RESPONSE_TRANSFORMERS = {
+    "getLicenseBasicInfo": transform_license_basic_info,
+    # You can add more like
+}
 
 # convert timestamp to readable format
 def format_unix_timestamp(ts: int) -> str:
     if not ts or ts == 0:
         return None
     return datetime.utcfromtimestamp(ts).strftime("%d %B %Y")
-
-# Format contract result based on method name and contract ABI
-def format_api_response(success: bool, data: Any = None, error: str = None, extra: Dict = None) -> Dict:
-    # Auto unwrap if already wrapped (defensive)
-    if isinstance(data, dict) and "success" in data and "data" in data:
-        return data
-    response = {"success": success}
-    if success:
-        response["data"] = data or {}
-    else:
-        response["data"] = {}
-        response["error"] = error or "Unknown error"
-    if extra:
-        response.update(extra)
-    return response
-
-# Unified transformation map for all methods
-GENERIC_TRANSFORM_MAP = {
-    "getLicenseBasicInfo": {
-        "fields": [
-            "licenseId", "applicantName", "category", "level", "status",
-            "applicant", "businessName", "district","state","division","applicationDate", "approvalDate","rejectionDate",  "expiryDate", "revokedDate", "renewalDate", "isActive",
-        ],
-        "enum_mappings": {
-            "category": LICENSE_CATEGORIES,
-            "level": ADMIN_LEVELS,
-            "status": LICENSE_STATUSES
-        },
-        "timestamp_fields": ["applicationDate", "approvalDate", "rejectionDate", "expiryDate", "revokedDate", "renewalDate"]
-    },
-    "getOfficerInfo": {
-        "fields": [
-            "officerAddress", "name", "employeeId", "role",
-            "department", "level", "jurisdiction", "isActive", "addedDate"
-        ],
-        "enum_mappings": {"level": ADMIN_LEVELS},
-        "timestamp_fields": ["addedDate"]
-    },
-    "getOfficerDetails": {
-        "fields": [
-            "name", "employeeId", "role", "department", "level",
-            "jurisdiction", "isActive", "addedDate"
-        ],
-        "enum_mappings": {"level": ADMIN_LEVELS},
-        "timestamp_fields": ["addedDate"]
-    },
-    "getLicenseStatusHistory": {
-        "fields": [
-            "timestamp", "actionType", "actor", "actorName",
-            "actorRole", "department", "remarks", "dataHash"
-        ],
-        "enum_mappings": {"actionType": ACTION_TYPES},
-        "timestamp_fields": ["timestamp"]
-    },
-    "getLicenseActionHistory": {
-        "fields": [
-            "timestamp", "actionType", "actor", "actorName",
-            "actorRole", "department", "remarks", "dataHash"
-        ],
-        "enum_mappings": {"actionType": ACTION_TYPES},
-        "timestamp_fields": ["timestamp"]
-    },
-    "getOfficerAssignment": {
-        "fields": [
-            "officer", "role", "department", "assignedDate",
-            "assignedBy", "isActive", "remarks"
-        ],
-        "timestamp_fields": ["assignedDate"]
-    },
-    "getOfficerRole": {
-        "fields": ["role"]
-    },
-    "listAllFunctions": {
-        "fields": []
-    },
-    "getAllInspectionFeedback": {
-        "fields": [
-            "inspector", "inspectorName", "remarks", "completedDate", "feedbackType"
-        ],
-        "enum_mappings": {"feedbackType": FEEDBACK_TYPES},
-        "timestamp_fields": ["completedDate"]
-    }
-
-    # add more methods as needed
-}
-
-# Format contract result based on method name and contract ABI
-def format_and_transform_response(result: Any, method_name: str, contract: Any) -> Any:
-    """
-    Formats and transforms a contract read response.
-    Applies field names, enum mappings, and timestamp formatting based on GENERIC_TRANSFORM_MAP.
-    """
-    base_formatted = format_contract_result(result, method_name, contract)
-
-    config = GENERIC_TRANSFORM_MAP.get(method_name)
-    if config:
-       # If the method has a config, apply generic transformation
-        if not isinstance(base_formatted, (list, tuple, dict)) and len(config.get("fields", [])) == 1:
-            base_formatted = (base_formatted,)
-        return generic_transform(method_name, base_formatted)
-
-    return base_formatted
 
 
 # Cache for loaded contracts
@@ -242,17 +97,6 @@ def get_contract(contract_name: str):
         with open(deployment_info_path, "r") as fh:
             deployment_info = json.load(fh)
 
-        # IMPORTANT: For upgradeable contracts, ALWAYS use the PROXY address
-        if "proxy" in deployment_info and deployment_info["proxy"]:
-            contract_address = deployment_info["proxy"]
-            logger.info(f"Using proxy address for {contract_name}: {contract_address}")
-        else:
-            raise ValueError(f"No proxy address found in deployment_info.json")
-        
-        # Determine ABI to use
-        # Check if we have a mapping for this contract name
-        abi_found = False
-
         # Always use proxy address for upgradeable contracts
         proxy_address = deployment_info.get("proxy")
         if not proxy_address:
@@ -271,9 +115,8 @@ def get_contract(contract_name: str):
         if not abi_found:
             abi_locations = [
                 os.path.join(BASE_DIR, "blockchainDeploymentScripts", "implementationABI", f"{contract_name}.json"),
-                os.path.join(BASE_DIR, "blockchainDeploymentScripts", f"{contract_name}ImplementationABI.json"),
                 os.path.join(CONTRACTS_DIR, "abi", f"{contract_name}.json"),
-                os.path.join(CONTRACTS_DIR, "abi", "seedLicenseContract.json"),  # for legacy support
+                os.path.join(CONTRACTS_DIR, "abi", "seedLicenseContract.json")
             ]
             for path in abi_locations:
                 if os.path.exists(path):
@@ -289,11 +132,15 @@ def get_contract(contract_name: str):
         # Create contract instance
         contract = w3.eth.contract(
             address=Web3.to_checksum_address(proxy_address),
+            address=Web3.to_checksum_address(proxy_address),
             abi=abi
         )
 
         # Cache and return
+
+        # Cache and return
         _contract_cache[contract_name] = contract
+        logger.info(f"✅ Contract {contract_name} loaded successfully with proxy: {proxy_address}")
         logger.info(f"✅ Contract {contract_name} loaded successfully with proxy: {proxy_address}")
         return contract
         
@@ -965,8 +812,16 @@ def read_from_contract(contract_name: str, method_name: str, params: List[Any]) 
         # Call the view function
         result = call_view_function(contract_function, *processed_params)
 
-        # Unified formatting
-        return format_and_transform_response(result, method_name, contract)
+        # Format the raw ABI result to dict with types
+        formatted = format_contract_result(result, method_name, contract)
+
+        # Apply response transformer if available
+        if method_name in CONTRACT_RESPONSE_TRANSFORMERS:
+            transformer = CONTRACT_RESPONSE_TRANSFORMERS[method_name]
+            transformed = transformer(result) 
+            return transformed
+
+        return formatted
 
     except ContractLogicError as e:
         logger.error(f"Contract logic error: {e}")
