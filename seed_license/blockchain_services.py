@@ -3,6 +3,7 @@ from typing import Any, List, Dict, Union, Optional, Tuple
 from django.conf import settings
 from web3 import Web3
 from web3.exceptions import ContractLogicError
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,56 @@ DEFAULT_ADDRESS = DEFAULT_ACCOUNT.address
 
 BASE_DIR = settings.BASE_DIR
 CONTRACTS_DIR = os.path.join(BASE_DIR, "Services", "blockchain", "contracts")
+
+# Matches LicenseCategory enum in smart contract
+LICENSE_CATEGORIES = ["SEED", "FERTILIZER", "INSECTICIDE"]
+
+#Admin levels as per smart contract
+ADMIN_LEVELS = ["STATE", "DIVISION", "DISTRICT"]
+
+# Matches LicenseStatus enum in smart contract
+# Note: Ensure this matches the enum in your Solidity contract
+LICENSE_STATUSES = [
+    "DRAFT", "SUBMITTED", "UNDER_REVIEW", "DOCUMENTS_VERIFIED",
+    "PAYMENT_PENDING", "PAYMENT_COMPLETED", "INSPECTION_SCHEDULED",
+    "INSPECTION_COMPLETED", "APPROVED", "REJECTED", "REVOKED",
+    "EXPIRED", "RENEWAL_PENDING"
+]
+
+# Transform raw license data into a structured format
+# This function assumes the raw data is a list with specific indices for each field
+def transform_license_basic_info(raw: list) -> dict:
+    if not isinstance(raw, (list, tuple)) or len(raw) < 12:
+        return {"error": "Unexpected data format", "raw": raw}
+
+    return {
+        "licenseId": raw[0],
+        "applicantName": raw[1],
+        "category": LICENSE_CATEGORIES[raw[2]] if raw[2] < len(LICENSE_CATEGORIES) else "UNKNOWN",
+        "level": ADMIN_LEVELS[raw[3]] if raw[3] < len(ADMIN_LEVELS) else "UNKNOWN",
+        "status": LICENSE_STATUSES[raw[4]] if raw[4] < len(LICENSE_STATUSES) else "UNKNOWN",
+        "applicant": raw[5],
+        "businessName": raw[6],
+        "district": raw[7],
+        "applicationDate": format_unix_timestamp(raw[8]),
+        "approvalDate": format_unix_timestamp(raw[9]),
+        "expiryDate": format_unix_timestamp(raw[10]),
+        "isActive": raw[11],
+    }
+
+# Map of contract response transformers
+# This allows us to apply specific transformations based on the method called
+CONTRACT_RESPONSE_TRANSFORMERS = {
+    "getLicenseBasicInfo": transform_license_basic_info,
+    # You can add more like
+}
+
+# convert timestamp to readable format
+def format_unix_timestamp(ts: int) -> str:
+    if not ts or ts == 0:
+        return None
+    return datetime.utcfromtimestamp(ts).strftime("%d %B %Y")
+
 
 # Cache for loaded contracts
 _contract_cache = {}
@@ -46,74 +97,49 @@ def get_contract(contract_name: str):
         # Load deployment info
         with open(deployment_info_path, "r") as fh:
             deployment_info = json.load(fh)
-        
-        # IMPORTANT: For upgradeable contracts, ALWAYS use the PROXY address
-        if "proxy" in deployment_info and deployment_info["proxy"]:
-            contract_address = deployment_info["proxy"]
-            logger.info(f"Using proxy address for {contract_name}: {contract_address}")
-        else:
-            raise ValueError(f"No proxy address found in deployment_info.json")
-        
-        # Determine ABI to use
-        # Check if we have a mapping for this contract name
-        abi_found = False
+
+        # Always use proxy address for upgradeable contracts
+        proxy_address = deployment_info.get("proxy")
+        if not proxy_address:
+            raise ValueError("Proxy address not found in deployment_info.json")
+
         abi = None
-        
-        # For LicenseSystemV1, we need to check if there's an implementation ABI file
-        if contract_name in ["LicenseSystemV1", "seedLicenseContract"]:
-            # Look for the implementation ABI that was shown in your screenshot
-            possible_abi_locations = [
-                # Check in blockchainDeploymentScripts folder
-                os.path.join(BASE_DIR, "blockchainDeploymentScripts", "implementationABI", "LicenseSystemV1.json"),
-                os.path.join(BASE_DIR, "blockchainDeploymentScripts", "LicenseSystemV1ImplementationABI.json"),
-                os.path.join(BASE_DIR, "blockchainDeploymentScripts", "[ ] implementationABI.json"),
-                # Check in standard locations
-                os.path.join(CONTRACTS_DIR, "abi", "LicenseSystemV1.json"),
-                os.path.join(CONTRACTS_DIR, "abi", "seedLicenseContract.json"),
-            ]
-            
-            # Try each location
-            for abi_path in possible_abi_locations:
-                if os.path.exists(abi_path):
-                    with open(abi_path, "r") as fh:
-                        abi = json.load(fh)
-                    logger.info(f"Found ABI at: {abi_path}")
-                    abi_found = True
-                    break
-        
-        # If no ABI found yet, check if it's the other contract type
+        abi_found = False
+
+        # Priority 1: If ABI is already embedded in deployment_info.json
+        if "implementationABI" in deployment_info and deployment_info["implementationABI"]:
+            abi = deployment_info["implementationABI"]
+            abi_found = True
+            logger.info("✅ Using embedded implementation ABI from deployment_info.json")
+
+        # Priority 2: Fallback locations if ABI wasn't found in JSON
         if not abi_found:
-            # This might be the seed license tracking contract
-            seed_abi_path = os.path.join(CONTRACTS_DIR, "abi", "seedLicenseContract.json")
-            if os.path.exists(seed_abi_path):
-                with open(seed_abi_path, "r") as fh:
-                    abi = json.load(fh)
-                logger.info(f"Using seed license ABI from: {seed_abi_path}")
-                abi_found = True
-        
-        if not abi_found or not abi:
-            # List available files for debugging
-            logger.error(f"Could not find ABI for {contract_name}")
-            logger.error(f"Checked locations: {possible_abi_locations if 'possible_abi_locations' in locals() else 'N/A'}")
-            
-            # Try to list what files are available
-            deployment_dir = os.path.join(BASE_DIR, "blockchainDeploymentScripts")
-            if os.path.exists(deployment_dir):
-                files = os.listdir(deployment_dir)
-                logger.error(f"Files in deployment directory: {files}")
-            
-            raise FileNotFoundError(f"No ABI file found for {contract_name}")
-        
-        # Create contract instance with PROXY address and IMPLEMENTATION ABI
+            abi_locations = [
+                os.path.join(BASE_DIR, "blockchainDeploymentScripts", "implementationABI", f"{contract_name}.json"),
+                os.path.join(BASE_DIR, "blockchainDeploymentScripts", f"{contract_name}ImplementationABI.json"),
+                os.path.join(CONTRACTS_DIR, "abi", f"{contract_name}.json"),
+                os.path.join(CONTRACTS_DIR, "abi", "seedLicenseContract.json"),  # for legacy support
+            ]
+            for path in abi_locations:
+                if os.path.exists(path):
+                    with open(path, "r") as f:
+                        abi = json.load(f)
+                    abi_found = True
+                    logger.info(f"✅ Loaded ABI from: {path}")
+                    break
+
+        if not abi or not abi_found:
+            raise FileNotFoundError(f"ABI for {contract_name} not found in any known location")
+
+        # Create contract instance
         contract = w3.eth.contract(
-            address=Web3.to_checksum_address(contract_address), 
+            address=Web3.to_checksum_address(proxy_address),
             abi=abi
         )
-        
-        # Cache the contract
+
+        # Cache and return
         _contract_cache[contract_name] = contract
-        
-        logger.info(f"Contract {contract_name} loaded successfully with proxy address: {contract_address}")
+        logger.info(f"✅ Contract {contract_name} loaded successfully with proxy: {proxy_address}")
         return contract
         
     except FileNotFoundError as e:
@@ -734,10 +760,18 @@ def read_from_contract(contract_name: str, method_name: str, params: List[Any]) 
         
         # Call the view function
         result = call_view_function(contract_function, *processed_params)
-        
-        # Format the result
-        return format_contract_result(result, method_name, contract)
-        
+
+        # Format the raw ABI result to dict with types
+        formatted = format_contract_result(result, method_name, contract)
+
+        # Apply response transformer if available
+        if method_name in CONTRACT_RESPONSE_TRANSFORMERS:
+            transformer = CONTRACT_RESPONSE_TRANSFORMERS[method_name]
+            transformed = transformer(result) 
+            return transformed
+
+        return formatted
+
     except ContractLogicError as e:
         logger.error(f"Contract logic error: {e}")
         raise
