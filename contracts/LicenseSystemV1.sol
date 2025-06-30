@@ -5,6 +5,7 @@ import "./LicenseStorage.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 /**
  * @title LicenseSystemV1
  * @dev Implementation contract with business logic
@@ -237,4 +238,57 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     functions[5] = "getLicenseBasicInfo(uint256)";
     return functions;
 }
+
+    struct FormattedAction {
+        uint256 timestamp;
+        uint8 actionType;
+        string actor;      // Address as hex string
+        string actorName;
+        string actorRole;
+        string department;
+        string remarks;
+        string dataHash;   // bytes32 as hex string
+    }
+
+    function getLicenseActionHistory(uint256 _licenseId)
+        public
+        view
+        licenseExists(_licenseId)
+        returns (FormattedAction[] memory)
+    {
+        License storage license = licenses[_licenseId];
+        FormattedAction[] memory actions = new FormattedAction[](license.actionHistory.length);
+
+        for (uint i = 0; i < license.actionHistory.length; i++) {
+            Action storage action = license.actionHistory[i];
+            actions[i] = FormattedAction({
+                timestamp: action.timestamp,
+                actionType: uint8(action.actionType),
+                actor: toHexString(action.actor),
+                actorName: action.actorName,
+                actorRole: action.actorRole,
+                department: action.department,
+                remarks: action.remarks,
+                dataHash: toHexString(action.dataHash)
+            });
+        }
+
+        return actions;
+    }
+
+    // Proper hex conversion functions
+    function toHexString(address account) internal pure returns (string memory) {
+        return Strings.toHexString(uint256(uint160(account)), 20);
+    }
+
+    function toHexString(bytes32 value) internal pure returns (string memory) {
+        bytes memory alphabet = "0123456789abcdef";
+        bytes memory str = new bytes(64);
+
+        for (uint i = 0; i < 32; i++) {
+            str[i*2] = alphabet[uint8(value[i] >> 4)];
+            str[i*2+1] = alphabet[uint8(value[i] & 0x0f)];
+        }
+        return string(str);
+    }
 }

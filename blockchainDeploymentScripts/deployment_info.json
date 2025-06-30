@@ -1,11 +1,11 @@
 {
   "network": 31337,
   "networkName": "Hardhat Network",
-  "deploymentTime": 1750935549,
-  "deploymentTimeFormatted": "2025-06-26 16:29:09",
+  "deploymentTime": 1751286105,
+  "deploymentTimeFormatted": "2025-06-30 17:51:45",
   "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "proxy": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-  "implementationV1": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "proxy": "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690",
+  "implementationV1": "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E",
   "implementationABI": [
     {
       "inputs": [],
@@ -74,6 +74,22 @@
         }
       ],
       "name": "OwnableUnauthorizedAccount",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "value",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "length",
+          "type": "uint256"
+        }
+      ],
+      "name": "StringsInsufficientHexLength",
       "type": "error"
     },
     {
@@ -373,6 +389,67 @@
           "type": "uint256"
         }
       ],
+      "name": "getLicenseActionHistory",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint8",
+              "name": "actionType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "string",
+              "name": "actor",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "actorName",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "actorRole",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "department",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "remarks",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "dataHash",
+              "type": "string"
+            }
+          ],
+          "internalType": "struct LicenseSystemV1.FormattedAction[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_licenseId",
+          "type": "uint256"
+        }
+      ],
       "name": "getLicenseBasicInfo",
       "outputs": [
         {
@@ -639,6 +716,6 @@
   },
   "verification": {
     "success": true,
-    "timestamp": 1750935549
+    "timestamp": 1751286105
   }
 }
