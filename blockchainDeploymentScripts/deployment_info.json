@@ -1,11 +1,11 @@
 {
   "network": 31337,
   "networkName": "Hardhat Network",
-  "deploymentTime": 1750842900,
-  "deploymentTimeFormatted": "2025-06-25 14:45:00",
-  "deployer": "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199",
-  "proxy": "0xB581C9264f59BF0289fA76D61B2D0746dCE3C30D",
-  "implementationV1": "0x73511669fd4dE447feD18BB79bAFeAC93aB7F31f",
+  "deploymentTime": 1751440592,
+  "deploymentTimeFormatted": "2025-07-02 12:46:32",
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "proxy": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+  "implementationV1": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
   "implementationABI": [
     {
       "inputs": [],
@@ -1160,6 +1160,6 @@
   },
   "verification": {
     "success": true,
-    "timestamp": 1750842900
+    "timestamp": 1751440592
   }
 }
