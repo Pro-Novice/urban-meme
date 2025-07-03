@@ -1,4 +1,6 @@
 import logging
+
+from environs import ValidationError
 from rest_framework.decorators import api_view
 from rest_framework.permissions import AllowAny
 from Services.api_response import ApiResponse
@@ -10,8 +12,8 @@ from .blockchain_services import (
     get_contract_abi,
     get_contract_address,
     estimate_gas_for_method,
-    get_all_contract_addresses
-    
+    get_all_contract_addresses, LicenseValidator
+
 )
 
 logger = logging.getLogger(__name__)
@@ -34,6 +36,9 @@ def blockchain_write_view(request):
         "private_key": "..." (optional)
     }
     """
+
+    # Initialize validator
+    # validator = LicenseValidator()
     contract_name = request.data.get("contract_name")
     method_name = request.data.get("method_name")
     params = request.data.get("params", [])
@@ -42,7 +47,7 @@ def blockchain_write_view(request):
     
     if not contract_name or not method_name:
         return ApiResponse(err="Missing required fields: contract_name, method_name", status=400)
-    
+
     try:
         result = write_to_contract(
             contract_name=contract_name,
@@ -84,7 +89,7 @@ def blockchain_read_view(request):
             method_name=method_name,
             params=params
         )
-        return ApiResponse(data={"result": result}, status=200)
+        return ApiResponse(data=result, status=200)
     except ValueError as e:
         return ApiResponse(err=str(e), status=400)
     except Exception as e:

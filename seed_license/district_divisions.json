@@ -1,0 +1,12 @@
+
+{
+  "divisions": {
+    "Ajmer Division": ["Ajmer", "Beawar", "Bhilwara", "Didwana-Kuchaman", "Nagaur", "Tonk"],
+    "Bharatpur Division": ["Bharatpur", "Deeg", "Dholpur", "Karauli", "Sawai Madhopur"],
+    "Bikaner Division": ["Bikaner", "Churu", "Hanumangarh", "Sri Ganganagar"],
+    "Jaipur Division": ["Alwar", "Dausa", "Jaipur", "Jhunjhunu", "Khairthal-Tijara", "Kotputli-Behror", "Sikar"],
+    "Jodhpur Division": ["Balotra", "Barmer", "Jaisalmer", "Jalore", "Jodhpur", "Pali", "Phalodi", "Sirohi"],
+    "Kota Division": ["Baran", "Bundi", "Jhalawar", "Kota"],
+    "Udaipur Division": ["Banswara", "Chittorgarh", "Dungarpur", "Pratapgarh", "Rajsamand", "Salumbar"]
+  }
+}

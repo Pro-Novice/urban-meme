@@ -6,7 +6,7 @@ services:
     container_name: rajasthan-agri-backend
     restart: always
     ports:
-      - "8000:8000"
+      - "8080:8000"
     volumes:
       - ./:/app
       - static_volume:/app/static
@@ -42,7 +42,7 @@ services:
     image: redis:alpine
     container_name: rajasthan-agri-redis
     ports:
-      - "6379:6379"
+      - "6379:6381"
     volumes:
       - redis_data:/data
     restart: unless-stopped

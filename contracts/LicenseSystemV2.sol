@@ -8,10 +8,10 @@ import "./LicenseSystemV1.sol";
  * @dev Upgraded version with new features
  */
 contract LicenseSystemV2 is LicenseSystemV1 {
-    
+
     // New events for V2
     event BulkOperationPerformed(uint256[] licenseIds, string operation);
-    
+
     // New function in V2
     function bulkUpdateStatus(
         uint256[] memory _licenseIds,
@@ -23,10 +23,10 @@ contract LicenseSystemV2 is LicenseSystemV1 {
                 updateStatus(_licenseIds[i], _newStatus, _remarks);
             }
         }
-        
+
         emit BulkOperationPerformed(_licenseIds, "bulkStatusUpdate");
     }
-    
+
     // Override existing function with new logic
     function createLicense(
         LicenseCategory _category,
@@ -35,7 +35,8 @@ contract LicenseSystemV2 is LicenseSystemV1 {
         string memory _aadhaarNumber,
         string memory _businessName,
         string memory _state,
-        string memory _district
+        string memory _district,
+        string memory _division
     ) public override returns (uint256) {
         // Call parent function
         uint256 licenseId = super.createLicense(
@@ -45,18 +46,19 @@ contract LicenseSystemV2 is LicenseSystemV1 {
             _aadhaarNumber,
             _businessName,
             _state,
-            _district
+            _district,
+            _division
         );
-        
+
         // New V2 logic: Auto-assign to district officer
         address districtOfficer = _getDistrictOfficer(_district);
         if (districtOfficer != address(0)) {
             _autoAssignOfficer(licenseId, districtOfficer);
         }
-        
+
         return licenseId;
     }
-    
+
     // New internal function for V2
     function _getDistrictOfficer(string memory _district) internal view returns (address) {
         // Logic to find district officer
@@ -68,7 +70,7 @@ contract LicenseSystemV2 is LicenseSystemV1 {
         }
         return address(0);
     }
-    
+
     function _autoAssignOfficer(uint256 _licenseId, address _officer) internal {
         License storage license = licenses[_licenseId];
         license.assignedOfficers.push(_officer);
@@ -81,7 +83,7 @@ contract LicenseSystemV2 is LicenseSystemV1 {
             isActive: true,
             remarks: "Auto-assigned"
         });
-        
+
         officerAssignedLicenses[_officer].push(_licenseId);
     }
 }

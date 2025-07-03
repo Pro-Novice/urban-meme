@@ -41,22 +41,11 @@ RUN chown -R appuser:appuser /app
 USER appuser
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8080
 
 # Create entrypoint script
-RUN echo '#!/bin/sh\n\
-echo "Waiting for postgres..."\n\
-while ! nc -z $POSTGRES_HOST $POSTGRES_PORT; do\n\
-  sleep 0.1\n\
-done\n\
-echo "PostgreSQL started"\n\
-\n\
-python manage.py migrate\n\
-python manage.py collectstatic --noinput\n\
-\n\
-exec "$@"' > /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
-
+# Ensure this line exists in your Dockerfile
+COPY entrypoint.sh /app/entrypoint.sh
 # Run with gunicorn
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["gunicorn", "agri_backend.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["gunicorn", "agri_backend.wsgi:application", "--bind", "0.0.0.0:8080"]

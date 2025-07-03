@@ -15,7 +15,29 @@ contract LicenseStorage {
     enum AdminLevel { STATE, DIVISION, DISTRICT }
     enum LicenseStatus { DRAFT, SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, PAYMENT_PENDING, PAYMENT_COMPLETED, INSPECTION_SCHEDULED, INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWAL_PENDING }
     enum ActionType { CREATED, SUBMITTED, DOCUMENT_UPLOADED, DOCUMENT_VERIFIED, PAYMENT_RECORDED, INSPECTION_SCHEDULED, INSPECTION_COMPLETED, STATUS_UPDATED, APPROVED, REJECTED, REVOKED, RENEWED, COMMENT_ADDED, OFFICER_ASSIGNED }
-    
+    enum OfficerRole {
+    //State Designation
+        AGRICULTURE_OFFICER_STATE,
+        ASSISTANT_AGRICULTURE_OFFICER_STATE,
+        ASSISTANT_DIRECTOR_STATE,
+        DEPUTY_DIRECTOR_STATE,
+        JOINT_DIRECTOR_STATE,
+        JOINT_DIRECTOR_INPUT_STATE,
+    //Division Designation
+        AGRICULTURE_OFFICER_DIVISION,
+        ASSISTANT_AGRICULTURE_OFFICER_DIVISION,
+        ASSISTANT_DIRECTOR_DIVISION,
+        DEPUTY_DIRECTOR_DIVISION,
+        JOINT_DIRECTOR_DIVISION,
+        JOINT_DIRECTOR_INPUT_DIVISION,
+    //District Designation
+        AGRICULTURE_OFFICER_DISTRICT,
+        ASSISTANT_AGRICULTURE_OFFICER_DISTRICT,
+        ASSISTANT_DIRECTOR_DISTRICT,
+        DEPUTY_DIRECTOR_DISTRICT,
+        JOINT_DIRECTOR_DISTRICT,
+        JOINT_DIRECTOR_INPUT_DISTRICT
+    }
     // Structs
     struct License {
         uint256 licenseId;
@@ -110,7 +132,7 @@ contract LicenseStorage {
     
     struct OfficerAssignment {
         address officer;
-        string role;
+         OfficerRole role;
         string department;
         uint256 assignedDate;
         address assignedBy;
@@ -122,7 +144,7 @@ contract LicenseStorage {
         address officerAddress;
         string name;
         string employeeId;
-        string role;
+       OfficerRole role;
         string department;
         AdminLevel level;
         string jurisdiction;
@@ -135,7 +157,12 @@ contract LicenseStorage {
     mapping(string => uint256) internal licenseNumberToId;
     mapping(address => Officer) internal officers;
     mapping(address => bool) internal isOfficer;
-    
+    // Division to Districts mapping
+    mapping(string => string[]) public divisionDistricts;
+
+    // District to Division mapping
+    mapping(string => string) public districtDivision;
+
     // Tracking arrays
     uint256[] internal allLicenseIds;
     address[] internal allOfficers;
@@ -179,4 +206,6 @@ contract LicenseStorage {
             sstore(slot, _newValue)
         }
     }
+
+
 }

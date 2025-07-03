@@ -1,11 +1,11 @@
 {
   "network": 31337,
   "networkName": "Hardhat Network",
-  "deploymentTime": 1751286105,
-  "deploymentTimeFormatted": "2025-06-30 17:51:45",
+  "deploymentTime": 1751543643,
+  "deploymentTimeFormatted": "2025-07-03 17:24:03",
   "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "proxy": "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690",
-  "implementationV1": "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E",
+  "proxy": "0x84eA74d481Ee0A5332c457a4d796187F6Ba67fEB",
+  "implementationV1": "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690",
   "implementationABI": [
     {
       "inputs": [],
@@ -202,25 +202,6 @@
         {
           "indexed": true,
           "internalType": "address",
-          "name": "officer",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "string",
-          "name": "role",
-          "type": "string"
-        }
-      ],
-      "name": "OfficerAdded",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
           "name": "previousOwner",
           "type": "address"
         },
@@ -292,34 +273,6 @@
       "type": "function"
     },
     {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_officer",
-          "type": "address"
-        },
-        {
-          "internalType": "string",
-          "name": "_name",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "_employeeId",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "_role",
-          "type": "string"
-        }
-      ],
-      "name": "addOfficer",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
       "inputs": [],
       "name": "admin",
       "outputs": [
@@ -366,6 +319,11 @@
         },
         {
           "internalType": "string",
+          "name": "_division",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
           "name": "_district",
           "type": "string"
         }
@@ -379,6 +337,49 @@
         }
       ],
       "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "name": "districtDivision",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "divisionDistricts",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -520,77 +521,10 @@
       "inputs": [
         {
           "internalType": "address",
-          "name": "_officer",
+          "name": "_officerManagementAddr",
           "type": "address"
         }
       ],
-      "name": "getOfficerDetails",
-      "outputs": [
-        {
-          "internalType": "string",
-          "name": "name",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "employeeId",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "role",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "department",
-          "type": "string"
-        },
-        {
-          "internalType": "enum LicenseStorage.AdminLevel",
-          "name": "level",
-          "type": "uint8"
-        },
-        {
-          "internalType": "string",
-          "name": "jurisdiction",
-          "type": "string"
-        },
-        {
-          "internalType": "bool",
-          "name": "isActive",
-          "type": "bool"
-        },
-        {
-          "internalType": "uint256",
-          "name": "addedDate",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_officer",
-          "type": "address"
-        }
-      ],
-      "name": "getOfficerRole",
-      "outputs": [
-        {
-          "internalType": "string",
-          "name": "",
-          "type": "string"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
       "name": "initialize",
       "outputs": [],
       "stateMutability": "nonpayable",
@@ -620,6 +554,19 @@
         }
       ],
       "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "officerManagement",
+      "outputs": [
+        {
+          "internalType": "contract OfficerManagement",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -708,6 +655,30 @@
       "outputs": [],
       "stateMutability": "payable",
       "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_licenseId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "_location",
+          "type": "string"
+        }
+      ],
+      "name": "validateLicenseJurisdiction",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
     }
   ],
   "gasUsed": {
@@ -716,6 +687,6 @@
   },
   "verification": {
     "success": true,
-    "timestamp": 1751286105
+    "timestamp": 1751543643
   }
 }
