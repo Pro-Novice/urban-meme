@@ -46,6 +46,7 @@ LICENSE_STATUSES = [
     "EXPIRED", "RENEWAL_PENDING"
 ]
 
+FEEDBACK_TYPES = ["None", "Satisfactory", "Unsatisfactory", "Needs Reinspection"]
 
 # generic transform map for contract methods
 # This map defines how to transform raw data from contract methods into a more usable format.
@@ -55,33 +56,57 @@ def generic_transform(method_name: str, raw_data: Any) -> Any:
         return [generic_transform(method_name, item) for item in raw_data]
     
     config = GENERIC_TRANSFORM_MAP.get(method_name)
-    if not config or not isinstance(raw_data, (list, tuple)):
-        return raw_data  # Return raw data if no config
-    
-    transformed = {}
+    if not config or not config.get("fields"):
+        return raw_data
+
     fields = config.get("fields", [])
     enum_mappings = config.get("enum_mappings", {})
     timestamp_fields = set(config.get("timestamp_fields", []))
-    
+
+    transformed = {}
+    status_str = None
+
     for i, field in enumerate(fields):
-        if i >= len(raw_data):
-            transformed[field] = None
-            continue
-            
-        value = raw_data[i]
-        
+        value = None
+        if isinstance(raw_data, dict):
+            value = raw_data.get(field)
+        elif isinstance(raw_data, (list, tuple)) and i < len(raw_data):
+            value = raw_data[i]
+
+        if field == "status":
+            # Save string version of status to apply conditional filters later
+            if field in enum_mappings:
+                enum_list = enum_mappings[field]
+                status_str = enum_list[value] if isinstance(value, int) and value < len(enum_list) else "UNKNOWN"
+            else:
+                status_str = value
+
         if field in enum_mappings:
             enum_list = enum_mappings[field]
-            if isinstance(value, int) and value < len(enum_list):
-                transformed[field] = enum_list[value]
-            else:
-                transformed[field] = "UNKNOWN"
+            transformed[field] = enum_list[value] if isinstance(value, int) and value < len(enum_list) else "UNKNOWN"
         elif field in timestamp_fields and value:
             transformed[field] = format_unix_timestamp(value)
         else:
             transformed[field] = value
-            
+
+    # 🌟 Remove irrelevant date fields based on status
+    if status_str != "APPROVED":
+       transformed.pop("approvalDate", None)
+
+    if status_str not in {"APPROVED", "EXPIRED"}:
+        transformed.pop("expiryDate", None)
+
+    if status_str != "REJECTED":
+        transformed.pop("rejectionDate", None)
+
+    if status_str != "REVOKED":
+        transformed.pop("revokedDate", None)
+
+    if status_str not in {"RENEWAL_PENDING", "RENEWED"}:
+        transformed.pop("renewalDate", None)
+
     return transformed
+
 
 # convert timestamp to readable format
 def format_unix_timestamp(ts: int) -> str:
@@ -109,15 +134,14 @@ GENERIC_TRANSFORM_MAP = {
     "getLicenseBasicInfo": {
         "fields": [
             "licenseId", "applicantName", "category", "level", "status",
-            "applicant", "businessName", "district",
-            "applicationDate", "approvalDate", "expiryDate", "isActive"
+            "applicant", "businessName", "district","applicationDate", "approvalDate","rejectionDate",  "expiryDate", "revokedDate", "renewalDate", "isActive",
         ],
         "enum_mappings": {
             "category": LICENSE_CATEGORIES,
             "level": ADMIN_LEVELS,
             "status": LICENSE_STATUSES
         },
-        "timestamp_fields": ["applicationDate", "approvalDate", "expiryDate"]
+        "timestamp_fields": ["applicationDate", "approvalDate", "rejectionDate", "expiryDate", "revokedDate", "renewalDate"]
     },
     "getOfficerInfo": {
         "fields": [
@@ -127,7 +151,23 @@ GENERIC_TRANSFORM_MAP = {
         "enum_mappings": {"level": ADMIN_LEVELS},
         "timestamp_fields": ["addedDate"]
     },
+    "getOfficerDetails": {
+        "fields": [
+            "name", "employeeId", "role", "department", "level",
+            "jurisdiction", "isActive", "addedDate"
+        ],
+        "enum_mappings": {"level": ADMIN_LEVELS},
+        "timestamp_fields": ["addedDate"]
+    },
     "getLicenseStatusHistory": {
+        "fields": [
+            "timestamp", "actionType", "actor", "actorName",
+            "actorRole", "department", "remarks", "dataHash"
+        ],
+        "enum_mappings": {"actionType": ACTION_TYPES},
+        "timestamp_fields": ["timestamp"]
+    },
+    "getLicenseActionHistory": {
         "fields": [
             "timestamp", "actionType", "actor", "actorName",
             "actorRole", "department", "remarks", "dataHash"
@@ -142,7 +182,21 @@ GENERIC_TRANSFORM_MAP = {
         ],
         "timestamp_fields": ["assignedDate"]
     },
-    # Add more methods as needed
+    "getOfficerRole": {
+        "fields": ["role"]
+    },
+    "listAllFunctions": {
+        "fields": []
+    },
+    "getAllInspectionFeedback": {
+        "fields": [
+            "inspector", "inspectorName", "remarks", "completedDate", "feedbackType"
+        ],
+        "enum_mappings": {"feedbackType": FEEDBACK_TYPES},
+        "timestamp_fields": ["completedDate"]
+    }
+
+    # add more methods as needed
 }
 
 # Format contract result based on method name and contract ABI
@@ -155,6 +209,9 @@ def format_and_transform_response(result: Any, method_name: str, contract: Any) 
    
     config = GENERIC_TRANSFORM_MAP.get(method_name)
     if config:
+       # If the method has a config, apply generic transformation
+        if not isinstance(base_formatted, (list, tuple, dict)) and len(config.get("fields", [])) == 1:
+            base_formatted = (base_formatted,)
         return generic_transform(method_name, base_formatted)
 
     return base_formatted  
