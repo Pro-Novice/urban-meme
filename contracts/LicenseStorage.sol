@@ -15,7 +15,7 @@ contract LicenseStorage {
     enum AdminLevel { STATE, DIVISION, DISTRICT }
     enum LicenseStatus { DRAFT, SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, PAYMENT_PENDING, PAYMENT_COMPLETED, INSPECTION_SCHEDULED, INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWAL_PENDING }
     enum ActionType { CREATED, SUBMITTED, DOCUMENT_UPLOADED, DOCUMENT_VERIFIED, PAYMENT_RECORDED, INSPECTION_SCHEDULED, INSPECTION_COMPLETED, STATUS_UPDATED, APPROVED, REJECTED, REVOKED, RENEWED, COMMENT_ADDED, OFFICER_ASSIGNED }
-    
+    enum InspectionFeedbackType { SATISFACTORY, UNSATISFACTORY, NEEDS_REINSPECTION }
     // Structs
     struct License {
         uint256 licenseId;
@@ -48,7 +48,9 @@ contract LicenseStorage {
         uint256 applicationDate;
         uint256 lastModifiedDate;
         uint256 approvalDate;
+        uint256 rejectionDate;
         uint256 expiryDate;
+        uint256 revokedDate;
         uint256 renewalDate;
         Action[] actionHistory;
         address[] assignedOfficers;
@@ -93,6 +95,7 @@ contract LicenseStorage {
         mapping(string => string) findings;
         string[] findingKeys;
         bool passed;
+        InspectionFeedbackType feedbackType; 
         string remarks;
         string reportHash;
     }
