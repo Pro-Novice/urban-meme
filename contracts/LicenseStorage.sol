@@ -13,37 +13,9 @@ contract LicenseStorage {
     // Enums (these don't use storage slots)
     enum LicenseCategory { SEED, FERTILIZER, INSECTICIDE }
     enum AdminLevel { STATE, DIVISION, DISTRICT }
-    enum LicenseStatus { DRAFT, SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED, INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWAL_PENDING }
-    enum ActionType { CREATED, SUBMITTED, DOCUMENT_UPLOADED, DOCUMENT_VERIFIED, DOCUMENT_REJECTED, PAYMENT_RECORDED, INSPECTION_SCHEDULED, INSPECTION_COMPLETED, STATUS_UPDATED, APPROVED, REJECTED, REVOKED, RENEWED, COMMENT_ADDED, OFFICER_ASSIGNED }
-    enum OfficerRole {
-        AGRICULTURE_OFFICER,
-        ASSISTANT_AGRICULTURE_OFFICER,
-        ASSISTANT_DIRECTOR,
-        DEPUTY_DIRECTOR,
-        JOINT_DIRECTOR,
-        JOINT_DIRECTOR_INPUT,
-        FIELD_INSPECTOR
-    }
-    enum Division {
-    AJMER_DIVISION,       // 0
-    BHARATPUR_DIVISION,   // 1
-    BIKANER_DIVISION,     // 2
-    JAIPUR_DIVISION,      // 3
-    JODHPUR_DIVISION,     // 4
-    KOTA_DIVISION,        // 5
-    UDAIPUR_DIVISION      // 6
-}
-    enum StandardDocumentType {
-    AFFIDAVIT_SEED_QUALITY,
-    ID_PROOF,
-    SHOP_MAP,
-    REGISTRATION_CERTIFICATE,
-    MEMORANDUM_ARTICLES,
-    PASSPORT_PHOTO,
-    AUTHORIZATION_LETTER
-}
-    enum InspectionFeedbackType {    NONE,  SATISFACTORY, UNSATISFACTORY, NEEDS_REINSPECTION }
-
+    enum LicenseStatus { DRAFT, SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, PAYMENT_PENDING, PAYMENT_COMPLETED, INSPECTION_SCHEDULED, INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWAL_PENDING }
+    enum ActionType { CREATED, SUBMITTED, DOCUMENT_UPLOADED, DOCUMENT_VERIFIED, PAYMENT_RECORDED, INSPECTION_SCHEDULED, INSPECTION_COMPLETED, STATUS_UPDATED, APPROVED, REJECTED, REVOKED, RENEWED, COMMENT_ADDED, OFFICER_ASSIGNED }
+    enum InspectionFeedbackType { SATISFACTORY, UNSATISFACTORY, NEEDS_REINSPECTION }
     // Structs
     struct License {
         uint256 licenseId;
@@ -77,7 +49,9 @@ contract LicenseStorage {
         uint256 lastModifiedDate;
         uint256 approvalDate;
         uint256 rejectionDate;
+        uint256 rejectionDate;
         uint256 expiryDate;
+        uint256 revokedDate;
         uint256 revokedDate;
         uint256 renewalDate;
         Action[] actionHistory;
@@ -120,7 +94,7 @@ contract LicenseStorage {
         mapping(string => string) findings;
         string[] findingKeys;
         bool passed;
-        InspectionFeedbackType feedbackType;
+        InspectionFeedbackType feedbackType; 
         string remarks;
         string reportHash;
     }
