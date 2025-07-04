@@ -15,7 +15,23 @@ contract LicenseStorage {
     enum AdminLevel { STATE, DIVISION, DISTRICT }
     enum LicenseStatus { DRAFT, SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, PAYMENT_PENDING, PAYMENT_COMPLETED, INSPECTION_SCHEDULED, INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWAL_PENDING }
     enum ActionType { CREATED, SUBMITTED, DOCUMENT_UPLOADED, DOCUMENT_VERIFIED, PAYMENT_RECORDED, INSPECTION_SCHEDULED, INSPECTION_COMPLETED, STATUS_UPDATED, APPROVED, REJECTED, REVOKED, RENEWED, COMMENT_ADDED, OFFICER_ASSIGNED }
-    
+    enum OfficerRole {
+        AGRICULTURE_OFFICER,
+        ASSISTANT_AGRICULTURE_OFFICER,
+        ASSISTANT_DIRECTOR,
+        DEPUTY_DIRECTOR,
+        JOINT_DIRECTOR,
+        JOINT_DIRECTOR_INPUT
+    }
+    enum Division {
+    AJMER_DIVISION,       // 0
+    BHARATPUR_DIVISION,   // 1
+    BIKANER_DIVISION,     // 2
+    JAIPUR_DIVISION,      // 3
+    JODHPUR_DIVISION,     // 4
+    KOTA_DIVISION,        // 5
+    UDAIPUR_DIVISION      // 6
+}
     // Structs
     struct License {
         uint256 licenseId;
@@ -102,7 +118,7 @@ contract LicenseStorage {
         ActionType actionType;
         address actor;
         string actorName;
-        string actorRole;
+        OfficerRole actorRole; // ✅ Not string
         string department;
         string remarks;
         bytes32 dataHash;
@@ -110,7 +126,7 @@ contract LicenseStorage {
     
     struct OfficerAssignment {
         address officer;
-        string role;
+        OfficerRole role;
         string department;
         uint256 assignedDate;
         address assignedBy;
@@ -122,14 +138,16 @@ contract LicenseStorage {
         address officerAddress;
         string name;
         string employeeId;
-        string role;
+        OfficerRole role;
         string department;
         AdminLevel level;
-        string jurisdiction;
+        string state;
+        string division;
+        string district;
         bool isActive;
         uint256 addedDate;
     }
-    
+
     // Main storage mappings - using specific slots
     mapping(uint256 => License) internal licenses;
     mapping(string => uint256) internal licenseNumberToId;

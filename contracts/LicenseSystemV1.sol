@@ -17,9 +17,13 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     event LicenseUpdated(uint256 indexed licenseId, string field, address indexed updatedBy);
     event StatusChanged(uint256 indexed licenseId, LicenseStatus oldStatus, LicenseStatus newStatus, address indexed changedBy);
     event DocumentUploaded(uint256 indexed licenseId, string documentType, address indexed uploadedBy);
-    event OfficerAdded(address indexed officer, string role);
-
-    // Modifiers
+    event OfficerAdded(address indexed officer, OfficerRole role);
+event DebugInput(
+    AdminLevel level,
+    string state,
+    string division,
+    string district
+);    // Modifiers
     modifier onlyAdmin() {
         require(msg.sender == admin(), "Only admin");
         _;
@@ -52,31 +56,56 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     // Business Logic Functions
 
     function addOfficer(
-        address _officer,
-        string memory _name,
-        string memory _employeeId,
-        string memory _role
-    ) public onlyAdmin {
-        require(!isOfficer[_officer], "Already an officer");
+    address _officer,
+    string memory _name,
+    string memory _employeeId,
+    OfficerRole _role,
+    string memory _department,
+    AdminLevel _level,
+    string memory _state,
+    string memory _district,
+    string memory _division
+) public onlyAdmin {
+    require(!isOfficer[_officer], "Already an officer");
 
-        officers[_officer] = Officer({
-            officerAddress: _officer,
-            name: _name,
-            employeeId: _employeeId,
-            role: _role,
-            department: "",
-            level: AdminLevel.STATE,
-            jurisdiction: "",
-            isActive: true,
-            addedDate: block.timestamp
-        });
-
-        isOfficer[_officer] = true;
-        allOfficers.push(_officer);
-
-        emit OfficerAdded(_officer, _role);
+emit DebugInput(_level, _state, _division, _district);
+    // Validate based on AdminLevel
+    if (_level == AdminLevel.STATE) {
+        require(bytes(_state).length > 0, "State is required for STATE level");
+        require(bytes(_district).length == 0, "District must be empty for STATE level");
+        require(bytes(_division).length == 0, "Division must be empty for STATE level");
+    } else if (_level == AdminLevel.DIVISION) {
+        require(bytes(_division).length > 0, "Division is required for DIVISION level");
+        require(bytes(_state).length == 0, "State must be empty for DIVISION level");
+        require(bytes(_district).length == 0, "District must be empty for DIVISION level");
+    } else if (_level == AdminLevel.DISTRICT) {
+        require(bytes(_district).length > 0, "District is required for DISTRICT level");
+        require(bytes(_state).length == 0, "State must be empty for DISTRICT level");
+        require(bytes(_division).length == 0, "Division must be empty for DISTRICT level");
+    } else {
+        revert("Invalid admin level");
     }
 
+    officers[_officer] = Officer({
+        officerAddress: _officer,
+        name: _name,
+        employeeId: _employeeId,
+        role: _role,
+        department: _department,
+        level: _level,
+        state: _state,
+        district: _district,
+        division: _division,
+        isActive: true,
+        addedDate: block.timestamp
+
+    });
+
+    isOfficer[_officer] = true;
+    allOfficers.push(_officer);
+
+    emit OfficerAdded(_officer, _role);
+}
     function createLicense(
         LicenseCategory _category,
         AdminLevel _level,
@@ -116,30 +145,36 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
 
         return newLicenseId;
     }
+function updateStatus(
+    uint256 _licenseId,
+    LicenseStatus _newStatus,
+    string memory _remarks
+) public onlyOfficerOrAdmin licenseExists(_licenseId) {
+    License storage license = licenses[_licenseId];
+    LicenseStatus oldStatus = license.status;
 
-    function updateStatus(
-        uint256 _licenseId,
-        LicenseStatus _newStatus,
-        string memory _remarks
-    ) public onlyOfficerOrAdmin licenseExists(_licenseId) {
-        License storage license = licenses[_licenseId];
-        LicenseStatus oldStatus = license.status;
+    // Enforce level match between officer and license
+    require(
+        officers[msg.sender].level == license.level,
+        "Officer level mismatch with license level"
+    );
 
-        // Remove from old status array
-        _removeFromStatusArray(oldStatus, _licenseId);
+    // Remove from old status array
+    _removeFromStatusArray(oldStatus, _licenseId);
 
-        // Add to new status array
-        licensesByStatus[_newStatus].push(_licenseId);
+    // Add to new status array
+    licensesByStatus[_newStatus].push(_licenseId);
 
-        // Update license
-        license.status = _newStatus;
-        license.lastModifiedDate = block.timestamp;
+    // Update license
+    license.status = _newStatus;
+    license.lastModifiedDate = block.timestamp;
 
-        // Record action
-        _recordAction(_licenseId, ActionType.STATUS_UPDATED, _remarks);
+    // Record action
+    _recordAction(_licenseId, ActionType.STATUS_UPDATED, _remarks);
 
-        emit StatusChanged(_licenseId, oldStatus, _newStatus, msg.sender);
-    }
+    emit StatusChanged(_licenseId, oldStatus, _newStatus, msg.sender);
+}
+
 
     // Internal helper functions
     function _recordAction(
@@ -154,7 +189,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             actionType: _actionType,
             actor: msg.sender,
             actorName: isOfficer[msg.sender] ? officers[msg.sender].name : license.applicantName,
-            actorRole: isOfficer[msg.sender] ? officers[msg.sender].role : "Applicant",
+            actorRole: isOfficer[msg.sender] ? officers[msg.sender].role : OfficerRole.AGRICULTURE_OFFICER,
             department: isOfficer[msg.sender] ? officers[msg.sender].department : "",
             remarks: _remarks,
             dataHash: keccak256(abi.encodePacked(_remarks, block.timestamp))
@@ -201,17 +236,16 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             license.isActive
         );
     }
-        function getOfficerRole(address _officer) public view returns (string memory) {
+        function getOfficerRole(address _officer) public view returns (OfficerRole) {
     require(isOfficer[_officer], "Address is not an officer");
     return officers[_officer].role;
 }
     function getOfficerDetails(address _officer) public view returns (
     string memory name,
     string memory employeeId,
-    string memory role,
+    OfficerRole role,
     string memory department,
     AdminLevel level,
-    string memory jurisdiction,
     bool isActive,
     uint256 addedDate
 ) {
@@ -223,7 +257,6 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         officer.role,
         officer.department,
         officer.level,
-        officer.jurisdiction,
         officer.isActive,
         officer.addedDate
     );
@@ -244,7 +277,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         uint8 actionType;
         string actor;      // Address as hex string
         string actorName;
-        string actorRole;
+        OfficerRole actorRole;
         string department;
         string remarks;
         string dataHash;   // bytes32 as hex string
@@ -266,7 +299,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                 actionType: uint8(action.actionType),
                 actor: toHexString(action.actor),
                 actorName: action.actorName,
-                actorRole: action.actorRole,
+                actorRole:  action.actorRole,
                 department: action.department,
                 remarks: action.remarks,
                 dataHash: toHexString(action.dataHash)

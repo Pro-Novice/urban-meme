@@ -4,6 +4,8 @@ from django.conf import settings
 from web3 import Web3
 from web3.exceptions import ContractLogicError
 
+from seed_license.enums import OfficerRole, DivisionEnum
+
 logger = logging.getLogger(__name__)
 
 # ── connect ───────────────────────────────────────────────────────────
@@ -561,7 +563,56 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
             address=Web3.to_checksum_address(contract_address),
             abi=abi
         )
-        
+        if method_name == "addOfficer":
+            # Convert role param (index 3)
+            try:
+                role_param = params[3]
+                if isinstance(role_param, str):
+                    role_enum = OfficerRole.from_string(role_param).value
+                    params[3] = role_enum
+            except (IndexError, ValueError) as e:
+                return {
+                    "success": False,
+                    "error": "Invalid role parameter",
+                    "details": str(e)
+                }
+
+            # Convert based on level param (index 5)
+            level = params[5]
+
+            if level == 0:  # STATE
+                params[6] = "RAJASTHAN" # Rajasthan enum value, adjust as needed
+                params[7] = -1  # division empty
+                params[8] = -1  #district empty
+
+            elif level == 1:  # DIVISION
+                try:
+                    division_param = params[8]
+                    if isinstance(division_param, str):
+                        division_enum = DivisionEnum.from_string(division_param)
+                        params[8] = division_enum
+                except (IndexError, ValueError) as e:
+                    return {
+                        "success": False,
+                        "error": "Invalid division parameter",
+                        "details": str(e)
+                    }
+
+            # elif level == 2:  # DISTRICT
+            #     try:
+            #         district_param = params[8]
+            #         if isinstance(district_param, str):
+            #             district_enum = CityEnum.from_string(district_param).value
+            #             params[8] = district_enum
+            #         params[6] = -1  # state empty
+            #         params[7] = -1  # division empty
+            #     except (IndexError, ValueError) as e:
+            #         return {
+            #             "success": False,
+            #             "error": "Invalid district parameter",
+            #             "details": str(e)
+            #         }
+
         # Get the function
         contract_function = getattr(contract.functions, method_name)
         
@@ -681,7 +732,7 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
                 response["message"] = f"Method '{method_name}' executed successfully"
         
         return response
-        
+
     except Exception as e:
         error_msg = str(e)
         
