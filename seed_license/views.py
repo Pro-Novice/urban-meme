@@ -3,6 +3,7 @@ from rest_framework.decorators import api_view
 from rest_framework.permissions import AllowAny
 from Services.api_response import ApiResponse
 from .blockchain_services import (
+    format_api_response,
     write_to_contract,
     read_from_contract,
     get_transaction_status,
@@ -84,12 +85,12 @@ def blockchain_read_view(request):
             method_name=method_name,
             params=params
         )
-        return ApiResponse(data={"result": result}, status=200)
+        return ApiResponse(format_api_response(True, result), status=200)
     except ValueError as e:
-        return ApiResponse(err=str(e), status=400)
+        return ApiResponse(format_api_response(False, error=str(e)), status=500)
     except Exception as e:
         logger.exception("Blockchain read error")
-        return ApiResponse(err=f"Blockchain read failed: {str(e)}", status=500)
+        return ApiResponse(format_api_response(False, error=f"Blockchain read failed: {str(e)}"), status=500)
 
 
 # ══════════════════════════════════════════════════════════════════════

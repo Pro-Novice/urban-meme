@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+
 /**
  * @title LicenseSystemV1
  * @dev Implementation contract with business logic
@@ -18,6 +19,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     event StatusChanged(uint256 indexed licenseId, LicenseStatus oldStatus, LicenseStatus newStatus, address indexed changedBy);
     event DocumentUploaded(uint256 indexed licenseId, string documentType, address indexed uploadedBy);
     event OfficerAdded(address indexed officer, OfficerRole role);
+    event FeedbackAdded(uint256 indexed licenseId, address indexed inspector, string remarks, uint256 timestamp);
 event DebugInput(
     AdminLevel level,
     string state,
@@ -206,37 +208,29 @@ function updateStatus(
             }
         }
     }
-    function getLicenseBasicInfo(uint256 _licenseId) public view returns (
-        uint256,
-        string memory,
-        LicenseCategory,
-        AdminLevel,
-        LicenseStatus,
-        address,
-        string memory,
-        string memory,
-        uint256,
-        uint256,
-        uint256,
-        bool
-    ) {
+
+    function getLicenseBasicInfo(uint256 _licenseId) public view returns (LicenseBasicInfo memory) {
         License storage license = licenses[_licenseId];
-        return (
-            license.licenseId,
-            license.applicantName,
-            license.category,
-            license.level,
-            license.status,
-            license.applicant,
-            license.businessName,
-            license.district,
-            license.applicationDate,
-            license.approvalDate,
-            license.expiryDate,
-            license.isActive
-        );
+        return LicenseBasicInfo({
+            licenseId: license.licenseId,
+            applicantName: license.applicantName,
+            category: license.category,
+            level: license.level,
+            status: license.status,
+            applicant: license.applicant,
+            businessName: license.businessName,
+            district: license.district,
+            applicationDate: license.applicationDate,
+            approvalDate: license.approvalDate,
+            rejectionDate: license.rejectionDate,
+            expiryDate: license.expiryDate,
+            revokedDate: license.revokedDate,
+            renewalDate: license.renewalDate,
+            isActive: license.isActive
+        });
     }
-        function getOfficerRole(address _officer) public view returns (OfficerRole) {
+
+       function getOfficerRole(address _officer) public view returns (OfficerRole) {
     require(isOfficer[_officer], "Address is not an officer");
     return officers[_officer].role;
 }
@@ -324,4 +318,98 @@ function updateStatus(
         }
         return string(str);
     }
+
+    /// New function to add inspection feedback
+       struct getAllFeedback {
+        address inspector;
+        string inspectorName;
+        string remarks;
+        uint256 completedDate;
+        InspectionFeedbackType feedbackType;
+    }
+
+    function addInspectionFeedback(
+        uint256 _licenseId,
+        address _inspector,
+        InspectionFeedbackType _feedbackType,
+        string memory _remarks
+    )
+        public
+        onlyOfficerOrAdmin
+        licenseExists(_licenseId)
+    {
+        require(isOfficer[_inspector], "Inspector is not a registered officer");
+        require(_feedbackType != InspectionFeedbackType.NONE, "Invalid feedback type");
+
+        License storage license = licenses[_licenseId];
+
+        uint256 inspectionIndex = license.inspections.length;
+        if (
+            inspectionIndex == 0 ||
+            license.inspections[inspectionIndex - 1].completedDate != 0
+        ) {
+            license.inspections.push();
+            inspectionIndex++;
+        }
+
+        Inspection storage inspection = license.inspections[inspectionIndex - 1];
+        inspection.inspector = _inspector;
+        inspection.inspectorName = officers[_inspector].name;
+        inspection.completedDate = block.timestamp;
+        inspection.feedbackType = _feedbackType;
+        inspection.remarks = _remarks;
+        inspection.passed = (_feedbackType == InspectionFeedbackType.SATISFACTORY);
+
+        _recordAction(_licenseId, ActionType.COMMENT_ADDED, _remarks);
+
+        emit FeedbackAdded(_licenseId, _inspector, _remarks, block.timestamp);
+    }
+
+    function getFeedbackTypeName(InspectionFeedbackType _type) public pure returns (string memory) {
+        if (_type == InspectionFeedbackType.SATISFACTORY) return "Satisfactory";
+        if (_type == InspectionFeedbackType.UNSATISFACTORY) return "Unsatisfactory";
+        if (_type == InspectionFeedbackType.NEEDS_REINSPECTION) return "Needs Reinspection";
+        return "None";
+    }
+
+    function countFeedbackByType(uint256 _licenseId, InspectionFeedbackType _type)
+        public
+        view
+        licenseExists(_licenseId)
+        returns (uint256 count)
+        {
+            Inspection[] storage inspections = licenses[_licenseId].inspections;
+            for (uint i = 0; i < inspections.length; i++) {
+                if (inspections[i].feedbackType == _type) {
+                    count++;
+                }
+            }
+        }
+
+    function getAllInspectionFeedback(uint256 _licenseId)
+        public
+        view
+        licenseExists(_licenseId)
+        returns (getAllFeedback[] memory)
+    {
+        License storage license = licenses[_licenseId];
+        uint256 count = license.inspections.length;
+
+        getAllFeedback[] memory feedback = new getAllFeedback[](count);
+
+        for (uint i = 0; i < count; i++) {
+            Inspection storage ins = license.inspections[i];
+            feedback[i] = getAllFeedback({
+                inspector: ins.inspector,
+                inspectorName: ins.inspectorName,
+                remarks: ins.remarks,
+                completedDate: ins.completedDate,
+                feedbackType: ins.feedbackType
+            });
+        }
+
+        return feedback;
+    }
+
+
 }

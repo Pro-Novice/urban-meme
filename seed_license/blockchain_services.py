@@ -3,6 +3,7 @@ from typing import Any, List, Dict, Union, Optional, Tuple
 from django.conf import settings
 from web3 import Web3
 from web3.exceptions import ContractLogicError
+from datetime import datetime
 
 from seed_license.enums import OfficerRole, DivisionEnum
 
@@ -24,6 +25,199 @@ DEFAULT_ADDRESS = DEFAULT_ACCOUNT.address
 
 BASE_DIR = settings.BASE_DIR
 CONTRACTS_DIR = os.path.join(BASE_DIR, "Services", "blockchain", "contracts")
+
+# Matches LicenseCategory enum in smart contract
+LICENSE_CATEGORIES = ["SEED", "FERTILIZER", "INSECTICIDE"]
+
+ACTION_TYPES = [
+    "CREATED", "SUBMITTED", "DOCUMENT_UPLOADED", "DOCUMENT_VERIFIED",
+    "PAYMENT_RECORDED", "INSPECTION_SCHEDULED", "INSPECTION_COMPLETED",
+    "STATUS_UPDATED", "APPROVED", "REJECTED", "REVOKED", "RENEWED",
+    "COMMENT_ADDED", "OFFICER_ASSIGNED"
+]
+
+#Admin levels as per smart contract
+ADMIN_LEVELS = ["STATE", "DIVISION", "DISTRICT"]
+
+# Matches LicenseStatus enum in smart contract
+# Note: Ensure this matches the enum in your Solidity contract
+LICENSE_STATUSES = [
+    "DRAFT", "SUBMITTED", "UNDER_REVIEW", "DOCUMENTS_VERIFIED",
+    "PAYMENT_PENDING", "PAYMENT_COMPLETED", "INSPECTION_SCHEDULED",
+    "INSPECTION_COMPLETED", "APPROVED", "REJECTED", "REVOKED",
+    "EXPIRED", "RENEWAL_PENDING"
+]
+
+FEEDBACK_TYPES = ["None", "Satisfactory", "Unsatisfactory", "Needs Reinspection"]
+
+# generic transform map for contract methods
+# This map defines how to transform raw data from contract methods into a more usable format.
+def generic_transform(method_name: str, raw_data: Any) -> Any:
+    if isinstance(raw_data, (list, tuple)) and all(isinstance(item, (list, tuple)) for item in raw_data):
+        # Handle array responses
+        return [generic_transform(method_name, item) for item in raw_data]
+
+    config = GENERIC_TRANSFORM_MAP.get(method_name)
+    if not config or not config.get("fields"):
+        return raw_data
+
+    fields = config.get("fields", [])
+    enum_mappings = config.get("enum_mappings", {})
+    timestamp_fields = set(config.get("timestamp_fields", []))
+
+    transformed = {}
+    status_str = None
+
+    for i, field in enumerate(fields):
+        value = None
+        if isinstance(raw_data, dict):
+            value = raw_data.get(field)
+        elif isinstance(raw_data, (list, tuple)) and i < len(raw_data):
+            value = raw_data[i]
+
+        if field == "status":
+            # Save string version of status to apply conditional filters later
+            if field in enum_mappings:
+                enum_list = enum_mappings[field]
+                status_str = enum_list[value] if isinstance(value, int) and value < len(enum_list) else "UNKNOWN"
+            else:
+                status_str = value
+
+        if field in enum_mappings:
+            enum_list = enum_mappings[field]
+            transformed[field] = enum_list[value] if isinstance(value, int) and value < len(enum_list) else "UNKNOWN"
+        elif field in timestamp_fields and value:
+            transformed[field] = format_unix_timestamp(value)
+        else:
+            transformed[field] = value
+
+    # 🌟 Remove irrelevant date fields based on status
+    if status_str != "APPROVED":
+       transformed.pop("approvalDate", None)
+
+    if status_str not in {"APPROVED", "EXPIRED"}:
+        transformed.pop("expiryDate", None)
+
+    if status_str != "REJECTED":
+        transformed.pop("rejectionDate", None)
+
+    if status_str != "REVOKED":
+        transformed.pop("revokedDate", None)
+
+    if status_str not in {"RENEWAL_PENDING", "RENEWED"}:
+        transformed.pop("renewalDate", None)
+
+    return transformed
+
+
+# convert timestamp to readable format
+def format_unix_timestamp(ts: int) -> str:
+    if not ts or ts == 0:
+        return None
+    return datetime.utcfromtimestamp(ts).strftime("%d %B %Y")
+
+# Format contract result based on method name and contract ABI
+def format_api_response(success: bool, data: Any = None, error: str = None, extra: Dict = None) -> Dict:
+    # Auto unwrap if already wrapped (defensive)
+    if isinstance(data, dict) and "success" in data and "data" in data:
+        return data
+    response = {"success": success}
+    if success:
+        response["data"] = data or {}
+    else:
+        response["data"] = {}
+        response["error"] = error or "Unknown error"
+    if extra:
+        response.update(extra)
+    return response
+
+# Unified transformation map for all methods
+GENERIC_TRANSFORM_MAP = {
+    "getLicenseBasicInfo": {
+        "fields": [
+            "licenseId", "applicantName", "category", "level", "status",
+            "applicant", "businessName", "district","applicationDate", "approvalDate","rejectionDate",  "expiryDate", "revokedDate", "renewalDate", "isActive",
+        ],
+        "enum_mappings": {
+            "category": LICENSE_CATEGORIES,
+            "level": ADMIN_LEVELS,
+            "status": LICENSE_STATUSES
+        },
+        "timestamp_fields": ["applicationDate", "approvalDate", "rejectionDate", "expiryDate", "revokedDate", "renewalDate"]
+    },
+    "getOfficerInfo": {
+        "fields": [
+            "officerAddress", "name", "employeeId", "role",
+            "department", "level", "jurisdiction", "isActive", "addedDate"
+        ],
+        "enum_mappings": {"level": ADMIN_LEVELS},
+        "timestamp_fields": ["addedDate"]
+    },
+    "getOfficerDetails": {
+        "fields": [
+            "name", "employeeId", "role", "department", "level",
+            "jurisdiction", "isActive", "addedDate"
+        ],
+        "enum_mappings": {"level": ADMIN_LEVELS},
+        "timestamp_fields": ["addedDate"]
+    },
+    "getLicenseStatusHistory": {
+        "fields": [
+            "timestamp", "actionType", "actor", "actorName",
+            "actorRole", "department", "remarks", "dataHash"
+        ],
+        "enum_mappings": {"actionType": ACTION_TYPES},
+        "timestamp_fields": ["timestamp"]
+    },
+    "getLicenseActionHistory": {
+        "fields": [
+            "timestamp", "actionType", "actor", "actorName",
+            "actorRole", "department", "remarks", "dataHash"
+        ],
+        "enum_mappings": {"actionType": ACTION_TYPES},
+        "timestamp_fields": ["timestamp"]
+    },
+    "getOfficerAssignment": {
+        "fields": [
+            "officer", "role", "department", "assignedDate",
+            "assignedBy", "isActive", "remarks"
+        ],
+        "timestamp_fields": ["assignedDate"]
+    },
+    "getOfficerRole": {
+        "fields": ["role"]
+    },
+    "listAllFunctions": {
+        "fields": []
+    },
+    "getAllInspectionFeedback": {
+        "fields": [
+            "inspector", "inspectorName", "remarks", "completedDate", "feedbackType"
+        ],
+        "enum_mappings": {"feedbackType": FEEDBACK_TYPES},
+        "timestamp_fields": ["completedDate"]
+    }
+
+    # add more methods as needed
+}
+
+# Format contract result based on method name and contract ABI
+def format_and_transform_response(result: Any, method_name: str, contract: Any) -> Any:
+    """
+    Formats and transforms a contract read response.
+    Applies field names, enum mappings, and timestamp formatting based on GENERIC_TRANSFORM_MAP.
+    """
+    base_formatted = format_contract_result(result, method_name, contract)
+
+    config = GENERIC_TRANSFORM_MAP.get(method_name)
+    if config:
+       # If the method has a config, apply generic transformation
+        if not isinstance(base_formatted, (list, tuple, dict)) and len(config.get("fields", [])) == 1:
+            base_formatted = (base_formatted,)
+        return generic_transform(method_name, base_formatted)
+
+    return base_formatted
+
 
 # Cache for loaded contracts
 _contract_cache = {}
@@ -59,68 +253,49 @@ def get_contract(contract_name: str):
         # Determine ABI to use
         # Check if we have a mapping for this contract name
         abi_found = False
-        abi = None
-        
-        # For LicenseSystemV1, we need to check if there's an implementation ABI file
-        if contract_name in ["LicenseSystemV1", "seedLicenseContract"]:
-            # Look for the implementation ABI that was shown in your screenshot
-            possible_abi_locations = [
-                # Check in blockchainDeploymentScripts folder
-                os.path.join(BASE_DIR, "blockchainDeploymentScripts", "implementationABI", "LicenseSystemV1.json"),
-                os.path.join(BASE_DIR, "blockchainDeploymentScripts", "LicenseSystemV1ImplementationABI.json"),
-                os.path.join(BASE_DIR, "blockchainDeploymentScripts", "[ ] implementationABI.json"),
-                # Check in standard locations
-                os.path.join(CONTRACTS_DIR, "abi", "LicenseSystemV1.json"),
-                os.path.join(CONTRACTS_DIR, "abi", "seedLicenseContract.json"),
-            ]
-            
-            # Try each location
-            for abi_path in possible_abi_locations:
-                if os.path.exists(abi_path):
-                    with open(abi_path, "r") as fh:
-                        abi = json.load(fh)
-                    logger.info(f"Found ABI at: {abi_path}")
-                    abi_found = True
-                    break
-        
-        # If no ABI found yet, check if it's the other contract type
-        if not abi_found:
-            # This might be the seed license tracking contract
-            seed_abi_path = os.path.join(CONTRACTS_DIR, "abi", "seedLicenseContract.json")
-            if os.path.exists(seed_abi_path):
-                with open(seed_abi_path, "r") as fh:
-                    abi = json.load(fh)
-                logger.info(f"Using seed license ABI from: {seed_abi_path}")
-                abi_found = True
-        if contract_name == "LicenseSystemV1":
-            abi = deployment_info.get("implementationABI")
-            contract_address = deployment_info.get("proxy")
 
-        if not abi or not contract_address:
-            raise ValueError(f"ABI or address not found for contract: {contract_name}")
-        if not abi_found or not abi:
-            # List available files for debugging
-            logger.error(f"Could not find ABI for {contract_name}")
-            logger.error(f"Checked locations: {possible_abi_locations if 'possible_abi_locations' in locals() else 'N/A'}")
-            
-            # Try to list what files are available
-            deployment_dir = os.path.join(BASE_DIR, "blockchainDeploymentScripts")
-            if os.path.exists(deployment_dir):
-                files = os.listdir(deployment_dir)
-                logger.error(f"Files in deployment directory: {files}")
-            
-            raise FileNotFoundError(f"No ABI file found for {contract_name}")
-        
-        # Create contract instance with PROXY address and IMPLEMENTATION ABI
+        # Always use proxy address for upgradeable contracts
+        proxy_address = deployment_info.get("proxy")
+        if not proxy_address:
+            raise ValueError("Proxy address not found in deployment_info.json")
+
+        abi = None
+        abi_found = False
+
+        # Priority 1: If ABI is already embedded in deployment_info.json
+        if "implementationABI" in deployment_info and deployment_info["implementationABI"]:
+            abi = deployment_info["implementationABI"]
+            abi_found = True
+            logger.info("✅ Using embedded implementation ABI from deployment_info.json")
+
+        # Priority 2: Fallback locations if ABI wasn't found in JSON
+        if not abi_found:
+            abi_locations = [
+                os.path.join(BASE_DIR, "blockchainDeploymentScripts", "implementationABI", f"{contract_name}.json"),
+                os.path.join(BASE_DIR, "blockchainDeploymentScripts", f"{contract_name}ImplementationABI.json"),
+                os.path.join(CONTRACTS_DIR, "abi", f"{contract_name}.json"),
+                os.path.join(CONTRACTS_DIR, "abi", "seedLicenseContract.json"),  # for legacy support
+            ]
+            for path in abi_locations:
+                if os.path.exists(path):
+                    with open(path, "r") as f:
+                        abi = json.load(f)
+                    abi_found = True
+                    logger.info(f"✅ Loaded ABI from: {path}")
+                    break
+
+        if not abi or not abi_found:
+            raise FileNotFoundError(f"ABI for {contract_name} not found in any known location")
+
+        # Create contract instance
         contract = w3.eth.contract(
-            address=Web3.to_checksum_address(contract_address), 
+            address=Web3.to_checksum_address(proxy_address),
             abi=abi
         )
-        
-        # Cache the contract
+
+        # Cache and return
         _contract_cache[contract_name] = contract
-        
-        logger.info(f"Contract {contract_name} loaded successfully with proxy address: {contract_address}")
+        logger.info(f"✅ Contract {contract_name} loaded successfully with proxy: {proxy_address}")
         return contract
         
     except FileNotFoundError as e:
@@ -790,10 +965,10 @@ def read_from_contract(contract_name: str, method_name: str, params: List[Any]) 
         
         # Call the view function
         result = call_view_function(contract_function, *processed_params)
-        
-        # Format the result
-        return format_contract_result(result, method_name, contract)
-        
+
+        # Unified formatting
+        return format_and_transform_response(result, method_name, contract)
+
     except ContractLogicError as e:
         logger.error(f"Contract logic error: {e}")
         raise

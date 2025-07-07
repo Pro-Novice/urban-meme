@@ -32,6 +32,7 @@ contract LicenseStorage {
     KOTA_DIVISION,        // 5
     UDAIPUR_DIVISION      // 6
 }
+
     // Structs
     struct License {
         uint256 licenseId;
@@ -64,7 +65,9 @@ contract LicenseStorage {
         uint256 applicationDate;
         uint256 lastModifiedDate;
         uint256 approvalDate;
+        uint256 rejectionDate;
         uint256 expiryDate;
+        uint256 revokedDate;
         uint256 renewalDate;
         Action[] actionHistory;
         address[] assignedOfficers;
@@ -74,7 +77,7 @@ contract LicenseStorage {
         bool documentsVerified;
         bool inspectionPassed;
     }
-    
+
     struct Document {
         string documentType;
         string documentName;
@@ -87,7 +90,7 @@ contract LicenseStorage {
         uint256 verificationDate;
         string remarks;
     }
-    
+
     struct Payment {
         uint256 amount;
         string transactionId;
@@ -97,7 +100,8 @@ contract LicenseStorage {
         bool isVerified;
         string receiptNumber;
     }
-    
+        enum InspectionFeedbackType {    NONE,  SATISFACTORY, UNSATISFACTORY, NEEDS_REINSPECTION }
+
     struct Inspection {
         uint256 inspectionId;
         uint256 scheduledDate;
@@ -109,10 +113,11 @@ contract LicenseStorage {
         mapping(string => string) findings;
         string[] findingKeys;
         bool passed;
+        InspectionFeedbackType feedbackType;
         string remarks;
         string reportHash;
     }
-    
+
     struct Action {
         uint256 timestamp;
         ActionType actionType;
@@ -123,7 +128,7 @@ contract LicenseStorage {
         string remarks;
         bytes32 dataHash;
     }
-    
+
     struct OfficerAssignment {
         address officer;
         OfficerRole role;
@@ -133,7 +138,7 @@ contract LicenseStorage {
         bool isActive;
         string remarks;
     }
-    
+
     struct Officer {
         address officerAddress;
         string name;
@@ -146,6 +151,23 @@ contract LicenseStorage {
         string district;
         bool isActive;
         uint256 addedDate;
+    }
+      struct LicenseBasicInfo {
+        uint256 licenseId;
+        string applicantName;
+        LicenseCategory category;
+        AdminLevel level;
+        LicenseStatus status;
+        address applicant;
+        string businessName;
+        string district;
+        uint256 applicationDate;
+        uint256 approvalDate;
+        uint256 rejectionDate;
+        uint256 expiryDate;
+        uint256 revokedDate;
+        uint256 renewalDate;
+        bool isActive;
     }
 
     // Main storage mappings - using specific slots
