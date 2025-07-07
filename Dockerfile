@@ -28,8 +28,12 @@ COPY requirements.txt .
 RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the entire project into the container
+# Copy project code
 COPY . .
+
+# Copy entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Environment variables
 ENV DJANGO_SETTINGS_MODULE=agri_backend.settings
@@ -41,22 +45,8 @@ RUN chown -R appuser:appuser /app
 USER appuser
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8080
 
-# Create entrypoint script
-RUN echo '#!/bin/sh\n\
-echo "Waiting for postgres..."\n\
-while ! nc -z $POSTGRES_HOST $POSTGRES_PORT; do\n\
-  sleep 0.1\n\
-done\n\
-echo "PostgreSQL started"\n\
-\n\
-python manage.py migrate\n\
-python manage.py collectstatic --noinput\n\
-\n\
-exec "$@"' > /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
-
-# Run with gunicorn
+# Use entrypoint
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["gunicorn", "agri_backend.wsgi:application", "--bind", "0.0.0.0:8000"]
