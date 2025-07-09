@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .views import document_hash_view
 
 app_name = 'seed_license'
 
@@ -7,7 +8,7 @@ urlpatterns = [
     # ══════════════════════════════════════════════════════════════════
     # Core Blockchain Interaction Endpoints
     # ══════════════════════════════════════════════════════════════════
-    
+    path('blockchain/hash/', document_hash_view, name='document-hash'),
     # Universal write endpoint for any state-changing contract function
     path('blockchain/write/', views.blockchain_write_view, name='blockchain-write'),
     

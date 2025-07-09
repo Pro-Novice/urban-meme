@@ -1,6 +1,10 @@
+import hashlib
 import logging
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, parser_classes
+from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny
+from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_200_OK
+
 from Services.api_response import ApiResponse
 from .blockchain_services import (
     format_api_response,
@@ -16,7 +20,20 @@ from .blockchain_services import (
 )
 
 logger = logging.getLogger(__name__)
+@api_view(['POST'])
+@parser_classes([MultiPartParser])
+def document_hash_view(request):
+    file = request.FILES.get('file')
+    if not file:
+        return ApiResponse(err= 'No file provided', status=HTTP_400_BAD_REQUEST)
 
+    # Generate SHA-256 hash
+    hash_func = hashlib.sha256()
+    for chunk in file.chunks():
+        hash_func.update(chunk)
+    file_hash = hash_func.hexdigest()
+
+    return ApiResponse(data={'hash': file_hash},status=HTTP_200_OK)
 # ══════════════════════════════════════════════════════════════════════
 # Core Blockchain Interaction Endpoints
 # ══════════════════════════════════════════════════════════════════════
@@ -60,7 +77,7 @@ def blockchain_write_view(request):
         return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=500)
 
 
-@api_view(["POST"])
+@api_view(["GET"])
 def blockchain_read_view(request):
     """
     Universal endpoint for reading from any smart contract method

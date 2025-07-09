@@ -14,14 +14,15 @@ contract LicenseStorage {
     enum LicenseCategory { SEED, FERTILIZER, INSECTICIDE }
     enum AdminLevel { STATE, DIVISION, DISTRICT }
     enum LicenseStatus { DRAFT, SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, PAYMENT_PENDING, PAYMENT_COMPLETED, INSPECTION_SCHEDULED, INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWAL_PENDING }
-    enum ActionType { CREATED, SUBMITTED, DOCUMENT_UPLOADED, DOCUMENT_VERIFIED, PAYMENT_RECORDED, INSPECTION_SCHEDULED, INSPECTION_COMPLETED, STATUS_UPDATED, APPROVED, REJECTED, REVOKED, RENEWED, COMMENT_ADDED, OFFICER_ASSIGNED }
+    enum ActionType { CREATED, SUBMITTED, DOCUMENT_UPLOADED, DOCUMENT_VERIFIED, DOCUMENT_REJECTED, PAYMENT_RECORDED, INSPECTION_SCHEDULED, INSPECTION_COMPLETED, STATUS_UPDATED, APPROVED, REJECTED, REVOKED, RENEWED, COMMENT_ADDED, OFFICER_ASSIGNED }
     enum OfficerRole {
         AGRICULTURE_OFFICER,
         ASSISTANT_AGRICULTURE_OFFICER,
         ASSISTANT_DIRECTOR,
         DEPUTY_DIRECTOR,
         JOINT_DIRECTOR,
-        JOINT_DIRECTOR_INPUT
+        JOINT_DIRECTOR_INPUT,
+        FIELD_INSPECTOR
     }
     enum Division {
     AJMER_DIVISION,       // 0
@@ -32,6 +33,16 @@ contract LicenseStorage {
     KOTA_DIVISION,        // 5
     UDAIPUR_DIVISION      // 6
 }
+    enum StandardDocumentType {
+    AFFIDAVIT_SEED_QUALITY,
+    ID_PROOF,
+    SHOP_MAP,
+    REGISTRATION_CERTIFICATE,
+    MEMORANDUM_ARTICLES,
+    PASSPORT_PHOTO,
+    AUTHORIZATION_LETTER
+}
+    enum InspectionFeedbackType {    NONE,  SATISFACTORY, UNSATISFACTORY, NEEDS_REINSPECTION }
 
     // Structs
     struct License {
@@ -58,8 +69,8 @@ contract LicenseStorage {
         string pincode;
         mapping(string => string) customFields;
         string[] customFieldKeys;
-        mapping(string => Document) documents;
-        string[] documentTypes;
+        mapping(StandardDocumentType => Document) documents;
+        StandardDocumentType[]  documentTypes;
         Payment paymentDetails;
         Inspection[] inspections;
         uint256 applicationDate;
@@ -79,17 +90,14 @@ contract LicenseStorage {
     }
 
     struct Document {
-        string documentType;
-        string documentName;
-        bytes32 documentHash;
-        string ipfsHash;
-        address uploadedBy;
-        uint256 uploadDate;
-        bool isVerified;
-        address verifiedBy;
-        uint256 verificationDate;
-        string remarks;
-    }
+    StandardDocumentType documentType;
+    string documentName;        // Optional name from backend
+    string documentHash;        // SHA256 hash from backend
+    bool isVerified;
+    address verifiedBy;
+    uint256 verificationDate;
+    string remarks;
+}
 
     struct Payment {
         uint256 amount;
@@ -100,7 +108,6 @@ contract LicenseStorage {
         bool isVerified;
         string receiptNumber;
     }
-        enum InspectionFeedbackType {    NONE,  SATISFACTORY, UNSATISFACTORY, NEEDS_REINSPECTION }
 
     struct Inspection {
         uint256 inspectionId;
@@ -152,7 +159,18 @@ contract LicenseStorage {
         bool isActive;
         uint256 addedDate;
     }
-      struct LicenseBasicInfo {
+        struct FormattedAction {
+        uint256 timestamp;
+        uint8 actionType;
+        string actor;      // Address as hex string
+        string actorName;
+        OfficerRole actorRole;
+        string department;
+        string remarks;
+        string dataHash;   // bytes32 as hex string
+    }
+
+    struct LicenseBasicInfo {
         uint256 licenseId;
         string applicantName;
         LicenseCategory category;
@@ -170,6 +188,14 @@ contract LicenseStorage {
         bool isActive;
     }
 
+
+    struct getAllFeedback {
+        address inspector;
+        string inspectorName;
+        string remarks;
+        uint256 completedDate;
+        InspectionFeedbackType feedbackType;
+    }
     // Main storage mappings - using specific slots
     mapping(uint256 => License) internal licenses;
     mapping(string => uint256) internal licenseNumberToId;
@@ -179,13 +205,16 @@ contract LicenseStorage {
     // Tracking arrays
     uint256[] internal allLicenseIds;
     address[] internal allOfficers;
+
     mapping(address => uint256[]) internal applicantLicenses;
     mapping(address => uint256[]) internal officerAssignedLicenses;
     mapping(LicenseStatus => uint256[]) internal licensesByStatus;
     mapping(LicenseCategory => uint256[]) internal licensesByCategory;
     mapping(AdminLevel => uint256[]) internal licensesByLevel;
     mapping(string => uint256[]) internal licensesByDistrict;
-    
+    StandardDocumentType[] public documentTypes;
+    mapping(StandardDocumentType => Document) documents;
+
     // Gap for future storage variables
     uint256[50] private __gap;
     
