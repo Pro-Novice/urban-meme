@@ -5,6 +5,8 @@ from web3 import Web3
 from web3.exceptions import ContractLogicError
 from datetime import datetime
 
+from seed_license.enums import OfficerRole, DivisionEnum
+
 logger = logging.getLogger(__name__)
 
 # ── connect ───────────────────────────────────────────────────────────
@@ -28,9 +30,9 @@ CONTRACTS_DIR = os.path.join(BASE_DIR, "Services", "blockchain", "contracts")
 LICENSE_CATEGORIES = ["SEED", "FERTILIZER", "INSECTICIDE"]
 
 ACTION_TYPES = [
-    "CREATED", "SUBMITTED", "DOCUMENT_UPLOADED", "DOCUMENT_VERIFIED", 
-    "PAYMENT_RECORDED", "INSPECTION_SCHEDULED", "INSPECTION_COMPLETED", 
-    "STATUS_UPDATED", "APPROVED", "REJECTED", "REVOKED", "RENEWED", 
+    "CREATED", "SUBMITTED", "DOCUMENT_UPLOADED", "DOCUMENT_VERIFIED",
+    "PAYMENT_RECORDED", "INSPECTION_SCHEDULED", "INSPECTION_COMPLETED",
+    "STATUS_UPDATED", "APPROVED", "REJECTED", "REVOKED", "RENEWED",
     "COMMENT_ADDED", "OFFICER_ASSIGNED"
 ]
 
@@ -54,7 +56,7 @@ def generic_transform(method_name: str, raw_data: Any) -> Any:
     if isinstance(raw_data, (list, tuple)) and all(isinstance(item, (list, tuple)) for item in raw_data):
         # Handle array responses
         return [generic_transform(method_name, item) for item in raw_data]
-    
+
     config = GENERIC_TRANSFORM_MAP.get(method_name)
     if not config or not config.get("fields"):
         return raw_data
@@ -206,7 +208,7 @@ def format_and_transform_response(result: Any, method_name: str, contract: Any) 
     Applies field names, enum mappings, and timestamp formatting based on GENERIC_TRANSFORM_MAP.
     """
     base_formatted = format_contract_result(result, method_name, contract)
-   
+
     config = GENERIC_TRANSFORM_MAP.get(method_name)
     if config:
        # If the method has a config, apply generic transformation
@@ -214,7 +216,7 @@ def format_and_transform_response(result: Any, method_name: str, contract: Any) 
             base_formatted = (base_formatted,)
         return generic_transform(method_name, base_formatted)
 
-    return base_formatted  
+    return base_formatted
 
 
 # Cache for loaded contracts
@@ -240,6 +242,17 @@ def get_contract(contract_name: str):
         # Load deployment info
         with open(deployment_info_path, "r") as fh:
             deployment_info = json.load(fh)
+
+        # IMPORTANT: For upgradeable contracts, ALWAYS use the PROXY address
+        if "proxy" in deployment_info and deployment_info["proxy"]:
+            contract_address = deployment_info["proxy"]
+            logger.info(f"Using proxy address for {contract_name}: {contract_address}")
+        else:
+            raise ValueError(f"No proxy address found in deployment_info.json")
+        
+        # Determine ABI to use
+        # Check if we have a mapping for this contract name
+        abi_found = False
 
         # Always use proxy address for upgradeable contracts
         proxy_address = deployment_info.get("proxy")
@@ -725,7 +738,56 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
             address=Web3.to_checksum_address(contract_address),
             abi=abi
         )
-        
+        if method_name == "addOfficer":
+            # Convert role param (index 3)
+            try:
+                role_param = params[3]
+                if isinstance(role_param, str):
+                    role_enum = OfficerRole.from_string(role_param).value
+                    params[3] = role_enum
+            except (IndexError, ValueError) as e:
+                return {
+                    "success": False,
+                    "error": "Invalid role parameter",
+                    "details": str(e)
+                }
+
+            # Convert based on level param (index 5)
+            level = params[5]
+
+            if level == 0:  # STATE
+                params[6] = "RAJASTHAN" # Rajasthan enum value, adjust as needed
+                params[7] = -1  # division empty
+                params[8] = -1  #district empty
+
+            elif level == 1:  # DIVISION
+                try:
+                    division_param = params[8]
+                    if isinstance(division_param, str):
+                        division_enum = DivisionEnum.from_string(division_param)
+                        params[8] = division_enum
+                except (IndexError, ValueError) as e:
+                    return {
+                        "success": False,
+                        "error": "Invalid division parameter",
+                        "details": str(e)
+                    }
+
+            # elif level == 2:  # DISTRICT
+            #     try:
+            #         district_param = params[8]
+            #         if isinstance(district_param, str):
+            #             district_enum = CityEnum.from_string(district_param).value
+            #             params[8] = district_enum
+            #         params[6] = -1  # state empty
+            #         params[7] = -1  # division empty
+            #     except (IndexError, ValueError) as e:
+            #         return {
+            #             "success": False,
+            #             "error": "Invalid district parameter",
+            #             "details": str(e)
+            #         }
+
         # Get the function
         contract_function = getattr(contract.functions, method_name)
         
@@ -845,7 +907,7 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
                 response["message"] = f"Method '{method_name}' executed successfully"
         
         return response
-        
+
     except Exception as e:
         error_msg = str(e)
         

@@ -57,8 +57,7 @@ def compile_all_contracts():
                 fix_windows_paths(project_root / "node_modules")
             ],
             import_remappings=[
-                f"@openzeppelin/={fix_windows_paths(node_modules)}/@openzeppelin/",
-                f"@openzeppelin/contracts-upgradeable/={fix_windows_paths(node_modules)}/@openzeppelin/contracts-upgradeable/"
+                            f"@openzeppelin=./node_modules/@openzeppelin"
             ]
         )
 

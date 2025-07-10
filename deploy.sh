@@ -10,12 +10,12 @@ else
     echo "####################################################################"
     echo "                  Connecting to Development Server"
     echo "####################################################################"
-    export AUTH_PORT=8001
+    export AUTH_PORT=8080
   else
     echo "####################################################################"
     echo "                  Connecting to Staging Server"
     echo "####################################################################"
-    export AUTH_PORT=8001
+    export AUTH_PORT=8080
   fi
 
     echo "####################################################################"
@@ -32,7 +32,7 @@ else
     echo "####################################################################"
     echo "                  Configuring Redis ACL"
     echo "####################################################################"
-    docker exec -it redis_local redis-cli -a password ACL SETUSER root on +@all ~* >password || {
+    docker exec -it rajasthan-agri-redis redis-cli -a password ACL SETUSER root on +@all ~* >password || {
       echo "Redis ACL Configuration Failed";
       exit 1;
     }

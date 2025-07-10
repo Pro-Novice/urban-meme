@@ -28,46 +28,46 @@ contract LicenseSystemV2 is LicenseSystemV1 {
     }
     
     // Override existing function with new logic
-    function createLicense(
-        LicenseCategory _category,
-        AdminLevel _level,
-        string memory _applicantName,
-        string memory _aadhaarNumber,
-        string memory _businessName,
-        string memory _state,
-        string memory _district
-    ) public override returns (uint256) {
+    //function createLicense(
+      //  LicenseCategory _category,
+     //   AdminLevel _level,
+      //  string memory _applicantName,
+       // string memory _aadhaarNumber,
+        //string memory _businessName,
+      ////  string memory _state,
+       // string memory _district
+    //) public override returns (uint256) {
         // Call parent function
-        uint256 licenseId = super.createLicense(
-            _category,
-            _level,
-            _applicantName,
-            _aadhaarNumber,
-            _businessName,
-            _state,
-            _district
-        );
+      //  uint256 licenseId = super.createLicense(
+         //   _category,
+         //   _level,
+         //   _applicantName,
+         //   _aadhaarNumber,
+           // _businessName,
+          //  _state,
+          //  _district
+      //  );
         
         // New V2 logic: Auto-assign to district officer
-        address districtOfficer = _getDistrictOfficer(_district);
-        if (districtOfficer != address(0)) {
-            _autoAssignOfficer(licenseId, districtOfficer);
-        }
+     //   address districtOfficer = _getDistrictOfficer(_district);
+       // if (districtOfficer != address(0)) {
+       //     _autoAssignOfficer(licenseId, districtOfficer);
+      //  }
         
-        return licenseId;
-    }
+    //    return licenseId;
+ //   }
     
     // New internal function for V2
-    function _getDistrictOfficer(string memory _district) internal view returns (address) {
+   // function _getDistrictOfficer(string memory _district) internal view returns (address) {
         // Logic to find district officer
         // This is just an example
-        for (uint i = 0; i < allOfficers.length; i++) {
-            if (keccak256(bytes(officers[allOfficers[i]].jurisdiction)) == keccak256(bytes(_district))) {
-                return allOfficers[i];
-            }
-        }
-        return address(0);
-    }
+       // for (uint i = 0; i < allOfficers.length; i++) {
+        //    if (keccak256(bytes(officers[allOfficers[i]].level)) == keccak256(bytes(_district))) {
+         //       return allOfficers[i];
+         //   }
+       // }
+     //   return address(0);
+  //  }
     
     function _autoAssignOfficer(uint256 _licenseId, address _officer) internal {
         License storage license = licenses[_licenseId];
