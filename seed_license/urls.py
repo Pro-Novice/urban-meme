@@ -1,6 +1,8 @@
 from django.urls import path
 from . import views
-from .views import document_hash_view
+from .views import  initialize_blockchain_contract, check_owner_blockchain, check_admin_blockchain, \
+    check_total_license_count, add_officer_view, get_officer_role, get_officer_details, create_license_view, \
+    update_license_status_view, update_license_action_history
 
 app_name = 'seed_license'
 
@@ -8,7 +10,56 @@ urlpatterns = [
     # ══════════════════════════════════════════════════════════════════
     # Core Blockchain Interaction Endpoints
     # ══════════════════════════════════════════════════════════════════
-    path('blockchain/hash/', document_hash_view, name='document-hash'),
+    #Initialize Contract
+    path('blockchain/initialize/', initialize_blockchain_contract, name='initialize_blockchain_contract'),
+    # check owner
+    path('blockchain/owner/', check_owner_blockchain, name='initialize_blockchain_contract'),
+    # check admin
+    path('blockchain/admin/', check_admin_blockchain, name='initialize_blockchain_contract'),
+    # count total License
+    path('blockchain/countLicense/', check_total_license_count, name='initialize_blockchain_contract'),
+
+    # add officer
+    path('blockchain/addOfficer/', add_officer_view, name='initialize_blockchain_contract'),
+    # get officer role
+    path('blockchain/officerRole/', get_officer_role, name='initialize_blockchain_contract'),
+    #get officer details
+    path('blockchain/officerDetails/', get_officer_details, name='initialize_blockchain_contract'),
+    #create License
+    path('blockchain/createLicense/',  create_license_view, name='initialize_blockchain_contract'),
+    #update license status view
+    path('blockchain/updateLicenseStatus/', update_license_status_view, name='initialize_blockchain_contract'),
+    #update license action history
+    path('blockchain/updateLicenseHistory/', update_license_action_history, name='update_license_action_history'),
+    path("blockchain/license/basic-info/<str:license_id>/", views.get_license_basic_info,
+         name="get-license-basic-info"),
+
+    # verify document hash
+    path("blockchain/license/verify-document/", views.verify_document, name="verify-document"),
+
+    # document hash generation and verification
+    path("blockchain/license/document-hash/", views.generate_document_hash, name="generate-document-hash"),
+
+    # document status by license ID and document type
+    path("blockchain/license/document-status/<str:license_id>/<str:document_type>/", views.get_document_status,
+         name="get-document-status"),
+
+    # Get all document statuses for a license
+    path("blockchain/license/document-statuses/<str:license_id>/", views.get_all_document_statuses,
+         name="get-all-document-statuses"),
+
+    # Add inspection feedback
+    path("blockchain/license/inspection-feedback/", views.add_inspection_feedback, name="add-inspection-feedback"),
+
+    # Get All Inspection Feedback
+    path("blockchain/license/inspection-feedback/<str:license_id>/", views.get_all_inspection_feedback,
+         name="get-all-inspection-feedback"),
+
+    # Get Inspection Feedback by Type
+    path("blockchain/license/feedback-count/<str:license_id>/<str:feedback_type>/", views.count_feedback_by_type,
+         name="feedback-count"),
+
+
     # Universal write endpoint for any state-changing contract function
     path('blockchain/write/', views.blockchain_write_view, name='blockchain-write'),
     

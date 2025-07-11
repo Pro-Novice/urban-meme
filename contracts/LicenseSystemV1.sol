@@ -81,24 +81,6 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
 ) public onlyAdmin {
     require(!isOfficer[_officer], "Already an officer");
 
-emit DebugInput(_level, _state, _division, _district);
-    // Validate based on AdminLevel
-    if (_level == AdminLevel.STATE) {
-        require(bytes(_state).length > 0, "State is required for STATE level");
-        require(bytes(_district).length == 0, "District must be empty for STATE level");
-        require(bytes(_division).length == 0, "Division must be empty for STATE level");
-    } else if (_level == AdminLevel.DIVISION) {
-        require(bytes(_division).length > 0, "Division is required for DIVISION level");
-        require(bytes(_state).length == 0, "State must be empty for DIVISION level");
-        require(bytes(_district).length == 0, "District must be empty for DIVISION level");
-    } else if (_level == AdminLevel.DISTRICT) {
-        require(bytes(_district).length > 0, "District is required for DISTRICT level");
-        require(bytes(_state).length == 0, "State must be empty for DISTRICT level");
-        require(bytes(_division).length == 0, "Division must be empty for DISTRICT level");
-    } else {
-        revert("Invalid admin level");
-    }
-
     officers[_officer] = Officer({
         officerAddress: _officer,
         name: _name,
@@ -128,7 +110,8 @@ emit DebugInput(_level, _state, _division, _district);
         string memory _aadhaarNumber,
         string memory _businessName,
         string memory _state,
-        string memory _district
+        string memory _district,
+        string memory _division
     ) public virtual returns (uint256) {
         uint256 newLicenseId = licenseIdCounter();
         _incrementLicenseCounter();
@@ -144,6 +127,7 @@ emit DebugInput(_level, _state, _division, _district);
         newLicense.businessName = _businessName;
         newLicense.state = _state;
         newLicense.district = _district;
+        newLicense.division = _division;
         newLicense.applicationDate = block.timestamp;
         newLicense.lastModifiedDate = block.timestamp;
         newLicense.isActive = true;

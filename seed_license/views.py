@@ -3,7 +3,7 @@ import logging
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny
-from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_200_OK
+from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_200_OK, HTTP_500_INTERNAL_SERVER_ERROR
 
 from Services.api_response import ApiResponse
 from .blockchain_services import (
@@ -18,25 +18,526 @@ from .blockchain_services import (
     get_all_contract_addresses
     
 )
+from .serialzers import AddOfficerSerializer, CreateLicenseSerializer, UpdateLicenseStatusSerializer
 
 logger = logging.getLogger(__name__)
-@api_view(['POST'])
-@parser_classes([MultiPartParser])
-def document_hash_view(request):
-    file = request.FILES.get('file')
-    if not file:
-        return ApiResponse(err= 'No file provided', status=HTTP_400_BAD_REQUEST)
 
-    # Generate SHA-256 hash
-    hash_func = hashlib.sha256()
-    for chunk in file.chunks():
-        hash_func.update(chunk)
-    file_hash = hash_func.hexdigest()
 
-    return ApiResponse(data={'hash': file_hash},status=HTTP_200_OK)
+
 # ══════════════════════════════════════════════════════════════════════
 # Core Blockchain Interaction Endpoints
 # ══════════════════════════════════════════════════════════════════════
+#
+# 1. Initialize Blockchain contract apis
+@api_view(["GET"])
+def initialize_blockchain_contract(request):
+    """
+    Universal endpoint for writing to any smart contract method
+
+    Expected payload:
+    {
+        "contract_name": "seedLicenseContract",
+        "method_name": "applyForLicense",
+        "params": [...],
+        "address": "0x..." (optional),
+        "private_key": "..." (optional)
+    }
+    """
+
+    try:
+        result = write_to_contract(
+            contract_name="LicenseSystemV1",
+            method_name="initialize",
+            params=[],
+            # address=address,
+            # private_key=private_key
+        )
+        return ApiResponse(data=result, status=200)
+    except ValueError as e:
+        return ApiResponse(err=str(e), status=400)
+    except Exception as e:
+        logger.exception("Blockchain write error")
+        return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=500)
+
+#2. Check owner of the blockchain
+@api_view(["GET"])
+def check_owner_blockchain(request):
+    """
+    Universal endpoint for writing to any smart contract method
+
+    Expected payload:
+    {
+        "contract_name": "seedLicenseContract",
+        "method_name": "applyForLicense",
+        "params": [...],
+        "address": "0x..." (optional),
+        "private_key": "..." (optional)
+    }
+    """
+
+    try:
+
+        result = read_from_contract(
+            contract_name="LicenseSystemV1",
+            method_name="owner",
+            params=[],
+            # address=address,
+            # private_key=private_key
+        )
+        return ApiResponse(data=result, status=200)
+    except ValueError as e:
+        return ApiResponse(err=str(e), status=400)
+    except Exception as e:
+        logger.exception("Blockchain write error")
+        return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=500)
+
+
+#3. check admin of the blockchain
+@api_view(["GET"])
+def check_admin_blockchain(request):
+    """
+    Universal endpoint for writing to any smart contract method
+
+    Expected payload:
+    {
+        "contract_name": "seedLicenseContract",
+        "method_name": "applyForLicense",
+        "params": [...],
+        "address": "0x..." (optional),
+        "private_key": "..." (optional)
+    }
+    """
+
+    try:
+        result = read_from_contract(
+            contract_name="LicenseSystemV1",
+            method_name="admin",
+            params=[],
+            # address=address,
+            # private_key=private_key
+        )
+        return ApiResponse(data=result, status=200)
+    except ValueError as e:
+        return ApiResponse(err=str(e), status=400)
+    except Exception as e:
+        logger.exception("Blockchain write error")
+        return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=500)
+
+#4. check total License count
+@api_view(["GET"])
+def check_total_license_count(request):
+    """
+    Universal endpoint for writing to any smart contract method
+
+    Expected payload:
+    {
+        "contract_name": "seedLicenseContract",
+        "method_name": "applyForLicense",
+        "params": [...],
+        "address": "0x..." (optional),
+        "private_key": "..." (optional)
+    }
+    """
+
+    try:
+        result = read_from_contract(
+            contract_name="LicenseSystemV1",
+            method_name="licenseIdCounter",
+            params=[],
+            # address=address,
+            # private_key=private_key
+        )
+        return ApiResponse(data=result, status=200)
+    except ValueError as e:
+        return ApiResponse(err=str(e), status=400)
+    except Exception as e:
+        logger.exception("Blockchain write error")
+        return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=500)
+
+#5. Add Officer according to level
+@api_view(["POST"])
+def add_officer_view(request):
+    # print("DEBUG: request.data =", request.data)
+    serializer = AddOfficerSerializer(data=request.data)
+    if not serializer.is_valid():
+        return ApiResponse(err=serializer.errors, status=400)
+
+    validated = serializer.validated_data
+
+    # Prepare parameters for smart contract
+    level = validated["officer_level"]
+
+    params = [
+        validated["officer_address"],
+        validated["officer_name"],
+        validated["officer_id"],
+        validated["officer_role"],  # already converted to enum
+        validated["department"],
+        level,  # already converted to enum
+        validated.get("state", ""),
+        validated.get("district", ""),
+        validated.get("division", "")  ]
+    print("params %s", params)
+
+    try:
+        result = write_to_contract(
+            contract_name="LicenseSystemV1",
+            method_name="addOfficer",
+            params=params,
+
+        )
+        return ApiResponse(data=result, status=200)
+    except ValueError as e:
+        return ApiResponse(err=str(e), status=400)
+    except Exception as e:
+        logger.exception("Blockchain write error")
+        return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=500)
+
+#6. get officer role
+@api_view(["GET"])
+def get_officer_role(request):
+    """
+    Universal endpoint for writing to any smart contract method
+
+    Expected payload:
+    {
+        "contract_name": "seedLicenseContract",
+        "method_name": "applyForLicense",
+        "params": [...],
+        "address": "0x..." (optional),
+        "private_key": "..." (optional)
+    }
+    """
+    Officer_address=request.query_params.get("officerAddress")
+
+    try:
+        result = read_from_contract(
+            contract_name="LicenseSystemV1",
+            method_name="getOfficerRole",
+            params=[
+                Officer_address,
+            ],
+            # address=address,
+            # private_key=private_key
+        )
+        return ApiResponse(data=result, status=200)
+    except ValueError as e:
+        return ApiResponse(err=str(e), status=400)
+    except Exception as e:
+        logger.exception("Blockchain write error")
+        return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=500)
+
+#7. get officer details
+@api_view(["GET"])
+def get_officer_details(request):
+    """
+    Universal endpoint for writing to any smart contract method
+
+    Expected payload:
+    {
+        "contract_name": "seedLicenseContract",
+        "method_name": "applyForLicense",
+        "params": [...],
+        "address": "0x..." (optional),
+        "private_key": "..." (optional)
+    }
+    """
+    Officer_address=request.query_params.get("officerAddress")
+    try:
+        result = read_from_contract(
+            contract_name="LicenseSystemV1",
+            method_name="getOfficerDetails",
+            params=[
+                Officer_address,
+            ],
+            # address=address,
+            # private_key=private_key
+        )
+        return ApiResponse(data=result, status=200)
+    except ValueError as e:
+        return ApiResponse(err=str(e), status=400)
+    except Exception as e:
+        logger.exception("Blockchain write error")
+        return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=500)
+
+#8. create License for all the levels
+@api_view(["POST"])
+def create_license_view(request):
+    # print("DEBUG: request.data =", request.data)
+
+    serializer = CreateLicenseSerializer(data=request.data)
+    if serializer.is_valid():
+        validated = serializer.validated_data
+        params = [
+            validated["license_category"],
+            validated["admin_level"],
+            validated["applicant_name"],
+            validated["aadhaar_number"],
+            validated["business_name"],
+            validated.get("state", ""),
+            validated.get("district", ""),
+            validated.get("division", "")
+        ]
+
+        result = write_to_contract(
+            contract_name="LicenseSystemV1",
+            method_name="createLicense",
+            params=params,
+            # address=request.data.get("address"),
+            # private_key=request.data.get("private_key")
+        )
+
+        return ApiResponse(data=result, status=200)
+    else:
+        return ApiResponse(err=serializer.errors, status=400)
+
+#9. Update License status
+@api_view(["POST"])
+def update_license_status_view(request):
+    # print("DEBUG: request.data =", request.data)
+    serializer = UpdateLicenseStatusSerializer(data={
+        "license_id": request.data.get("license_id"),
+        "status": request.data.get("status"),
+        "remarks": request.data.get("remarks")
+    })
+
+    if serializer.is_valid():
+        validated = serializer.validated_data
+        params = [
+            validated["license_id"],
+            validated["status"],  # integer value of enum
+            validated["remarks"]
+        ]
+
+        result = write_to_contract(
+            contract_name="LicenseSystemV1",
+            method_name="updateStatus",
+            params=params,
+            # address=request.data.get("address"),
+            # private_key=request.data.get("private_key")
+        )
+
+        return ApiResponse(data=result, status=200)
+
+    else:
+        return ApiResponse(err=serializer.errors, status=400)
+
+# 10. Update License Action History
+@api_view(["GET"])
+def update_license_action_history(request):
+    """
+    Universal endpoint for writing to any smart contract method
+
+    Expected payload:
+    {
+        "contract_name": "seedLicenseContract",
+        "method_name": "applyForLicense",
+        "params": [...],
+        "address": "0x..." (optional),
+        "private_key": "..." (optional)
+    }
+    """
+    license_id=request.query_params.get("licenseId")
+    try:
+        result = read_from_contract(
+            contract_name="LicenseSystemV1",
+            method_name="getLicenseActionHistory",
+            params=[
+                license_id,
+            ],
+            # address=address,
+            # private_key=private_key
+        )
+        return ApiResponse(data=result, status=200)
+    except ValueError as e:
+        return ApiResponse(err=str(e), status=400)
+    except Exception as e:
+        logger.exception("Blockchain write error")
+        return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=500)
+
+#11. get_license_basic_info
+@api_view(["GET"])
+def get_license_basic_info(request, license_id):
+    license_id = int(license_id) if license_id.isdigit() else None
+    if not license_id:
+        return ApiResponse(format_api_response(False, error="Missing license_id in URL"), status=400)
+    try:
+        result = read_from_contract(
+                contract_name="LicenseSystemV1",
+                method_name="getLicenseBasicInfo",
+                params=[license_id]
+        )
+        return ApiResponse(format_api_response(True, data=result))
+    except Exception as e:
+        logger.exception("Fetch license basic info failed")
+        return ApiResponse(format_api_response(False, error=f"License basic info fetch failed: {str(e)}"),
+                               status=500)
+# 12.Verify Document Hash
+@api_view(["POST"])
+@parser_classes([MultiPartParser])
+def generate_document_hash(request):
+    file = request.FILES.get("file")
+    if not file:
+        return ApiResponse(err="File is required", status=400)
+
+    try:
+        hash_func = hashlib.sha256()
+        for chunk in file.chunks():
+            hash_func.update(chunk)
+        file_hash = hash_func.hexdigest()
+        return ApiResponse(data={"hash": file_hash})
+    except Exception as e:
+        logger.exception("Hash generation failed")
+        return ApiResponse(err=f"Document hash generation failed: {str(e)}", status=500)
+
+#13. verify_document
+@api_view(["POST"])
+def verify_document(request):
+    required_fields = ["license_id", "document_type", "document_hash", "is_verified", "remarks"]
+    for field in required_fields:
+        if field not in request.data or request.data[field] in [None, ""]:
+            return ApiResponse(err=f"Missing or empty field: {field}", status=400)
+
+    try:
+        license_id = int(request.data["license_id"])
+        document_type = int(request.data["document_type"])
+        is_verified = request.data["is_verified"] in [True, "true", "True", 1, "1"]
+        document_hash = str(request.data["document_hash"])
+        remarks = str(request.data["remarks"])
+    except (ValueError, TypeError) as e:
+        return ApiResponse(err=f"Invalid input types: {str(e)}", status=400)
+
+    try:
+        result = write_to_contract(
+                contract_name="LicenseSystemV1",
+                method_name="verifyDocument",
+                params=[license_id, document_type, document_hash, is_verified, remarks],
+                address=request.data.get("address"),
+                private_key=request.data.get("private_key")
+            )
+        return ApiResponse(data=result)
+    except Exception as e:
+        logger.exception("Document verification failed")
+        return ApiResponse(err=f"Document verification failed: {str(e)}", status=500)
+
+#13. Get All Document Statuses with type and license_id
+@api_view(["GET"])
+def get_document_status(request, license_id, document_type):
+    license_id = int(license_id) if license_id.isdigit() else None
+    document_type = int(document_type) if document_type.isdigit() else None
+    if not license_id or not document_type:
+        return ApiResponse(format_api_response(False, error="Invalid license_id or document_type"), status=400)
+
+    try:
+        result = read_from_contract(
+                contract_name="LicenseSystemV1",
+                method_name="getDocumentStatus",
+                params=[license_id, document_type]
+            )
+        return ApiResponse(format_api_response(True, data={
+                "isVerified": result[0],
+                "verifiedBy": result[1],
+                "verificationDate": result[2],
+                "remarks": result[3],
+                "documentHash": result[4]
+            }))
+    except Exception as e:
+        logger.exception("Fetch document status failed")
+        return ApiResponse(format_api_response(False, error=f"Document status fetch failed: {str(e)}"), status=500)
+
+#14. Get All Document Statuses for a License_id
+@api_view(["GET"])
+def get_all_document_statuses(request, license_id):
+    license_id = int(license_id) if license_id.isdigit() else None
+    if not license_id:
+        return ApiResponse(format_api_response(False, error="Missing license_id in URL"), status=400)
+
+    try:
+        result = read_from_contract(
+                contract_name="LicenseSystemV1",
+                method_name="getAllDocumentStatuses",
+                params=[license_id]
+            )
+        return ApiResponse(format_api_response(True, data={
+                "documentTypes": result[0],
+                "verificationStatuses": result[1],
+                "remarks": result[2]
+            }))
+    except Exception as e:
+        logger.exception("Fetch all document statuses failed")
+        return ApiResponse(format_api_response(False, error=f"All document statuses fetch failed: {str(e)}"),
+                               status=500)
+
+#15. add_inspection_feedback
+@api_view(["POST"])
+def add_inspection_feedback(request):
+    required_fields = ["license_id", "inspector", "feedback_type", "remarks"]
+    for field in required_fields:
+        if field not in request.data or request.data[field] in [None, ""]:
+            return ApiResponse(err=f"Missing or empty field: {field}", status=400)
+
+    try:
+        license_id = int(request.data["license_id"])
+        inspector = str(request.data["inspector"])
+        feedback_type = int(request.data["feedback_type"])
+        remarks = str(request.data["remarks"])
+    except (ValueError, TypeError) as e:
+        return ApiResponse(err=f"Invalid input types: {str(e)}", status=400)
+
+    try:
+        result = write_to_contract(
+                contract_name="LicenseSystemV1",
+                method_name="addInspectionFeedback",
+                params=[license_id, inspector, feedback_type, remarks],
+                address=request.data.get("address"),
+                private_key=request.data.get("private_key")
+            )
+        return ApiResponse(data=result)
+    except Exception as e:
+        logger.exception("Add inspection feedback failed")
+        return ApiResponse(err=f"Inspection feedback submission failed: {str(e)}", status=500)
+
+#16. Get All Inspection Feedback
+@api_view(["GET"])
+def get_all_inspection_feedback(request, license_id):
+
+    license_id = int(license_id)
+    if license_id is None:
+        return ApiResponse(err="Missing license_id in URL", status=HTTP_400_BAD_REQUEST)
+    if not license_id.isdigit():
+        return ApiResponse(err="License id should be in digit", status=HTTP_400_BAD_REQUEST)
+    try:
+        result = read_from_contract(
+                contract_name="LicenseSystemV1",
+                method_name="getAllInspectionFeedback",
+                params=[license_id]
+            )
+        return ApiResponse(format_api_response(True, data=result))
+    except Exception as e:
+        logger.exception("Fetch inspection feedback failed")
+        return ApiResponse(format_api_response(False, error=f"Inspection feedback fetch failed: {str(e)}"),
+                               status=500)
+
+#17. Count Feedback by Type
+@api_view(["GET"])
+def count_feedback_by_type(request, license_id, feedback_type):
+    try:
+        license_id = int(license_id)
+        feedback_type = int(feedback_type)
+    except (ValueError, TypeError):
+        return ApiResponse(
+        format_api_response(False, error="Invalid license_id or feedback_type (must be integers)"), status=400)
+
+    try:
+        result = read_from_contract(
+                contract_name="LicenseSystemV1",
+                method_name="countFeedbackByType",
+                params=[license_id, feedback_type]
+            )
+        return ApiResponse(format_api_response(True, data={"count": result}))
+    except Exception as e:
+        logger.exception("Count feedback by type failed")
+        return ApiResponse(format_api_response(False, error=f"Count feedback fetch failed: {str(e)}"), status=500)
 
 @api_view(["POST"])
 def blockchain_write_view(request):
