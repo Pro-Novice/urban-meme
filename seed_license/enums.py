@@ -48,6 +48,28 @@ class DivisionEnum(Enum):
             raise ValueError(f"Invalid division string: '{div_str}'")
         return mapping[normalized]
 
+class LicenseStatusEnum(Enum):
+    DRAFT = 0
+    SUBMITTED = 1
+    UNDER_REVIEW = 2
+    DOCUMENTS_VERIFIED = 3
+    PAYMENT_PENDING = 4
+    PAYMENT_COMPLETED = 5
+    INSPECTION_SCHEDULED = 6
+    INSPECTION_COMPLETED = 7
+    APPROVED = 8
+    REJECTED = 9
+    REVOKED = 10
+    EXPIRED = 11
+    RENEWAL_PENDING = 12
+
+    @classmethod
+    def from_string(cls, value: str):
+        normalized = value.strip().upper().replace(" ", "_")
+        try:
+            return cls[normalized].value
+        except KeyError:
+            raise ValueError(f"Invalid license status: '{value}'")
 # class CityEnum(Enum):
 #     # Ajmer Division
 #     AJMER = 0

@@ -1,11 +1,11 @@
 {
   "network": 31337,
   "networkName": "Hardhat Network",
-  "deploymentTime": 1752056777,
-  "deploymentTimeFormatted": "2025-07-09 15:56:17",
+  "deploymentTime": 1752148601,
+  "deploymentTimeFormatted": "2025-07-10 17:26:41",
   "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "proxy": "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1",
-  "implementationV1": "0x59b670e9fA9D0A427751Af201D676719a970857b",
+  "proxy": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
+  "implementationV1": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
   "implementationABI": [
     {
       "inputs": [],
@@ -581,6 +581,11 @@
           "internalType": "string",
           "name": "_district",
           "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_division",
+          "type": "string"
         }
       ],
       "name": "createLicense",
@@ -1155,6 +1160,6 @@
   },
   "verification": {
     "success": true,
-    "timestamp": 1752056777
+    "timestamp": 1752148601
   }
 }
