@@ -136,7 +136,7 @@ GENERIC_TRANSFORM_MAP = {
     "getLicenseBasicInfo": {
         "fields": [
             "licenseId", "applicantName", "category", "level", "status",
-            "applicant", "businessName", "district","applicationDate", "approvalDate","rejectionDate",  "expiryDate", "revokedDate", "renewalDate", "isActive",
+            "applicant", "businessName", "district","state","division","applicationDate", "approvalDate","rejectionDate",  "expiryDate", "revokedDate", "renewalDate", "isActive",
         ],
         "enum_mappings": {
             "category": LICENSE_CATEGORIES,

@@ -179,6 +179,8 @@ contract LicenseStorage {
         address applicant;
         string businessName;
         string district;
+        string state;
+        string division;
         uint256 applicationDate;
         uint256 approvalDate;
         uint256 rejectionDate;

@@ -1,36 +1,45 @@
 from django.urls import path
 from . import views
-from .views import  initialize_blockchain_contract, check_owner_blockchain, check_admin_blockchain, \
-    check_total_license_count, add_officer_view, get_officer_role, get_officer_details, create_license_view, \
-    update_license_status_view, update_license_action_history
+
 
 app_name = 'seed_license'
 
 urlpatterns = [
+
     # ══════════════════════════════════════════════════════════════════
-    # Core Blockchain Interaction Endpoints
+    # Backend Interaction Endpoints
     # ══════════════════════════════════════════════════════════════════
     #Initialize Contract
-    path('blockchain/initialize/', initialize_blockchain_contract, name='initialize_blockchain_contract'),
+    path('blockchain/initialize/', views.initialize_blockchain_contract, name='initialize_blockchain_contract'),
+
     # check owner
-    path('blockchain/owner/', check_owner_blockchain, name='initialize_blockchain_contract'),
+    path('blockchain/owner/', views.check_owner_blockchain, name='check_owner_blockchain'),
+
     # check admin
-    path('blockchain/admin/', check_admin_blockchain, name='initialize_blockchain_contract'),
+    path('blockchain/admin/', views.check_admin_blockchain, name='check_admin_blockchain'),
+
     # count total License
-    path('blockchain/countLicense/', check_total_license_count, name='initialize_blockchain_contract'),
+    path('blockchain/license/count/', views.check_total_license_count, name='check_total_license_count'),
 
     # add officer
-    path('blockchain/addOfficer/', add_officer_view, name='initialize_blockchain_contract'),
+    path('blockchain/officer/add/', views.add_officer_view, name='add_officer_view'),
+
     # get officer role
-    path('blockchain/officerRole/', get_officer_role, name='initialize_blockchain_contract'),
+    path('blockchain/officer/role/<str:address>/', views.get_officer_role, name='get_officer_role'),
+
     #get officer details
-    path('blockchain/officerDetails/', get_officer_details, name='initialize_blockchain_contract'),
+    path('blockchain/officer/details/<str:address>/', views.get_officer_details, name='get_officer_details'),
+
     #create License
-    path('blockchain/createLicense/',  create_license_view, name='initialize_blockchain_contract'),
+    path('blockchain/license/create/',  views.create_license_view, name='create_license_view'),
+
     #update license status view
-    path('blockchain/updateLicenseStatus/', update_license_status_view, name='initialize_blockchain_contract'),
-    #update license action history
-    path('blockchain/updateLicenseHistory/', update_license_action_history, name='update_license_action_history'),
+    path('blockchain/license/update-Status/', views.update_license_status_view, name='update_license_status_view'),
+
+    #get license action history
+    path('blockchain/license-history/<str:license_id>/', views.get_license_action_history, name='get_license_action_history'),
+
+    # Get license basic info
     path("blockchain/license/basic-info/<str:license_id>/", views.get_license_basic_info,
          name="get-license-basic-info"),
 
@@ -45,7 +54,7 @@ urlpatterns = [
          name="get-document-status"),
 
     # Get all document statuses for a license
-    path("blockchain/license/document-statuses/<str:license_id>/", views.get_all_document_statuses,
+    path("blockchain/license/document-statuses/<str:license_id>/", views.get_all_document_status,
          name="get-all-document-statuses"),
 
     # Add inspection feedback
@@ -59,6 +68,9 @@ urlpatterns = [
     path("blockchain/license/feedback-count/<str:license_id>/<str:feedback_type>/", views.count_feedback_by_type,
          name="feedback-count"),
 
+    # ══════════════════════════════════════════════════════════════════
+    # Core Blockchain Interaction Endpoints
+    # ══════════════════════════════════════════════════════════════════
 
     # Universal write endpoint for any state-changing contract function
     path('blockchain/write/', views.blockchain_write_view, name='blockchain-write'),
@@ -88,4 +100,5 @@ urlpatterns = [
     
     # Estimate gas for a method call
     path('blockchain/estimate-gas/', views.estimate_gas_view, name='estimate-gas'),
+
 ]

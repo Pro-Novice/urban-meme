@@ -218,6 +218,8 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             applicant: license.applicant,
             businessName: license.businessName,
             district: license.district,
+            state:license.state,
+            division:license.division,
             applicationDate: license.applicationDate,
             approvalDate: license.approvalDate,
             rejectionDate: license.rejectionDate,

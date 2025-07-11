@@ -12,6 +12,7 @@ OFFICER_ROLE_MAP = {
     "JOINT_DIRECTOR_INPUT": 5,
     "FIELD_INSPECTOR": 6,
 }
+REVERSE_OFFICER_ROLE_MAP = {v: k for k, v in OFFICER_ROLE_MAP.items()}
 
 LEVEL_MAP = {
     "STATE": 0,
@@ -188,3 +189,35 @@ class UpdateLicenseStatusSerializer(serializers.Serializer):
             return LicenseStatusEnum.from_string(value)
         except ValueError as e:
             raise serializers.ValidationError(str(e))
+
+class VerifyDocumentSerializer(serializers.Serializer):
+    license_id = serializers.IntegerField(min_value=1)
+    document_type = serializers.IntegerField(min_value=0)
+    document_hash = serializers.CharField()
+    is_verified = serializers.BooleanField()
+    remarks = serializers.CharField()
+
+    def validate_document_hash(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Document hash cannot be empty.")
+        return value
+
+    def validate_remarks(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Remarks cannot be empty.")
+        return value
+class AddInspectionFeedbackSerializer(serializers.Serializer):
+    license_id = serializers.IntegerField(min_value=1)
+    inspector = serializers.CharField()
+    feedback_type = serializers.IntegerField(min_value=0)
+    remarks = serializers.CharField()
+
+    def validate_inspector(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Inspector name cannot be empty.")
+        return value
+
+    def validate_remarks(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Remarks cannot be empty.")
+        return value
