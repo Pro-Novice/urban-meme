@@ -17,9 +17,9 @@ services:
     env_file:
       - .env.docker
     environment:
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - REDIS_URL=redis://redis:6379/0
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - REDIS_URL=${REDIS_URL}
     networks:
       - agri-network
 
@@ -31,9 +31,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=${}
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=agri_db
+      - POSTGRES_USER=${POSTGRES_USER} 
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     restart: unless-stopped
     networks:
       - agri-network
