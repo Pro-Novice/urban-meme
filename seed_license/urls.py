@@ -44,28 +44,28 @@ urlpatterns = [
          name="get-license-basic-info"),
 
     # verify document hash
-    path("blockchain/license/verify-document/", views.verify_document, name="verify-document"),
+    path("blockchain/verify-document/", views.verify_document, name="verify-document"),
 
     # document hash generation and verification
-    path("blockchain/license/document-hash/", views.generate_document_hash, name="generate-document-hash"),
+    path("blockchain/document-hash/", views.generate_document_hash, name="generate-document-hash"),
 
     # document status by license ID and document type
-    path("blockchain/license/document-status/<str:license_id>/<str:document_type>/", views.get_document_status,
+    path("blockchain/document-status/<str:license_id>/<str:document_type>/", views.get_document_status,
          name="get-document-status"),
 
     # Get all document statuses for a license
-    path("blockchain/license/document-statuses/<str:license_id>/", views.get_all_document_status,
+    path("blockchain/document-statuses/<str:license_id>/", views.get_all_document_status,
          name="get-all-document-statuses"),
 
     # Add inspection feedback
-    path("blockchain/license/inspection-feedback/", views.add_inspection_feedback, name="add-inspection-feedback"),
+    path("blockchain/inspection-feedback/", views.add_inspection_feedback, name="add-inspection-feedback"),
 
     # Get All Inspection Feedback
-    path("blockchain/license/inspection-feedback/<str:license_id>/", views.get_all_inspection_feedback,
+    path("blockchain/inspection-feedback/<str:license_id>/", views.get_all_inspection_feedback,
          name="get-all-inspection-feedback"),
 
     # Get Inspection Feedback by Type
-    path("blockchain/license/feedback-count/<str:license_id>/<str:feedback_type>/", views.count_feedback_by_type,
+    path("blockchain/feedback-count/<str:license_id>/<str:feedback_type>/", views.count_feedback_by_type,
          name="feedback-count"),
 
     # ══════════════════════════════════════════════════════════════════
