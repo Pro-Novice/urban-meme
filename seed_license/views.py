@@ -432,6 +432,8 @@ def get_license_basic_info(request, license_id):
 @parser_classes([MultiPartParser])
 def generate_document_hash(request):
     file = request.FILES.get("file")
+def generate_document_hash(request):
+    file = request.FILES.get("file")
     if not file:
         return ApiResponse(err="File is required", status=HTTP_400_BAD_REQUEST)
 

@@ -1,3 +1,8 @@
+# Rajasthan_Agri_Backend License Authentication System (Django Backend)
+
+A Django-based backend for managing role-based authentication of agriculture license holders in Rajasthan, supporting PostgreSQL, JWT, Redis, and secure API development.
+
+## Setup Guide (Local)
 # Rajasthan Agriculture Blockchain License System
 
 A Django-based backend for managing agriculture licenses in Rajasthan using blockchain technology for authentication and verification.
