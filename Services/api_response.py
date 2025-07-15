@@ -62,12 +62,17 @@ class ApiResponse(JsonResponse):
             if not status:
                 status = 400  # default status in case of error
         else:
+            nested_success = data.get("success") if isinstance(data, dict) else None
+         
+            success_flag = (msg == "success" or msg is True) and (nested_success is not False)
+
             response_data = {
-                "success": True if (msg == "success" or msg == True) else False,
+                "success": success_flag,
                 "data": data if data else {},
             }
-            if not status:
-                status = 200  # default status in case of success
+
+            if status is None:
+                status = 200 if success_flag else 400
         super().__init__(response_data, status=status, **kwargs)
 
 

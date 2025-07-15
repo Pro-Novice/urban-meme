@@ -69,6 +69,17 @@ class LicenseStatusEnum(Enum):
         except KeyError:
             raise ValueError(f"Invalid license status: '{value}'")
 
+class DoctypeEnum(Enum):
+    AFFIDAVIT_SEED_QUALITY = 0
+    ID_PROOF = 1
+    SHOP_MAP = 2
+    REGISTRATION_CERTIFICATE = 3
+    MEMORANDUM_ARTICLES = 4
+    PASSPORT_PHOTO = 5
+    AUTHORIZATION_LETTER = 6
+
+
+
 LICENSE_STATUS_REVERSE = {status.value: status.name for status in LicenseStatusEnum}
 # class CityEnum(Enum):
 #     # Ajmer Division
