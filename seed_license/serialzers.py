@@ -12,10 +12,7 @@ OFFICER_ROLE_MAP = {
     "JOINT_DIRECTOR_INPUT": 5,
     "FIELD_INSPECTOR": 6,
 }
-<<<<<<< HEAD
 REVERSE_OFFICER_ROLE_MAP = {v: k for k, v in OFFICER_ROLE_MAP.items()}
-=======
->>>>>>> 5e206e93b62f0e14ec0d9f5f947015966a3b21cb
 
 LEVEL_MAP = {
     "STATE": 0,
@@ -191,7 +188,6 @@ class UpdateLicenseStatusSerializer(serializers.Serializer):
         try:
             return LicenseStatusEnum.from_string(value)
         except ValueError as e:
-<<<<<<< HEAD
             raise serializers.ValidationError(str(e))
 
 class VerifyDocumentSerializer(serializers.Serializer):
@@ -225,6 +221,3 @@ class AddInspectionFeedbackSerializer(serializers.Serializer):
         if not value.strip():
             raise serializers.ValidationError("Remarks cannot be empty.")
         return value
-=======
-            raise serializers.ValidationError(str(e))
->>>>>>> 5e206e93b62f0e14ec0d9f5f947015966a3b21cb
