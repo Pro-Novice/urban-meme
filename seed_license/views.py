@@ -52,6 +52,8 @@ def initialize_blockchain_contract(request):
             # address=address,
             # private_key=private_key
         )
+        if not result.get("success"):
+            return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
         return ApiResponse(data=result, status=HTTP_200_OK)
     except ValueError as e:
         return ApiResponse(err=str(e), status=HTTP_400_BAD_REQUEST)
@@ -186,6 +188,9 @@ def add_officer_view(request):
             params=params,
 
         )
+        if not result.get("success"):
+            return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
+
         return ApiResponse(data=result, status=HTTP_200_OK)
     except ValueError as e:
         return ApiResponse(err=str(e), status=HTTP_400_BAD_REQUEST)
@@ -284,6 +289,10 @@ def create_license_view(request):
             # address=request.data.get("address"),
             # private_key=request.data.get("private_key")
         )
+        if not result.get("success"):
+            return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
+
+
         return ApiResponse(data=result, status=HTTP_200_OK)
 
     except Exception as e:
@@ -323,6 +332,8 @@ def update_license_status_view(request):
             # address=request.data.get("address"),
             # private_key=request.data.get("private_key")
         )
+        if not result.get("success"):
+            return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
         return ApiResponse(data=result, status=HTTP_200_OK)
 
     except Exception as e:
@@ -430,6 +441,8 @@ def verify_document(request):
                 "License not found" in result.get("details", "")
         ):
             return ApiResponse(err="License not found. Please check the license ID.", status=HTTP_400_BAD_REQUEST)
+        if not result.get("success"):
+            return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
         return ApiResponse(data=result, status=HTTP_200_OK)
     except Exception as e:
         logger.exception("Document verification failed")
@@ -501,6 +514,8 @@ def add_inspection_feedback(request):
                 "License not found" in result.get("details", "")
         ):
             return ApiResponse(err=f"License not found. Please check the license ID: ", status=HTTP_400_BAD_REQUEST)
+        if not result.get("success"):
+            return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
         return ApiResponse(data=result, status=HTTP_200_OK)
     except Exception as e:
         logger.exception("Add inspection feedback failed")
