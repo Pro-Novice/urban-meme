@@ -2,7 +2,7 @@ import hashlib
 import logging
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser
-from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_200_OK, HTTP_500_INTERNAL_SERVER_ERROR
+from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_200_OK, HTTP_500_INTERNAL_SERVER_ERROR, HTTP_404_NOT_FOUND
 
 from Services.api_response import ApiResponse
 from .blockchain_services import (
@@ -13,14 +13,34 @@ from .blockchain_services import (
     get_contract_abi,
     get_contract_address,
     estimate_gas_for_method,
-    get_all_contract_addresses
+    get_all_contract_addresses, FEEDBACK_TYPES
 
 )
+from .enums import LicenseStatusEnum, DoctypeEnum
 from .serialzers import AddOfficerSerializer, CreateLicenseSerializer, UpdateLicenseStatusSerializer, \
     VerifyDocumentSerializer, AddInspectionFeedbackSerializer, REVERSE_OFFICER_ROLE_MAP
 
 logger = logging.getLogger(__name__)
 
+# Valid transitions for status progression
+VALID_STATUS_TRANSITIONS = {
+    LicenseStatusEnum.DRAFT.value: [LicenseStatusEnum.SUBMITTED.value],
+    LicenseStatusEnum.SUBMITTED.value: [LicenseStatusEnum.UNDER_REVIEW.value],
+    LicenseStatusEnum.UNDER_REVIEW.value: [
+        LicenseStatusEnum.DOCUMENTS_VERIFIED.value,
+        LicenseStatusEnum.REJECTED.value,
+    ],
+    LicenseStatusEnum.DOCUMENTS_VERIFIED.value: [LicenseStatusEnum.INSPECTION_SCHEDULED.value],
+    LicenseStatusEnum.INSPECTION_SCHEDULED.value: [
+        LicenseStatusEnum.INSPECTION_COMPLETED.value,
+        LicenseStatusEnum.REJECTED.value,
+    ],
+    LicenseStatusEnum.INSPECTION_COMPLETED.value: [
+        LicenseStatusEnum.APPROVED.value,
+        LicenseStatusEnum.REJECTED.value,
+    ],
+
+}
 
 # ══════════════════════════════════════════════════════════════════
 # Backend Interaction Endpoints
@@ -301,36 +321,34 @@ def create_license_view(request):
 
 @api_view(["POST"])
 def update_license_status_view(request):
-    """
-    Update the status of a license on the blockchain.
-
-    Expected JSON payload:
-    {
-        "license_id": 123,
-        "status": "APPROVED",   # will be converted to enum int by serializer
-        "remarks": "Status updated by admin"
-        # "address": "0x...",   # optional
-        # "private_key": "..."  # optional
-    }
-    """
     serializer = UpdateLicenseStatusSerializer(data=request.data)
     if not serializer.is_valid():
         return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
 
     validated = serializer.validated_data
-    params = [
-        validated["license_id"],
-        validated["status"],  # enum integer
-        validated["remarks"]
-    ]
+    license_id = validated["license_id"]
+    new_status = validated["status"]
+    remarks = validated["remarks"]
 
     try:
+        # 1. Fetch current license info
+        current_data = read_from_contract(
+            contract_name="LicenseSystemV1",
+            method_name="getLicenseBasicInfo",
+            params=[license_id]
+        )
+
+        current_status = LicenseStatusEnum.from_string(current_data["status"])
+        if new_status not in VALID_STATUS_TRANSITIONS.get(current_status, []):
+            return ApiResponse(
+                err=f"Invalid status transition from {LicenseStatusEnum(current_status).name} to {LicenseStatusEnum(new_status).name}",
+                status=HTTP_400_BAD_REQUEST
+            )
+        # 3. Proceed with update
         result = write_to_contract(
             contract_name="LicenseSystemV1",
             method_name="updateStatus",
-            params=params,
-            # address=request.data.get("address"),
-            # private_key=request.data.get("private_key")
+            params=[license_id, new_status, remarks],
         )
         if not result.get("success"):
             return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
@@ -339,7 +357,6 @@ def update_license_status_view(request):
     except Exception as e:
         logger.exception("Update license status failed")
         return ApiResponse(err=f"Update license status failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
-
 # 10. Update License Action History
 @api_view(["GET"])
 def get_license_action_history(request,license_id):
@@ -368,6 +385,7 @@ def get_license_action_history(request,license_id):
             # address=address,
             # private_key=private_key
         )
+
         return ApiResponse(data=result, status=HTTP_200_OK)
     except ValueError as e:
         return ApiResponse(err=str(e), status=HTTP_400_BAD_REQUEST)
@@ -377,23 +395,38 @@ def get_license_action_history(request,license_id):
 #11. get_license_basic_info
 @api_view(["GET"])
 def get_license_basic_info(request, license_id):
-    license_id = int(license_id)
-    if not license_id:
-        return ApiResponse( err="Missing license_id in URL", status=HTTP_400_BAD_REQUEST)
-    #
-    # if not license_id.isdigit():
-    #     return ApiResponse( err="License id should be an integer", status=HTTP_400_BAD_REQUEST)
+    try:
+        license_id = int(license_id)
+    except ValueError:
+        return ApiResponse(err="License id should be an integer", status=HTTP_400_BAD_REQUEST)
+
+    if license_id <= 0:
+        return ApiResponse(err="Invalid license_id in URL", status=HTTP_400_BAD_REQUEST)
+
     try:
         result = read_from_contract(
-                contract_name="LicenseSystemV1",
-                method_name="getLicenseBasicInfo",
-                params=[license_id]
+            contract_name="LicenseSystemV1",
+            method_name="getLicenseBasicInfo",
+            params=[license_id]
         )
-        return ApiResponse(data=result,status=HTTP_200_OK)
+
+        # Check for dummy values
+        if (
+            not result or
+            result.get("licenseId") == 0 or
+            result.get("applicant") == "0x0000000000000000000000000000000000000000" or
+            not result.get("isActive", False)
+        ):
+            return ApiResponse(err="License not found", status=HTTP_404_NOT_FOUND)
+
+        return ApiResponse(data=result, status=HTTP_200_OK)
+
     except Exception as e:
         logger.exception("Fetch license basic info failed")
-        return ApiResponse(err=f"License basic info fetch failed: {str(e)}",
-                               status=HTTP_500_INTERNAL_SERVER_ERROR)
+        return ApiResponse(
+            err=f"License basic info fetch failed: {str(e)}",
+            status=HTTP_500_INTERNAL_SERVER_ERROR
+        )
 # 12.Verify Document Hash
 @api_view(["POST"])
 @parser_classes([MultiPartParser])
@@ -450,40 +483,80 @@ def verify_document(request):
 #13. Get All Document Statuses with type and license_id
 @api_view(["GET"])
 def get_document_status(request, license_id, document_type):
-    # license_id = int(license_id) if license_id.isdigit() else None
-    # document_type = int(document_type)
-    # if not license_id or not document_type:
-    #     return ApiResponse(err=f"Invalid license_id or document_type: ", status=HTTP_400_BAD_REQUEST)
-
     try:
-        result = read_from_contract(
-                contract_name="LicenseSystemV1",
-                method_name="getDocumentStatus",
-                params=[license_id, document_type]
+        license_id = int(license_id)
+        document_type = int(document_type)
+
+        # Validate that the int value is in DoctypeEnum
+        try:
+            doc_enum = DoctypeEnum(document_type)
+        except ValueError:
+            return ApiResponse(
+                err=f"Invalid document_type: {document_type}. Must be between 0 and {len(DoctypeEnum) - 1}.",
+                status=HTTP_400_BAD_REQUEST
             )
+
+        # Call contract
+        result = read_from_contract(
+            contract_name="LicenseSystemV1",
+            method_name="getDocumentStatus",
+            params=[license_id, document_type]
+        )
+
+        if not result.get("isVerified", False):
+            return ApiResponse(
+                err=f"{doc_enum.name} not verified yet.",
+                status=HTTP_404_NOT_FOUND
+            )
+
         return ApiResponse(data=result, status=HTTP_200_OK)
+
+    except ValueError:
+        return ApiResponse(
+            err="Invalid license_id or document_type. Must be integers.",
+            status=HTTP_400_BAD_REQUEST
+        )
     except Exception as e:
         logger.exception("Fetch document status failed")
-        return ApiResponse(err=f"Document status fetch failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
+        return ApiResponse(
+            err=f"Document status fetch failed: {str(e)}",
+            status=HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 #14. Get All Document Statuses for a License_id
 @api_view(["GET"])
 def get_all_document_status(request, license_id):
-    license_id = int(license_id) if license_id.isdigit() else None
-    if not license_id:
-        return ApiResponse(err="Missing license_id in URL", status=HTTP_400_BAD_REQUEST)
+    try:
+        license_id = int(license_id)
+    except ValueError:
+        return ApiResponse(err="Invalid license_id in URL", status=HTTP_400_BAD_REQUEST)
 
     try:
         result = read_from_contract(
-                contract_name="LicenseSystemV1",
-                method_name="getAllDocumentStatuses",
-                params=[license_id]
+            contract_name="LicenseSystemV1",
+            method_name="getAllDocumentStatuses",
+            params=[license_id]
+        )
+
+        document_types = result.get("documentTypes", [])
+        statuses = result.get("verificationStatuses", [])
+        remarks = result.get("remarks", [])
+
+        # Check if all returned lists are empty
+        if not document_types and not statuses and not remarks:
+            return ApiResponse(
+                err="No documents verified yet for this license.",
+                status=HTTP_404_NOT_FOUND
             )
 
         return ApiResponse(data=result, status=HTTP_200_OK)
+
     except Exception as e:
         logger.exception("Fetch all document statuses failed")
-        return ApiResponse(err=f"All document statuses fetch failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
+        return ApiResponse(
+            err=f"All document statuses fetch failed: {str(e)}",
+            status=HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 #15. add_inspection_feedback
 @api_view(["POST"])
@@ -524,22 +597,34 @@ def add_inspection_feedback(request):
 #16. Get All Inspection Feedback
 @api_view(["GET"])
 def get_all_inspection_feedback(request, license_id):
+    try:
+        license_id = int(license_id)
+    except ValueError:
+        return ApiResponse(err="Invalid license_id in URL", status=HTTP_400_BAD_REQUEST)
 
-    license_id = int(license_id)
-    if license_id is None:
-        return ApiResponse(err=f"Missing license_id in URL:", status=HTTP_400_BAD_REQUEST)
-    # if not license_id.isdigit():
-    #     return ApiResponse(err="License id should be in digit", status=HTTP_400_BAD_REQUEST)
     try:
         result = read_from_contract(
-                contract_name="LicenseSystemV1",
-                method_name="getAllInspectionFeedback",
-                params=[license_id]
+            contract_name="LicenseSystemV1",
+            method_name="getAllInspectionFeedback",
+            params=[license_id]
+        )
+
+        # ✅ Check if result is empty or count is zero
+        if not result:
+            return ApiResponse(
+                err="Physical verification not yet done for this license.",
+                status=HTTP_404_NOT_FOUND
             )
+
         return ApiResponse(data=result, status=HTTP_200_OK)
+
     except Exception as e:
         logger.exception("Fetch inspection feedback failed")
-        return ApiResponse(err=f"Inspection feedback fetch failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
+        return ApiResponse(
+            err=f"Inspection feedback fetch failed: {str(e)}",
+            status=HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 
 #17. Count Feedback by Type
 @api_view(["GET"])
@@ -548,18 +633,33 @@ def count_feedback_by_type(request, license_id, feedback_type):
         license_id = int(license_id)
         feedback_type = int(feedback_type)
     except (ValueError, TypeError):
-        return ApiResponse(err=f"Invalid license_id or feedback_type (must be integers):", status=HTTP_400_BAD_REQUEST)
+        return ApiResponse(
+            err="Invalid license_id or feedback_type (must be integers).",
+            status=HTTP_400_BAD_REQUEST
+        )
 
     try:
         result = read_from_contract(
-                contract_name="LicenseSystemV1",
-                method_name="countFeedbackByType",
-                params=[license_id, feedback_type]
+            contract_name="LicenseSystemV1",
+            method_name="countFeedbackByType",
+            params=[license_id, feedback_type]
+        )
+
+        # Assume 0 count means no feedback submitted for that type
+        if result == 0:
+            return ApiResponse(
+                err=f"No feedback of type: {FEEDBACK_TYPES[feedback_type]} submitted for license ID {license_id}.",
+                status=HTTP_404_NOT_FOUND
             )
+
         return ApiResponse(data={"count": result}, status=HTTP_200_OK)
+
     except Exception as e:
         logger.exception("Count feedback by type failed")
-        return ApiResponse(err=f"Count feedback fetch failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
+        return ApiResponse(
+            err=f"Count feedback fetch failed: {str(e)}",
+            status=HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 # ══════════════════════════════════════════════════════════════════
 # Core Blockchain Interaction Endpoints

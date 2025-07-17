@@ -155,10 +155,10 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     LicenseStatus oldStatus = license.status;
 
     // Enforce level match between officer and license
-    require(
-        officers[msg.sender].level == license.level,
-        "Officer level mismatch with license level"
-    );
+    //require(
+        //officers[msg.sender].level == license.level,
+        //"Officer level mismatch with license level"
+ //   );
 
     // Remove from old status array
     _removeFromStatusArray(oldStatus, _licenseId);
@@ -403,7 +403,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             _recordAction(_licenseId, ActionType.DOCUMENT_VERIFIED, "All documents verified");
 
             if (license.status == LicenseStatus.DOCUMENTS_VERIFIED) {
-                updateStatus(_licenseId, LicenseStatus.PAYMENT_PENDING, "Documents verified, pending payment");
+                updateStatus(_licenseId, LicenseStatus.INSPECTION_SCHEDULED, "Documents verified, inspection scheduled");
             }
         }
     }

@@ -53,15 +53,13 @@ class LicenseStatusEnum(Enum):
     SUBMITTED = 1
     UNDER_REVIEW = 2
     DOCUMENTS_VERIFIED = 3
-    PAYMENT_PENDING = 4
-    PAYMENT_COMPLETED = 5
-    INSPECTION_SCHEDULED = 6
-    INSPECTION_COMPLETED = 7
-    APPROVED = 8
-    REJECTED = 9
-    REVOKED = 10
-    EXPIRED = 11
-    RENEWAL_PENDING = 12
+    INSPECTION_SCHEDULED = 4
+    INSPECTION_COMPLETED = 5
+    APPROVED = 6
+    REJECTED = 7
+    REVOKED = 8
+    EXPIRED = 9
+    RENEWAL = 10
 
     @classmethod
     def from_string(cls, value: str):
@@ -70,6 +68,19 @@ class LicenseStatusEnum(Enum):
             return cls[normalized].value
         except KeyError:
             raise ValueError(f"Invalid license status: '{value}'")
+
+class DoctypeEnum(Enum):
+    AFFIDAVIT_SEED_QUALITY = 0
+    ID_PROOF = 1
+    SHOP_MAP = 2
+    REGISTRATION_CERTIFICATE = 3
+    MEMORANDUM_ARTICLES = 4
+    PASSPORT_PHOTO = 5
+    AUTHORIZATION_LETTER = 6
+
+
+
+LICENSE_STATUS_REVERSE = {status.value: status.name for status in LicenseStatusEnum}
 # class CityEnum(Enum):
 #     # Ajmer Division
 #     AJMER = 0
