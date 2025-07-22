@@ -146,16 +146,16 @@ WSGI_APPLICATION = 'agri_backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env('POSTGRES_DB'),
-        'USER': env('POSTGRES_USER'),
-        'PASSWORD': env('POSTGRES_PASSWORD'),
-        'HOST': env('POSTGRES_HOST', default='localhost'),
-        'PORT': env('POSTGRES_PORT', default='5432'),
-    }
-}
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': env('POSTGRES_DB'),
+#         'USER': env('POSTGRES_USER'),
+#         'PASSWORD': env('POSTGRES_PASSWORD'),
+#         'HOST': env('POSTGRES_HOST', default='localhost'),
+#         'PORT': env('POSTGRES_PORT', default='5432'),
+#     }
+# }
 # User model is no longer used, using API key authentication instead
 # AUTH_USER_MODEL = 'user.AgriUser'
 
@@ -177,13 +177,13 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": env('REDIS_URL'),
-        "CLIENT_CLASS": "django_redis.client.DefaultClient",
-    }
-}
+# CACHES = {
+#     "default": {
+#         "BACKEND": "django_redis.cache.RedisCache",
+#         "LOCATION": env('REDIS_URL'),
+#         "CLIENT_CLASS": "django_redis.client.DefaultClient",
+#     }
+# }
 
 # Smart contract settings
 
