@@ -1,45 +1,15 @@
+# models.py
 from django.db import models
-from django.conf import settings
 
-class License(models.Model):
-    STATUS_CHOICES = [
-        ("APPLIED",                    "Applied"),
-        ("DOCUMENTS_VERIFIED",        "Documents verified"),
-        ("FIELD_INSPECTION_COMPLETED", "Field inspection completed"),
-        ("QUALITY_VERIFIED",          "Quality verified"),
-        ("APPROVED",                  "Approved"),
-        ("REJECTED",                  "Rejected"),
-        ("REVOKED",                   "Revoked"),
-        ("EXPIRED",                   "Expired"),
-    ]
-
-    applicant          = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True)
-    license_id         = models.IntegerField(unique=True)
-    license_type       = models.CharField(max_length=50)
-    crop_type          = models.CharField(max_length=50)
-    seed_variety       = models.CharField(max_length=100)
-    quantity           = models.DecimalField(max_digits=10, decimal_places=2)
-    location           = models.CharField(max_length=255)
-    quality_parameters = models.TextField()
-    source             = models.CharField(max_length=100)
-    aadhaar            = models.CharField(max_length=12)
-
-    blockchain_tx_id   = models.CharField(max_length=66)
-    status             = models.CharField(max_length=30, choices=STATUS_CHOICES, default="APPLIED")
-    submitted_at       = models.DateTimeField(auto_now_add=True)
-    updated_at         = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"License {self.license_id}"
-
-class BlockchainTransaction(models.Model):
-    tx_hash      = models.CharField(max_length=66, primary_key=True)
+class BlockchainEvent(models.Model):
+    event_name = models.CharField(max_length=100)
+    license_id = models.IntegerField(null=True, blank=True)
     block_number = models.IntegerField()
-    status       = models.CharField(max_length=10)
-    timestamp    = models.DateTimeField()
-    action_type  = models.CharField(max_length=50)
-    license      = models.ForeignKey(License, on_delete=models.CASCADE, related_name="transactions")
-    created_by   = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True)
-
-    def __str__(self):
-        return f"TX {self.tx_hash[:10]}… for License {self.license.license_id}"
+    tx_hash = models.CharField(max_length=66)
+    address = models.CharField(max_length=42)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    payload = models.JSONField()
+    class Meta:
+        verbose_name = 'Blockchain Event'
+        verbose_name_plural = 'Blockchain Events'
+        ordering = ['-timestamp']
