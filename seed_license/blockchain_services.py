@@ -4,7 +4,7 @@ from django.conf import settings
 from web3 import Web3
 from web3.exceptions import ContractLogicError
 from datetime import datetime
-
+from .models import BlockchainEvent
 from seed_license.enums import OfficerRole, DivisionEnum
 
 logger = logging.getLogger(__name__)
@@ -904,7 +904,16 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
                 response["message"] = "Officer added successfully"
             else:
                 response["message"] = f"Method '{method_name}' executed successfully"
-        
+        for event in events:
+            BlockchainEvent.objects.create(
+                event_name=event.get("event"),
+                license_id=event.get("license_id"),
+                block_number=event.get("block_number") or receipt.blockNumber,
+                tx_hash=event.get("transaction_hash") or receipt.transactionHash.hex(),
+                address=event.get("address") or contract_address,
+                payload=event
+            )
+
         return response
 
     except Exception as e:
