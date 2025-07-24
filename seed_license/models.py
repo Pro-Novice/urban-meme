@@ -1,45 +1,73 @@
+# models.py
 from django.db import models
-from django.conf import settings
+import re
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email as django_validate_email
 
-class License(models.Model):
-    STATUS_CHOICES = [
-        ("APPLIED",                    "Applied"),
-        ("DOCUMENTS_VERIFIED",        "Documents verified"),
-        ("FIELD_INSPECTION_COMPLETED", "Field inspection completed"),
-        ("QUALITY_VERIFIED",          "Quality verified"),
-        ("APPROVED",                  "Approved"),
-        ("REJECTED",                  "Rejected"),
-        ("REVOKED",                   "Revoked"),
-        ("EXPIRED",                   "Expired"),
-    ]
 
-    applicant          = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True)
-    license_id         = models.IntegerField(unique=True)
-    license_type       = models.CharField(max_length=50)
-    crop_type          = models.CharField(max_length=50)
-    seed_variety       = models.CharField(max_length=100)
-    quantity           = models.DecimalField(max_digits=10, decimal_places=2)
-    location           = models.CharField(max_length=255)
-    quality_parameters = models.TextField()
-    source             = models.CharField(max_length=100)
-    aadhaar            = models.CharField(max_length=12)
+def validate_email(value):
+    """email format validation"""
+    try:
+        django_validate_email(value)
+    except ValidationError:
+        raise ValidationError("Invalid email address")
 
-    blockchain_tx_id   = models.CharField(max_length=66)
-    status             = models.CharField(max_length=30, choices=STATUS_CHOICES, default="APPLIED")
-    submitted_at       = models.DateTimeField(auto_now_add=True)
-    updated_at         = models.DateTimeField(auto_now=True)
 
-    def __str__(self):
-        return f"License {self.license_id}"
+def validate_pincode(value):
+    if not re.match(r"^[1-9][0-9]{5}$", str(value)):
+        raise ValidationError("Pincode must be 6 digits (no leading zero)")
 
-class BlockchainTransaction(models.Model):
-    tx_hash      = models.CharField(max_length=66, primary_key=True)
+
+def validate_aadhaar(value):
+    if not re.match(r"^[1-9][0-9]{11}$", value):
+        raise ValidationError("Aadhaar must be 12 digits (no leading zero)")
+
+
+def validate_mobile(value):
+    if not re.match(r"^(\+91[\-\s]?)?[6-9]\d{9}$", value):
+        raise ValidationError("Invalid phone number")
+
+
+def validate_username(value):
+    if not re.match(r"^[\w.@+-]+$", value):
+        raise ValidationError("Username may contain only letters, digits and @/./+/-/_")
+
+
+def validate_name(value):
+    if not re.match(r"^[a-zA-Z \-'.]{2,100}$", value):
+        raise ValidationError("Name must be 2-100 characters with valid characters")
+
+
+def validate_password(value):
+    if len(value) < 8:
+        raise ValidationError("Password must be at least 8 characters long")
+    if not re.search(r"[A-Z]", value):
+        raise ValidationError("Password must contain at least one uppercase letter")
+    if not re.search(r"[a-z]", value):
+        raise ValidationError("Password must contain at least one lowercase letter")
+    if not re.search(r"[0-9]", value):
+        raise ValidationError("Password must contain at least one digit")
+
+
+def validate_address(value):
+    if not isinstance(value, dict):
+        raise ValidationError("Address must be a dictionary")
+    required_fields = ['address', 'city', 'state', 'postal_code', 'country']
+    missing = [field for field in required_fields if field not in value]
+    if missing:
+        raise ValidationError(f"Missing address fields: {', '.join(missing)}")
+    validate_pincode(value['postal_code'])
+
+
+class BlockchainEvent(models.Model):
+    event_name = models.CharField(max_length=100)
+    license_id = models.IntegerField(null=True, blank=True)
     block_number = models.IntegerField()
-    status       = models.CharField(max_length=10)
-    timestamp    = models.DateTimeField()
-    action_type  = models.CharField(max_length=50)
-    license      = models.ForeignKey(License, on_delete=models.CASCADE, related_name="transactions")
-    created_by   = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True)
-
-    def __str__(self):
-        return f"TX {self.tx_hash[:10]}… for License {self.license.license_id}"
+    tx_hash = models.CharField(max_length=66)
+    address = models.CharField(max_length=42)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    payload = models.JSONField()
+    class Meta:
+        verbose_name = 'Blockchain Event'
+        verbose_name_plural = 'Blockchain Events'
+        ordering = ['-timestamp']

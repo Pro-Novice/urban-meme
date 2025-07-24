@@ -26,11 +26,12 @@ COPY --chown=appuser:appuser requirements.txt .
 RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the project as appuser
+# Copy the rest of the project
 COPY --chown=appuser:appuser . .
 
-# Copy entrypoint script explicitly (in case it is .dockerignored, make sure it is NOT!)
+# Copy entrypoint script and make executable
 COPY --chown=appuser:appuser entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 ENV DJANGO_SETTINGS_MODULE=agri_backend.settings
 ENV WEB_CONCURRENCY=3

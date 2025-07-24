@@ -47,6 +47,11 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         _;
     }
 
+    modifier onlyOfficers() {
+        require(isOfficer[msg.sender], "Only officers can call this function");
+        _;
+    }
+    
     modifier licenseExists(uint256 _licenseId) {
         require(licenses[_licenseId].applicant != address(0), "License not found");
         _;
@@ -150,7 +155,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     uint256 _licenseId,
     LicenseStatus _newStatus,
     string memory _remarks
-) public onlyOfficerOrAdmin licenseExists(_licenseId) {
+) public onlyOfficers licenseExists(_licenseId) {
     License storage license = licenses[_licenseId];
     LicenseStatus oldStatus = license.status;
 
@@ -326,7 +331,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     string memory _documentHash,
     bool _isVerified,
     string memory _remarks
-) public onlyOfficerOrAdmin licenseExists(_licenseId) {
+) public onlyOfficers licenseExists(_licenseId) {
     License storage license = licenses[_licenseId];
 
     Document storage doc = license.documents[_documentType];
@@ -458,7 +463,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         string memory _remarks
     )
         public
-        onlyOfficerOrAdmin
+        onlyOfficers
         licenseExists(_licenseId)
     {
         require(isOfficer[_inspector], "Inspector is not a registered officer");

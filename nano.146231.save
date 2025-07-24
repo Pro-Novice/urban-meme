@@ -1,0 +1,14 @@
+SECRET_KEY=djangoinsecure
+POSTGRES_DB=agri_db
+POSTGRES_USER=agriadmin
+POSTGRES_PASSWORD=strongpassword
+POSTGRES_HOST=rajasthan-agri-postgres
+POSTGRES_PORT=5432
+REDIS_URL=redis://127.0.0.1:6379/1
+RPC_URL=http://localhost:8545/
+EMAIL_HOST_USER=sumit
+EMAIL_HOST_PASSWORD=sumit
+DEBUG=True
+RAJ_AGRI_API_KEY=test_api_key_12345
+EVAULT_API_URL=https://apitest.sewadwaar.rajasthan.gov.in/app/live/Rajevault/Staging/webservices/api/
+PRIVATE_KEY=8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63
