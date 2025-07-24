@@ -54,14 +54,6 @@ def initialize_blockchain_contract(request):
     """
     Universal endpoint for writing to any smart contract method
 
-    Expected payload:
-    {
-        "contract_name": "seedLicenseContract",
-        "method_name": "applyForLicense",
-        "params": [...],
-        "address": "0x..." (optional),
-        "private_key": "..." (optional)
-    }
     """
 
     try:
@@ -87,14 +79,6 @@ def check_owner_blockchain(request):
     """
     Universal endpoint for writing to any smart contract method
 
-    Expected payload:
-    {
-        "contract_name": "seedLicenseContract",
-        "method_name": "applyForLicense",
-        "params": [...],
-        "address": "0x..." (optional),
-        "private_key": "..." (optional)
-    }
     """
 
     try:
@@ -119,15 +103,6 @@ def check_owner_blockchain(request):
 def check_admin_blockchain(request):
     """
     Universal endpoint for writing to any smart contract method
-
-    Expected payload:
-    {
-        "contract_name": "seedLicenseContract",
-        "method_name": "applyForLicense",
-        "params": [...],
-        "address": "0x..." (optional),
-        "private_key": "..." (optional)
-    }
     """
 
     try:
@@ -151,14 +126,6 @@ def check_total_license_count(request):
     """
     Universal endpoint for writing to any smart contract method
 
-    Expected payload:
-    {
-        "contract_name": "seedLicenseContract",
-        "method_name": "applyForLicense",
-        "params": [...],
-        "address": "0x..." (optional),
-        "private_key": "..." (optional)
-    }
     """
 
     try:
@@ -179,6 +146,21 @@ def check_total_license_count(request):
 #5. Add Officer according to level
 @api_view(["POST"])
 def add_officer_view(request):
+    """ Add a new officer to the blockchain.
+    Expected payload:
+    {
+        "officer_address": "0xabc123...",
+        "officer_name": "John Doe",
+        "officer_id": 12345,
+        "officer_role": "JOINT_DIRECTOR",
+        "department": "Agriculture",
+        "officer_level": "DISTRICT",
+        "state": "Rajasthan",
+        "district": "Jaipur",
+        "division": "North"
+    }
+
+    """
     # print("DEBUG: request.data =", request.data)
     serializer = AddOfficerSerializer(data=request.data)
     if not serializer.is_valid():
@@ -222,6 +204,7 @@ def add_officer_view(request):
 def get_officer_role(request, address):
     """
     Get officer role by their blockchain address.
+
     """
     if not address:
         return ApiResponse(err="Missing officer address in URL", status=HTTP_400_BAD_REQUEST)
@@ -247,6 +230,7 @@ def get_officer_role(request, address):
 def get_officer_details(request, address):
     """
     Get officer details by blockchain address.
+
     """
     if not address:
         return ApiResponse(err="Missing officer address in URL", status=HTTP_400_BAD_REQUEST)
@@ -269,20 +253,17 @@ def get_officer_details(request, address):
 @api_view(["POST"])
 def create_license_view(request):
     """
-    Universal endpoint to create a license on smart contract.
-
-    Expected JSON payload:
+    Create a new license by interacting with the smart contract.
+    Expected payload:
     {
-        "license_category": "SEED",
-        "admin_level": "STATE",
+        "license_category": "AGRICULTURE",
+        "admin_level": "DISTRICT",
         "applicant_name": "John Doe",
-        "aadhaar_number": "123412341234",
+        "aadhaar_number": "123456789012",
         "business_name": "John's Farm",
-        "state": "RAJASTHAN",       # optional, depending on level
-        "district": "",            # optional, depending on level
-        "division": ""             # optional, depending on level
-        # "address": "0x...",      # optional, for contract call
-        # "private_key": "..."     # optional, for contract call
+        "state": "Rajasthan",
+        "district": "Jaipur",
+        "division": "North"
     }
     """
     serializer = CreateLicenseSerializer(data=request.data)
@@ -321,6 +302,15 @@ def create_license_view(request):
 
 @api_view(["POST"])
 def update_license_status_view(request):
+    """ Update the status of an existing license.
+    Expected payload:
+    {
+        "license_id": 123,
+        "status": "APPROVED",
+        "remarks": "License approved after review"
+    }
+    """
+
     serializer = UpdateLicenseStatusSerializer(data=request.data)
     if not serializer.is_valid():
         return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
@@ -363,14 +353,6 @@ def get_license_action_history(request,license_id):
     """
     Universal endpoint for writing to any smart contract method
 
-    Expected payload:
-    {
-        "contract_name": "seedLicenseContract",
-        "method_name": "applyForLicense",
-        "params": [...],
-        "address": "0x..." (optional),
-        "private_key": "..." (optional)
-    }
     """
     license_id = int(license_id)
     if not license_id:
@@ -395,6 +377,9 @@ def get_license_action_history(request,license_id):
 #11. get_license_basic_info
 @api_view(["GET"])
 def get_license_basic_info(request, license_id):
+    """ Fetch basic license information by ID.
+    Expected URL: /api/license/basic-info/<license_id>/
+    """
     try:
         license_id = int(license_id)
     except ValueError:
@@ -431,6 +416,12 @@ def get_license_basic_info(request, license_id):
 @api_view(["POST"])
 @parser_classes([MultiPartParser])
 def generate_document_hash(request):
+    """ Generate a SHA-256 hash for a document file.
+    Expected payload:
+    {
+        "file": <file>
+    }
+    """
     file = request.FILES.get("file")
     if not file:
         return ApiResponse(err="File is required", status=HTTP_400_BAD_REQUEST)
@@ -448,6 +439,13 @@ def generate_document_hash(request):
 #13. verify_document
 @api_view(["POST"])
 def verify_document(request):
+    """ Verify a document's hash and update its status in the blockchain.
+    Expected payload:
+    {
+        "license_id": 123,
+        "document_type": 0,
+    }
+    """
     serializer = VerifyDocumentSerializer(data=request.data)
     if not serializer.is_valid():
         return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
@@ -483,6 +481,8 @@ def verify_document(request):
 #13. Get All Document Statuses with type and license_id
 @api_view(["GET"])
 def get_document_status(request, license_id, document_type):
+    """ Fetch the status of a specific document for a given license.
+    """
     try:
         license_id = int(license_id)
         document_type = int(document_type)
@@ -526,6 +526,8 @@ def get_document_status(request, license_id, document_type):
 #14. Get All Document Statuses for a License_id
 @api_view(["GET"])
 def get_all_document_status(request, license_id):
+    """ Fetch the status of all documents for a given license.
+    """
     try:
         license_id = int(license_id)
     except ValueError:
@@ -561,6 +563,15 @@ def get_all_document_status(request, license_id):
 #15. add_inspection_feedback
 @api_view(["POST"])
 def add_inspection_feedback(request):
+    """ Add feedback from an inspection for a license.
+    Expected payload:
+    {
+        "license_id": 123,
+        "inspector": "John Doe",
+        "feedback_type": 0,
+        "remarks": "Inspection passed"
+    }
+    """
     serializer = AddInspectionFeedbackSerializer(data=request.data)
     if not serializer.is_valid():
         return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
@@ -597,6 +608,8 @@ def add_inspection_feedback(request):
 #16. Get All Inspection Feedback
 @api_view(["GET"])
 def get_all_inspection_feedback(request, license_id):
+    """ Fetch all inspection feedback for a given license.
+    """
     try:
         license_id = int(license_id)
     except ValueError:
@@ -629,6 +642,8 @@ def get_all_inspection_feedback(request, license_id):
 #17. Count Feedback by Type
 @api_view(["GET"])
 def count_feedback_by_type(request, license_id, feedback_type):
+    """ Count the number of feedback entries for a specific type on a license.
+    """
     try:
         license_id = int(license_id)
         feedback_type = int(feedback_type)

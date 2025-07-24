@@ -3,6 +3,9 @@ import re
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
 
+# Officer roles
+# Maps officer roles to integers for serialization and validation
+# Reverse mapping for easier lookup
 OFFICER_ROLE_MAP = {
     "AGRICULTURE_OFFICER": 0,
     "ASSISTANT_AGRICULTURE_OFFICER": 1,
@@ -12,6 +15,10 @@ OFFICER_ROLE_MAP = {
     "JOINT_DIRECTOR_INPUT": 5,
     "FIELD_INSPECTOR": 6,
 }
+
+# Reverse mapping for easier lookup
+# This allows us to convert from integer back to string representation
+# Useful for displaying in serializers or responses
 REVERSE_OFFICER_ROLE_MAP = {v: k for k, v in OFFICER_ROLE_MAP.items()}
 
 LEVEL_MAP = {
@@ -26,6 +33,8 @@ LICENSE_CATEGORY_MAP = {
 }
 from .enums import DivisionEnum, LicenseStatusEnum  # or wherever DivisionEnum is defined
 
+# Serializers for various operations in the seed license app
+# Serializers are used to validate and serialize data for API endpoints
 class AddOfficerSerializer(serializers.Serializer):
     officer_address = serializers.CharField()
     officer_name = serializers.CharField()
@@ -97,6 +106,8 @@ class AddOfficerSerializer(serializers.Serializer):
 
         return data
 
+# Serializers for license creation and updates
+# These serializers handle the validation and serialization of license-related data 
 class CreateLicenseSerializer(serializers.Serializer):
     license_category = serializers.CharField()
     admin_level = serializers.CharField()
@@ -178,7 +189,8 @@ class CreateLicenseSerializer(serializers.Serializer):
 
         return data
 
-
+# Serializers for updating license status, verifying documents, and adding inspection feedback
+# These serializers handle the validation and serialization of data for these specific operations
 class UpdateLicenseStatusSerializer(serializers.Serializer):
     license_id = serializers.IntegerField(min_value=1)
     status = serializers.CharField()
@@ -190,6 +202,8 @@ class UpdateLicenseStatusSerializer(serializers.Serializer):
         except ValueError as e:
             raise serializers.ValidationError(str(e))
 
+# Serializers for verifying documents and adding inspection feedback
+# These serializers handle the validation and serialization of data for these specific operations
 class VerifyDocumentSerializer(serializers.Serializer):
     license_id = serializers.IntegerField(min_value=1)
     document_type = serializers.IntegerField(min_value=0)
@@ -206,6 +220,9 @@ class VerifyDocumentSerializer(serializers.Serializer):
         if not value.strip():
             raise serializers.ValidationError("Remarks cannot be empty.")
         return value
+    
+# Serializers for adding inspection feedback
+# These serializers handle the validation and serialization of data for inspection feedback operations
 class AddInspectionFeedbackSerializer(serializers.Serializer):
     license_id = serializers.IntegerField(min_value=1)
     inspector = serializers.CharField()

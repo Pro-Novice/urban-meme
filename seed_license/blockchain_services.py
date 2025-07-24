@@ -29,6 +29,7 @@ CONTRACTS_DIR = os.path.join(BASE_DIR, "Services", "blockchain", "contracts")
 # Matches LicenseCategory enum in smart contract
 LICENSE_CATEGORIES = ["SEED", "FERTILIZER", "INSECTICIDE"]
 
+# Action types for license events
 ACTION_TYPES = [
     "CREATED", "SUBMITTED", "DOCUMENT_UPLOADED", "DOCUMENT_VERIFIED",
     "PAYMENT_RECORDED", "INSPECTION_SCHEDULED", "INSPECTION_COMPLETED",
@@ -47,11 +48,20 @@ LICENSE_STATUSES = [
     "EXPIRED", "RENEWAL_PENDING"
 ]
 
+# Feedback types for inspection
 FEEDBACK_TYPES = ["None", "Satisfactory", "Unsatisfactory", "Needs Reinspection"]
 
 # generic transform map for contract methods
 # This map defines how to transform raw data from contract methods into a more usable format.
 def generic_transform(method_name: str, raw_data: Any) -> Any:
+    """    Generic transformation function to apply field names, enum mappings, and timestamp formatting.
+           This function handles both single objects and lists of objects.
+           Args:
+            method_name (str): The name of the contract method being called.
+            raw_data (Any): The raw data returned from the contract call, can be a dict or list.
+            Returns:
+            Any: Transformed data with field names, enum mappings, and formatted timestamps.
+    """
     if isinstance(raw_data, (list, tuple)) and all(isinstance(item, (list, tuple)) for item in raw_data):
         # Handle array responses
         return [generic_transform(method_name, item) for item in raw_data]
@@ -111,12 +121,27 @@ def generic_transform(method_name: str, raw_data: Any) -> Any:
 
 # convert timestamp to readable format
 def format_unix_timestamp(ts: int) -> str:
+    """    Convert a Unix timestamp to a human-readable date string.
+        Args:
+            ts (int): Unix timestamp in seconds.
+        Returns:
+            str: Formatted date string in "DD Month YYYY" format.
+    """
     if not ts or ts == 0:
         return None
     return datetime.utcfromtimestamp(ts).strftime("%d %B %Y")
 
 # Format contract result based on method name and contract ABI
 def format_api_response(success: bool, data: Any = None, error: str = None, extra: Dict = None) -> Dict:
+    """    Format a standard API response structure.
+        Args:
+            success (bool): Whether the operation was successful.
+            data (Any): The data to return if successful.
+            error (str): Error message if the operation failed.
+            extra (Dict): Any additional data to include in the response.
+        Returns:
+            Dict: Formatted response dictionary.
+    """
     # Auto unwrap if already wrapped (defensive)
     if isinstance(data, dict) and "success" in data and "data" in data:
         return data
@@ -205,6 +230,12 @@ def format_and_transform_response(result: Any, method_name: str, contract: Any) 
     """
     Formats and transforms a contract read response.
     Applies field names, enum mappings, and timestamp formatting based on GENERIC_TRANSFORM_MAP.
+    Args:
+        result (Any): The raw result from the contract call.
+        method_name (str): The name of the contract method being called.
+        contract (Any): The contract instance used for the call.
+    Returns:    
+        Any: Transformed data with field names, enum mappings, and formatted timestamps.
     """
     base_formatted = format_contract_result(result, method_name, contract)
 
@@ -228,8 +259,17 @@ def clear_contract_cache():
     logger.info("Contract cache cleared")
 
 
+# Get contract instance by name 
+# This function retrieves a contract instance by its name, loading the ABI and address from deployment info.
 def get_contract(contract_name: str):
-    """Load ABI + address and return web3 Contract."""
+    """Load ABI + address and return web3 Contract.
+    Args:
+        contract_name (str): Name of the contract to load.
+        Returns:
+        Contract: Web3 contract instance.
+        Raises:
+        ValueError: If the contract configuration is not found.
+    """
     # Check cache first
     if contract_name in _contract_cache:
         return _contract_cache[contract_name]
@@ -305,14 +345,25 @@ def get_contract(contract_name: str):
         raise
 
 
+# Sign and send a transaction
+# This function signs a transaction with the provided private key and sends it to the blockchain.
 def _sign_and_send(tx: dict, private_key: str) -> str:
     signed = w3.eth.account.sign_transaction(tx, private_key)
     return w3.eth.send_raw_transaction(signed.raw_transaction)
 
+# Call a contract function
+# This function builds, signs, and sends a transaction to the blockchain.
 def call_function(function, *args, address=None, private_key=None) -> Tuple[Any, Any]:
     """
     Enhanced function to build, sign & send a state-changing transaction and wait for receipt.
     Now returns both receipt and return value.
+    Args:
+        function: The contract function to call.
+        *args: Arguments for the function.
+        address (str): Optional address to send from, defaults to DEFAULT_ADDRESS.
+        private_key (str): Optional private key to sign the transaction, defaults to DEFAULT_PRIVATE_KEY.
+    Returns:
+        Tuple[Any, Any]: The transaction receipt and the return value from the function call.
     """
     sender = address or DEFAULT_ADDRESS
     key = private_key or DEFAULT_PRIVATE_KEY
@@ -502,8 +553,15 @@ def call_view_function(function, *args):
     return function(*args).call()
 
 
+# get transaction status
+# This function retrieves the status of a transaction by its hash.
 def get_transaction_status(tx_hash: str):
-    """Return Tx status + meta used by `/blockchain/transactions/*` APIs."""
+    """Return Tx status + meta used by `/blockchain/transactions/*` APIs.
+    Args:
+        tx_hash (str): The transaction hash to check.
+    Returns:
+        Dict[str, Any]: The transaction status and metadata.
+    """
     try:
         receipt = w3.eth.get_transaction_receipt(tx_hash)
         block = w3.eth.get_block(receipt.blockNumber)
@@ -521,10 +579,17 @@ def get_transaction_status(tx_hash: str):
 # ══════════════════════════════════════════════════════════════════════
 # Enhanced Event Parsing
 # ══════════════════════════════════════════════════════════════════════
-
+# This function parses events from a transaction receipt
+# and extracts relevant data, including license IDs and other important fields.
 def parse_receipt_events(receipt: Any, contract: Any) -> List[Dict[str, Any]]:
     """
     Enhanced event parsing to extract license IDs and other important data
+    from transaction receipts.
+    Args:
+        receipt (Any): The transaction receipt to parse.
+        contract (Any): The contract instance used for parsing.
+    Returns:
+        List[Dict[str, Any]]: A list of parsed events with relevant data.
     """
     events = []
     
@@ -652,7 +717,7 @@ def _get_network_info():
 # ══════════════════════════════════════════════════════════════════════
 # Enhanced Write to Contract Function
 # ══════════════════════════════════════════════════════════════════════
-
+# unified function to write to smart contract
 def write_to_contract(contract_name: str, method_name: str, params: List[Any], 
                                address: Optional[str] = None, private_key: Optional[str] = None) -> Dict[str, Any]:
     """
@@ -660,6 +725,14 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
     - Validates method and parameters against ABI from deployment_info.json
     - Executes transaction with minimal overhead
     - Returns clean response
+    Args:
+        contract_name (str): Name of the contract to interact with. 
+        method_name (str): Name of the method to call.
+        params (List[Any]): List of parameters to pass to the method.
+        address (Optional[str]): Address to send the transaction from. Defaults to DEFAULT_ADDRESS.
+        private_key (Optional[str]): Private key to sign the transaction. Defaults to DEFAULT_PRIVATE_KEY.
+    Returns:
+        Dict[str, Any]: Response dictionary with success status, data or error message.
     """
     try:
         # =============== LOAD CONTRACT FROM DEPLOYMENT INFO ===============
@@ -841,7 +914,7 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
         # =============== PARSE EVENTS FOR LICENSE ID ===============
         license_id = None
         events = []
-        
+
         try:
             for log in receipt.logs:
                 if log.address.lower() == contract_address.lower():
@@ -953,10 +1026,19 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
 
 
 
+# Universal function to read from any smart contract method
 
 def read_from_contract(contract_name: str, method_name: str, params: List[Any]) -> Any:
     """
     Universal function to read from any smart contract method
+    - Validates method and parameters against ABI from deployment_info.json
+    - Returns formatted response
+    Args:
+        contract_name (str): Name of the contract to interact with.
+        method_name (str): Name of the method to call.
+        params (List[Any]): List of parameters to pass to the method.
+    Returns:
+        Any: The result of the contract call, formatted according to the method's return type.  
     """
     try:
         contract = get_contract(contract_name)
@@ -985,6 +1067,7 @@ def read_from_contract(contract_name: str, method_name: str, params: List[Any]) 
         raise
 
 
+# processes parameters for a contract function based on its ABI
 def process_params_for_abi(params: List[Any], contract_function: Any, contract: Any) -> List[Any]:
     """
     Process parameters according to the contract ABI types
@@ -1064,9 +1147,23 @@ def process_params_for_abi(params: List[Any], contract_function: Any, contract: 
     return processed
 
 
+# formats the result of a contract call based on its type
+# this is used to format the result of a contract call
 def format_contract_result(result: Any, method_name: str, contract: Any) -> Any:
     """
     Format the result based on the method's return type
+    - If the result is None, return None
+    - If it's a simple type (str, int, bool), return as is
+    - If it's a list/tuple, format each item\
+    - If it's bytes, convert to hex
+    - If the method has named outputs, return a dict with names as keys
+    Args:
+        result (Any): The raw result from the contract call.
+        method_name (str): The name of the method called.   
+        contract (Any): The contract instance used for the call.
+    Returns:    
+        Any: The formatted result, either as a simple type, list, or dict with named outputs.
+
     """
     if result is None:
         return None
@@ -1105,7 +1202,7 @@ def format_contract_result(result: Any, method_name: str, contract: Any) -> Any:
     
     return result
 
-
+# formats the result of a contract call
 def format_single_value(value: Any, value_type: str) -> Any:
     """
     Format a single value based on its type
@@ -1127,13 +1224,15 @@ def format_single_value(value: Any, value_type: str) -> Any:
 # ══════════════════════════════════════════════════════════════════════
 # Utility Functions for Contract Information
 # ══════════════════════════════════════════════════════════════════════
-
+# Get contract instance from deployment info
 def get_contract_abi(contract_name: str) -> List[Dict]:
     """Get the ABI for a contract"""
     contract = get_contract(contract_name)
     return contract.abi
 
 
+# Get all deployed contract addresses
+# This function reads the deployment_info.json file and returns all contract addresses
 def get_all_contract_addresses() -> dict:
     """
     Get all deployed contract addresses
@@ -1187,7 +1286,8 @@ def get_all_contract_addresses() -> dict:
             "addresses": {}
         }
 
-
+# get the address of a specific contract by name
+# this is used to get the address of a contract by its name
 def get_contract_address(contract_name: str) -> str:
     """
     Get the address for a specific contract
@@ -1236,7 +1336,8 @@ def get_contract_address(contract_name: str) -> str:
         except:
             raise ValueError(f"Contract address not found for {contract_name}: {str(e)}")
 
-
+# Get all available methods for a contract
+# This function retrieves all methods from the contract ABI and categorizes them into read and write methods
 def get_available_methods(contract_name: str) -> Dict[str, List[Dict]]:
     """Get all available methods for a contract with details"""
     contract = get_contract(contract_name)
@@ -1268,7 +1369,8 @@ def get_available_methods(contract_name: str) -> Dict[str, List[Dict]]:
         "write_methods": sorted(write_methods, key=lambda x: x['name'])
     }
 
-
+# Estimate gas for a contract method call
+# This function estimates the gas required for a specific method call on a contract
 def estimate_gas_for_method(contract_name: str, method_name: str, 
                            params: List[Any], from_address: Optional[str] = None) -> Dict[str, Any]:
     """Estimate gas for a contract method call"""
