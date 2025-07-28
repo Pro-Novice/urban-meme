@@ -29,6 +29,20 @@ npm install --save-dev hardhat
 # Initialize Hardhat project
 npx hardhat init project
 
+
+### Inside the project directory:
+## in hardhat.config.js file add below code
+require("@nomicfoundation/hardhat-toolbox");
+
+/** @type import('hardhat/config').HardhatUserConfig */
+module.exports = {
+  solidity: "0.8.28",
+  networks: {
+    hardhat: {
+      allowUnlimitedContractSize: true
+    }
+  }
+};
 3. Run Hardhat node in a new terminal
 ```
 npx hardhat node
@@ -58,8 +72,6 @@ The system uses UUPS (Universal Upgradeable Proxy Standard) pattern for smart co
 - SUBMITTED
 - UNDER_REVIEW
 - DOCUMENTS_VERIFIED
-- PAYMENT_PENDING
-- PAYMENT_COMPLETED
 - INSPECTION_SCHEDULED
 - INSPECTION_COMPLETED
 - APPROVED
@@ -100,10 +112,18 @@ The easiest way to run this application is using Docker:
    Edit the `.env` file with your specific settings, especially:
    - Blockchain settings (BLOCKCHAIN_URL, CONTRACT_ADDRESS, PRIVATE_KEY)
    - API key configuration
-
-3. **Run the application**:
+   
+3. **Compile smart contracts**:
+   ```bash 
+   python3 blockchainDeploymentScripts/compile_contracts.py
+   ```
+4. **Deploy smart contract to blockchain
+    ```bash
+   python3 blockchainDeploymentScripts/deploy_upgradeable.py
+   ```
+5. **Run the application**:
    ```bash
-   docker-compose up -d
+   ./deploy.sh
    ```
    
    This will start:
@@ -111,12 +131,12 @@ The easiest way to run this application is using Docker:
    - PostgreSQL database
    - Redis cache
 
-4. **Create a superuser** (if needed):
+6. **Create a superuser** (if needed):
    ```bash
    docker-compose exec web python manage.py createsuperuser
    ```
 
-5. **Access the application**:
+7.  **Access the application**:
    - API Endpoints: http://localhost:8000/api/
    - Admin Interface: http://localhost:8000/admin/
 
