@@ -676,6 +676,54 @@ def count_feedback_by_type(request, license_id, feedback_type):
             status=HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+# verify license details
+@api_view(["GET"])
+def verify_license(request, license_id):
+    """
+    Verify the authenticity of a license using its license ID.
+
+    Expected URL:
+    /api/blockchain/license/verify/<license_id>/
+    """
+    try:
+        license_id = int(license_id)
+    except ValueError:
+        return ApiResponse(err="License ID must be an integer", status=HTTP_400_BAD_REQUEST)
+
+    if license_id <= 0:
+        return ApiResponse(err="Invalid license_id in URL", status=HTTP_400_BAD_REQUEST)
+
+    try:
+        result = read_from_contract(
+            contract_name="LicenseSystemV1",
+            method_name="getLicenseBasicInfo",
+            params=[license_id]
+        )
+
+        if (
+            not result or
+            result.get("licenseId", 0) == 0 or
+            result.get("applicant") == "0x0000000000000000000000000000000000000000"
+        ):
+            return ApiResponse(err="License not found", status=HTTP_404_NOT_FOUND)
+
+        status = result.get("status", "").upper()
+
+        if status != "APPROVED":
+            return ApiResponse(err=f"License is not approved (current status: {status}). Verification allowed only if status is APPROVED.", status=HTTP_400_BAD_REQUEST)
+
+        return ApiResponse(data={
+            "message": "License verification successful",
+            "license": result
+        }, status=HTTP_200_OK)
+
+    except Exception as e:
+        logger.exception("Verify license failed")
+        return ApiResponse(
+            err=f"Verify license failed: {str(e)}",
+            status=HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 # ══════════════════════════════════════════════════════════════════
 # Core Blockchain Interaction Endpoints
 # ══════════════════════════════════════════════════════════════════
