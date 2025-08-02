@@ -11,18 +11,9 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  * @title LicenseSystemV1
  * @dev Implementation contract optimized for API integration
  */
-contract LicenseSystemV1 is
-    LicenseStorage,
-    Initializable,
-    UUPSUpgradeable,
-    OwnableUpgradeable
-{
+contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, OwnableUpgradeable {
     // Events
-    event LicenseApplicationSubmitted(
-        uint256 indexed licenseId,
-        string licenseNumber,
-        LicenseCategory category
-    );
+    event LicenseApplicationSubmitted(uint256 indexed licenseId, string licenseNumber, LicenseCategory category);
     event LicenseApproved(
         uint256 indexed licenseId,
         string changedByOfficerName,
@@ -53,20 +44,12 @@ contract LicenseSystemV1 is
 
     // Modifiers
     modifier onlyAdmins() {
-        require(
-            msg.sender == owner() || admins[msg.sender],
-            "Only authorized addresses can perform this action"
-        );
+        require(msg.sender == owner() || admins[msg.sender], "Only authorized addresses can perform this action");
         _;
     }
 
     modifier licenseExists(uint256 _licenseId) {
-        string memory errorMessage = string(
-            abi.encodePacked(
-                "License not found: ",
-                Strings.toString(_licenseId)
-            )
-        );
+        string memory errorMessage = string(abi.encodePacked("License not found: ", Strings.toString(_licenseId)));
         require(licenseIdExists(_licenseId), errorMessage);
         _;
     }
@@ -82,9 +65,7 @@ contract LicenseSystemV1 is
         admins[msg.sender] = true; // also add to admin mapping
     }
 
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function addAdmin(address newAdmin) public {
         require(msg.sender == owner(), "Only owner can add admins");
@@ -138,23 +119,11 @@ contract LicenseSystemV1 is
                 actorName: _applicantName,
                 actorRole: userRole.CITIZEN,
                 remarks: "License Application Successfully Submitted",
-                dataHash: _toHexString(
-                    keccak256(
-                        abi.encodePacked(
-                            _applicantName,
-                            _businessName,
-                            block.timestamp
-                        )
-                    )
-                )
+                dataHash: _toHexString(keccak256(abi.encodePacked(_applicantName, _businessName, block.timestamp)))
             })
         );
 
-        newLicense.licenseNumber = _generateLicenseNumber(
-            _category,
-            _level,
-            newLicenseId
-        );
+        newLicense.licenseNumber = _generateLicenseNumber(_category, _level, newLicenseId);
 
         // Update tracking
         allLicenseIds.push(newLicenseId);
@@ -165,11 +134,7 @@ contract LicenseSystemV1 is
         licensesByDistrict[_district].push(newLicenseId);
         licenseNumberToId[newLicense.licenseNumber] = newLicenseId;
 
-        emit LicenseApplicationSubmitted(
-            newLicenseId,
-            newLicense.licenseNumber,
-            _category
-        );
+        emit LicenseApplicationSubmitted(newLicenseId, newLicense.licenseNumber, _category);
 
         return newLicenseId;
     }
@@ -225,10 +190,7 @@ contract LicenseSystemV1 is
         License storage license = licenses[_licenseId];
         LicenseStatus oldStatus = license.status;
 
-        require(
-            oldStatus != _newStatus,
-            "License status already set to requested status"
-        );
+        require(oldStatus != _newStatus, "License status already set to requested status");
 
         // Update common fields
         license.status = _newStatus;
@@ -237,14 +199,9 @@ contract LicenseSystemV1 is
         // Handle specific status updates
         if (_newStatus == LicenseStatus.APPROVED) {
             // For approvals (new or renewals)
-            require(
-                _renewalPeriodDays > 0,
-                "Renewal period must be greater than 0"
-            );
+            require(_renewalPeriodDays > 0, "Renewal period must be greater than 0");
             license.approvalDate = block.timestamp;
-            license.expiryDate =
-                block.timestamp +
-                (_renewalPeriodDays * 1 days);
+            license.expiryDate = block.timestamp + (_renewalPeriodDays * 1 days);
             license.isActive = true;
 
             // If this was a renewal (from EXPIRED status)
@@ -253,10 +210,7 @@ contract LicenseSystemV1 is
             }
         } else if (_newStatus == LicenseStatus.REVOKED) {
             // For revocations
-            require(
-                oldStatus == LicenseStatus.APPROVED,
-                "Only approved licenses can be revoked"
-            );
+            require(oldStatus == LicenseStatus.APPROVED, "Only approved licenses can be revoked");
             license.revokedDate = block.timestamp;
             license.isActive = false;
         } else if (_newStatus == LicenseStatus.EXPIRED) {
@@ -277,37 +231,16 @@ contract LicenseSystemV1 is
 
         // Record action with appropriate action type
         ActionType actionType = _getActionTypeForStatus(_newStatus, oldStatus);
-        string memory actionDescription = _buildActionDescription(
-            oldStatus,
-            _newStatus,
-            _remarks
-        );
+        string memory actionDescription = _buildActionDescription(oldStatus, _newStatus, _remarks);
 
-        _recordAction(
-            _licenseId,
-            actionType,
-            _role,
-            actionDescription,
-            _officerName
-        );
+        _recordAction(_licenseId, actionType, _role, actionDescription, _officerName);
 
         // Emit appropriate events
-        _emitStatusEvent(
-            _licenseId,
-            oldStatus,
-            _newStatus,
-            _officerName,
-            _role,
-            _remarks
-        );
+        _emitStatusEvent(_licenseId, oldStatus, _newStatus, _officerName, _role, _remarks);
     }
 
-    // 5.
-
     // Internal functions
-    function _hashAadhaar(
-        string memory _aadhaarNumber
-    ) internal pure returns (string memory) {
+    function _hashAadhaar(string memory _aadhaarNumber) internal pure returns (string memory) {
         return _toHexString(keccak256(abi.encodePacked(_aadhaarNumber)));
     }
 
@@ -337,9 +270,7 @@ contract LicenseSystemV1 is
                 actorName: _officerName,
                 actorRole: _userRole,
                 remarks: _remarks,
-                dataHash: _toHexString(
-                    keccak256(abi.encodePacked(_remarks, block.timestamp))
-                )
+                dataHash: _toHexString(keccak256(abi.encodePacked(_remarks, block.timestamp)))
             })
         );
     }
@@ -360,21 +291,10 @@ contract LicenseSystemV1 is
                 ? "DV"
                 : "DT";
 
-        return
-            string(
-                abi.encodePacked(
-                    "RJ",
-                    categoryCode,
-                    levelCode,
-                    Strings.toString(_licenseId)
-                )
-            );
+        return string(abi.encodePacked("RJ", categoryCode, levelCode, Strings.toString(_licenseId)));
     }
 
-    function _removeFromStatusArray(
-        LicenseStatus _status,
-        uint256 _licenseId
-    ) internal {
+    function _removeFromStatusArray(LicenseStatus _status, uint256 _licenseId) internal {
         uint256[] storage statusArray = licensesByStatus[_status];
         for (uint256 i = 0; i < statusArray.length; i++) {
             if (statusArray[i] == _licenseId) {
@@ -445,70 +365,30 @@ contract LicenseSystemV1 is
         userRole _role,
         string memory _remarks
     ) private {
-        if (
-            _newStatus == LicenseStatus.APPROVED &&
-            _oldStatus == LicenseStatus.EXPIRED
-        ) {
-            emit LicenseRenewed(
-                _licenseId,
-                _officerName,
-                _role,
-                licenses[_licenseId].expiryDate
-            );
+        if (_newStatus == LicenseStatus.APPROVED && _oldStatus == LicenseStatus.EXPIRED) {
+            emit LicenseRenewed(_licenseId, _officerName, _role, licenses[_licenseId].expiryDate);
         } else if (_newStatus == LicenseStatus.REVOKED) {
             emit LicenseRevoked(_licenseId, _officerName, _role, _remarks);
         } else if (_newStatus == LicenseStatus.APPROVED) {
-            emit LicenseApproved(
-                _licenseId,
-                _officerName,
-                _role,
-                licenses[_licenseId].expiryDate
-            );
+            emit LicenseApproved(_licenseId, _officerName, _role, licenses[_licenseId].expiryDate);
         } else {
-            emit StatusChanged(
-                _licenseId,
-                _oldStatus,
-                _newStatus,
-                _officerName,
-                _role
-            );
+            emit StatusChanged(_licenseId, _oldStatus, _newStatus, _officerName, _role);
         }
     }
 
-    function _licenseStatusToString(
-        LicenseStatus status
-    ) internal pure returns (string memory) {
+    function _licenseStatusToString(LicenseStatus status) internal pure returns (string memory) {
         if (status == LicenseStatus.DRAFT) return "DRAFT";
         if (status == LicenseStatus.SUBMITTED) return "SUBMITTED";
         if (status == LicenseStatus.UNDER_REVIEW) return "UNDER_REVIEW";
-        if (status == LicenseStatus.DOCUMENTS_VERIFIED)
-            return "DOCUMENTS_VERIFIED";
-        if (status == LicenseStatus.INSPECTION_SCHEDULED)
-            return "INSPECTION_SCHEDULED";
-        if (status == LicenseStatus.INSPECTION_COMPLETED)
-            return "INSPECTION_COMPLETED";
+        if (status == LicenseStatus.DOCUMENTS_VERIFIED) return "DOCUMENTS_VERIFIED";
+        if (status == LicenseStatus.INSPECTION_SCHEDULED) return "INSPECTION_SCHEDULED";
+        if (status == LicenseStatus.INSPECTION_COMPLETED) return "INSPECTION_COMPLETED";
         if (status == LicenseStatus.APPROVED) return "APPROVED";
         if (status == LicenseStatus.REJECTED) return "REJECTED";
         if (status == LicenseStatus.REVOKED) return "REVOKED";
         if (status == LicenseStatus.EXPIRED) return "EXPIRED";
         if (status == LicenseStatus.RENEWED) return "RENEWED";
         return "UNKNOWN";
-    }
-
-    function _userRoleToString(
-        userRole role
-    ) internal pure returns (string memory) {
-        if (role == userRole.CITIZEN) return "CITIZEN";
-        if (role == userRole.AGRICULTURE_OFFICER) return "AGRICULTURE_OFFICER";
-        if (role == userRole.ASSISTANT_AGRICULTURE_OFFICER)
-            return "ASSISTANT_AGRICULTURE_OFFICER";
-        if (role == userRole.ASSISTANT_DIRECTOR) return "ASSISTANT_DIRECTOR";
-        if (role == userRole.DEPUTY_DIRECTOR) return "DEPUTY_DIRECTOR";
-        if (role == userRole.JOINT_DIRECTOR) return "JOINT_DIRECTOR";
-        if (role == userRole.JOINT_DIRECTOR_INPUT)
-            return " JOINT_DIRECTOR_INPUT";
-        if (role == userRole.FIELD_INSPECTOR) return "FIELD_INSPECTOR";
-        return "UNKNOWN_ROLE";
     }
 
     function licenseIdExists(uint256 _licenseId) public view returns (bool) {

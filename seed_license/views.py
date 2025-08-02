@@ -33,10 +33,6 @@ VALID_STATUS_TRANSITIONS = {
     LicenseStatusEnum.EXPIRED.value: [LicenseStatusEnum.RENEWED.value], 
 }
 
-# ══════════════════════════════════════════════════════════════════
-# Backend Interaction Endpoints
-# ══════════════════════════════════════════════════════════════════
-
 # 1. Initialize Blockchain contract
 @api_view(["GET"])
 def initialize_blockchain_contract(request):
@@ -47,7 +43,7 @@ def initialize_blockchain_contract(request):
             method_name="initialize",
             params=[]
         )
-        if not result.get("success"):
+        if not result.get("status", "") == "confirmed":
             return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
         return ApiResponse(data=result, status=HTTP_200_OK)
     except ValueError as e:
@@ -556,82 +552,6 @@ def count_feedback_by_type(request, license_id, feedback_type):
             err=f"Count feedback fetch failed: {str(e)}",
             status=HTTP_500_INTERNAL_SERVER_ERROR
         )
-
-# ══════════════════════════════════════════════════════════════════
-# Core Blockchain Interaction Endpoints
-# ══════════════════════════════════════════════════════════════════
-
-@api_view(["POST"])
-def blockchain_write_view(request):
-    """
-    Universal endpoint for writing to any smart contract method
-
-    Expected payload:
-    {
-        "contract_name": "seedLicenseContract",
-        "method_name": "applyForLicense",
-        "params": [...],
-        "address": "0x..." (optional),
-        "private_key": "..." (optional)
-    }
-    """
-    contract_name = request.data.get("contract_name")
-    method_name = request.data.get("method_name")
-    params = request.data.get("params", [])
-    address = request.data.get("address")
-    private_key = request.data.get("private_key")
-
-    if not contract_name or not method_name:
-        return ApiResponse(err="Missing required fields: contract_name, method_name", status=400)
-
-    try:
-        result = write_to_contract(
-            contract_name=contract_name,
-            method_name=method_name,
-            params=params,
-            address=address,
-            private_key=private_key
-        )
-        return ApiResponse(data=result, status=200)
-    except ValueError as e:
-        return ApiResponse(err=str(e), status=400)
-    except Exception as e:
-        logger.exception("Blockchain write error")
-        return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=500)
-
-
-@api_view(["GET"])
-def blockchain_read_view(request):
-    """
-    Universal endpoint for reading from any smart contract method
-
-    Expected payload:
-    {
-        "contract_name": "seedLicenseContract",
-        "method_name": "getLicenseDetails",
-        "params": [123]
-    }
-    """
-    contract_name = request.data.get("contract_name")
-    method_name = request.data.get("method_name")
-    params = request.data.get("params", [])
-
-    if not contract_name or not method_name:
-        return ApiResponse(err="Missing required fields: contract_name, method_name", status=400)
-
-    try:
-        result = read_from_contract(
-            contract_name=contract_name,
-            method_name=method_name,
-            params=params
-        )
-        return ApiResponse(data=result, status=200)
-    except ValueError as e:
-        return ApiResponse(err=str(e), status=500)
-    except Exception as e:
-        logger.exception("Blockchain read error")
-        return ApiResponse(err=f"Blockchain read failed: {str(e)}", status=500)
-
 
 # ══════════════════════════════════════════════════════════════════════
 # Transaction Management

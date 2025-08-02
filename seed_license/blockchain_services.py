@@ -7,6 +7,7 @@ from datetime import datetime
 from .models import BlockchainEvent
 from seed_license.enums import OfficerRole, DivisionEnum, REVERSE_OFFICER_ROLE, LICENSE_STATUS_REVERSE, REVERSE_LEVEL_MAP, REVERSE_LICENSE_CATEGORY
 
+
 logger = logging.getLogger(__name__)
 
 # ── connect ───────────────────────────────────────────────────────────
