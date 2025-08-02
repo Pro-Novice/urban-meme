@@ -152,6 +152,25 @@ contract LicenseStorage {
         bool inspectionPassed;
     }
 
+    struct LicenseVerificationData {
+        bool isValid;
+        bool isActive;
+        bool isExpired;
+        bool isRevoked;
+        string licenseNumber;
+        string applicantName;
+        string businessName;
+        string businessAddress;
+        LicenseCategory category;
+        LicenseLevel level;
+        LicenseStatus status;
+        uint256 approvalDate;
+        uint256 expiryDate;
+        uint256 revokedDate;
+        string verificationHash;
+        string statusMessage;
+    }
+
     struct InspectionFeedback {
         string inspectorOfficerId;
         string inspectorName;

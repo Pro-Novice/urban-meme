@@ -24,6 +24,8 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         string changedByOfficerName,
         userRole changedByOfficerRole
     );
+    event LicenseVerified(string licenseNumber, bool isValid, LicenseStatus status);
+    event TamperAttemptDetected(string licenseNumber, string suspiciousData);
     event ApiCallerAuthorized(address indexed caller);
     event ApiCallerRevoked(address indexed caller);
 
@@ -35,7 +37,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
 
     modifier licenseExists(uint256 _licenseId) {
         string memory errorMessage = string(abi.encodePacked("License not found: ", Strings.toString(_licenseId)));
-        require(licenseIdExists(_licenseId), errorMessage);
+        require(_licenseIdExists(_licenseId), errorMessage);
         _;
     }
 
@@ -47,7 +49,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     function initialize() public initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
-        admins[msg.sender] = true; // also add to admin mapping
+        admins[msg.sender] = true; // Add to admin mapping
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
@@ -220,9 +222,108 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         _emitStatusEvent(_licenseId, oldStatus, _newStatus, _officerName, _role, _remarks);
     }
 
-    // Internal functions
+    // 5. Get License Verification Hash
+    function getLicenseVerificationHash(uint256 _licenseId) public view licenseExists(_licenseId) returns (string memory) {
+        License storage license = licenses[_licenseId];
+        return _generateVerificationHash(license);
+    }
+
+    // 6. Verify License Integrity and Validity
+    function verifyLicenseWithHash(string memory _licenseNumber, string memory _expectedHash) public returns (LicenseVerificationData memory, bool) {
+        LicenseVerificationData memory verificationData = verifyLicenseByNumber(_licenseNumber);
+
+        if (!verificationData.isValid) {
+            return (verificationData, false);
+        }
+
+        // Check for tampering by comparing hashes
+        bool isTampered = !_compareStrings(verificationData.verificationHash, _expectedHash);
+
+        if (isTampered) {
+            verificationData.statusMessage = string(abi.encodePacked(verificationData.statusMessage, " - WARNING: Potential tampering detected!"));
+            emit TamperAttemptDetected(_licenseNumber, verificationData.verificationHash);
+        } else {
+            emit LicenseVerified(_licenseNumber, verificationData.isValid, verificationData.status);
+        }
+
+        return (verificationData, isTampered);
+    }
+    // 7. Verify License by Number - Private function to be used internally
+    function verifyLicenseByNumber(string memory _licenseNumber) private view returns (LicenseVerificationData memory) {
+        uint256 licenseId = licenseNumberToId[_licenseNumber];
+
+        if (!_licenseIdExists(licenseId)) {
+            return
+                LicenseVerificationData({
+                    isValid: false,
+                    isActive: false,
+                    isExpired: false,
+                    isRevoked: false,
+                    licenseNumber: _licenseNumber,
+                    applicantName: "",
+                    businessName: "",
+                    businessAddress: "",
+                    category: LicenseCategory.SEED,
+                    level: LicenseLevel.STATE,
+                    status: LicenseStatus.SUBMITTED,
+                    approvalDate: 0,
+                    expiryDate: 0,
+                    revokedDate: 0,
+                    verificationHash: "",
+                    statusMessage: "License not found or invalid license number"
+                });
+        }
+
+        License storage license = licenses[licenseId];
+
+        // Generate verification hash for tamper detection
+        string memory verificationHash = _generateVerificationHash(license);
+
+        // Check expiry
+        bool isExpired = (license.expiryDate > 0 && block.timestamp > license.expiryDate);
+
+        // Check if revoked
+        bool isRevoked = (license.status == LicenseStatus.REVOKED);
+
+        // Determine if license is valid and active
+        bool isValid = (license.status == LicenseStatus.APPROVED && !isExpired && !isRevoked);
+        bool isActive = license.isActive && isValid;
+
+        // Generate status message
+        string memory statusMessage = _generateStatusMessage(license.status, isExpired, isRevoked);
+
+        return
+            LicenseVerificationData({
+                isValid: isValid,
+                isActive: isActive,
+                isExpired: isExpired,
+                isRevoked: isRevoked,
+                licenseNumber: license.licenseNumber,
+                applicantName: license.applicantName,
+                businessName: license.businessName,
+                businessAddress: license.businessAddress,
+                category: license.category,
+                level: license.level,
+                status: license.status,
+                approvalDate: license.approvalDate,
+                expiryDate: license.expiryDate,
+                revokedDate: license.revokedDate,
+                verificationHash: verificationHash,
+                statusMessage: statusMessage
+            });
+    }
+
+    // Helper functions
     function _hashAadhaar(string memory _aadhaarNumber) internal pure returns (string memory) {
         return _toHexString(keccak256(abi.encodePacked(_aadhaarNumber)));
+    }
+
+    function _licenseIdExists(uint256 _licenseId) internal view returns (bool) {
+        return bytes(licenses[_licenseId].licenseNumber).length > 0;
+    }
+
+    function _compareStrings(string memory a, string memory b) internal pure returns (bool) {
+        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 
     function _toHexString(bytes32 data) internal pure returns (string memory) {
@@ -368,7 +469,52 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         return "UNKNOWN";
     }
 
-    function licenseIdExists(uint256 _licenseId) public view returns (bool) {
-        return bytes(licenses[_licenseId].licenseNumber).length > 0;
+    function _generateVerificationHash(License storage license) internal view returns (string memory) {
+        return
+            _toHexString(
+                keccak256(
+                    abi.encodePacked(
+                        license.licenseNumber,
+                        license.applicantName,
+                        license.businessName,
+                        license.businessAddress,
+                        uint256(license.category),
+                        uint256(license.level),
+                        uint256(license.status),
+                        license.approvalDate,
+                        license.expiryDate,
+                        license.revokedDate,
+                        license.isActive
+                    )
+                )
+            );
+    }
+
+    function _generateStatusMessage(LicenseStatus status, bool isExpired, bool isRevoked) internal pure returns (string memory) {
+        if (isRevoked) {
+            return "License has been revoked and is no longer valid";
+        }
+
+        if (isExpired) {
+            return "License has expired and needs renewal";
+        }
+
+        if (status == LicenseStatus.APPROVED) {
+            return "License is valid and active";
+        } else if (status == LicenseStatus.UNDER_REVIEW) {
+            return "License application is under review";
+        } else if (status == LicenseStatus.REJECTED) {
+            return "License application has been rejected";
+        } else if (status == LicenseStatus.SUBMITTED) {
+            return "License application has been submitted";
+        } else if (status == LicenseStatus.DOCUMENTS_VERIFIED) {
+            return "License documents have been verified";
+        } else if (status == LicenseStatus.INSPECTION_SCHEDULED) {
+            return "License inspection has been scheduled";
+        } else if (status == LicenseStatus.INSPECTION_COMPLETED) {
+            return "License inspection has been completed";
+        }
+
+        return "License status unknown";
     }
 }

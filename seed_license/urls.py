@@ -14,18 +14,12 @@ urlpatterns = [
      path('blockchain/license/count/', views.check_total_license_count, name='license-count'),
      path('blockchain/license/<str:license_id>/info/', views.get_license_basic_info, name='license-basic-info'),
      path('blockchain/license/<str:license_id>/history/', views.get_license_action_history, name='license-action-history'),
-     path('blockchain/license/<str:license_id>/document/<str:document_type>/status/', views.get_document_status, name='document-status'),
-     path('blockchain/license/<str:license_id>/document/statuses/', views.get_all_document_status, name='all-document-statuses'),
      path('blockchain/license/<str:license_id>/inspection-feedback/', views.get_all_inspection_feedback, name='all-inspection-feedback'),
      path('blockchain/license/<str:license_id>/inspection-feedback/<str:feedback_type>/count/', views.count_feedback_by_type, name='feedback-count'),
      path('blockchain/license/update-status/', views.update_license_status_view, name='update-license-status'),
 
      # Inspection Feedback
      path('blockchain/inspection-feedback/add/', views.add_inspection_feedback, name='add-inspection-feedback'),
-
-     # Document Handling
-     path('blockchain/document/verify/', views.verify_document, name='verify-document'),
-     path('blockchain/document/generate-hash/', views.generate_document_hash, name='generate-document-hash'),
 
      # Transactions
      path('blockchain/transaction/<str:tx_hash>/', views.transaction_status_view, name='transaction-status'),

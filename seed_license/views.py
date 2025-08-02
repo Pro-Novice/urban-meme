@@ -13,10 +13,11 @@ from .blockchain_services import (
     get_contract_abi,
     get_contract_address,
     estimate_gas_for_method,
-    get_all_contract_addresses, FEEDBACK_TYPES
-
+    get_all_contract_addresses, 
+    FEEDBACK_TYPES
 )
-from .enums import LicenseStatusEnum, DoctypeEnum, LICENSE_STATUS_REVERSE, REVERSE_OFFICER_ROLE
+
+from .enums import LicenseStatusEnum, LICENSE_STATUS_REVERSE, REVERSE_OFFICER_ROLE
 
 from .serialzers import SubmitLicenseApplicationSerializer, UpdateLicenseStatusSerializer, VerifyDocumentSerializer, AddInspectionFeedbackSerializer
 
@@ -153,17 +154,6 @@ def get_license_basic_info(request, license_id):
         return ApiResponse(err="License ID must be a valid integer", status=HTTP_400_BAD_REQUEST)
 
     try:
-        # 1. First check if license exists
-        exists = read_from_contract(
-            contract_name="LicenseSystemV1",
-            method_name="licenseIdExists",
-            params=[license_id]
-        )
-        
-        if not exists:
-            return ApiResponse(err=f"License ID {license_id} not found", status=HTTP_404_NOT_FOUND)
-
-        # 2. Only fetch details if license exists
         result = read_from_contract(
             contract_name="LicenseSystemV1",
             method_name="getLicenseBasicInfo",
@@ -192,17 +182,6 @@ def get_license_action_history(request, license_id):
         return ApiResponse(err="License ID must be a valid integer", status=HTTP_400_BAD_REQUEST)
    
     try:
-        # 1. First check if license exists
-        exists = read_from_contract(
-            contract_name="LicenseSystemV1",
-            method_name="licenseIdExists",
-            params=[license_id]
-        )
-        
-        if not exists:
-            return ApiResponse(err=f"License ID {license_id} not found", status=HTTP_404_NOT_FOUND)
-        
-        # 2. Fetch action history
         result = read_from_contract(
             contract_name="LicenseSystemV1",
             method_name="getLicenseActionHistory",
@@ -289,153 +268,6 @@ def update_license_status_view(request):
         logger.exception("Update license status failed")
         return ApiResponse(err=f"Update license status failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
 
-# 12.Verify Document Hash
-@api_view(["POST"])
-@parser_classes([MultiPartParser])
-def generate_document_hash(request):
-    """ Generate a SHA-256 hash for a document file.
-    Expected payload:
-    {
-        "file": <file>
-    }
-    """
-    file = request.FILES.get("file")
-    if not file:
-        return ApiResponse(err="File is required", status=HTTP_400_BAD_REQUEST)
-
-    try:
-        hash_func = hashlib.sha256()
-        for chunk in file.chunks():
-            hash_func.update(chunk)
-        file_hash = hash_func.hexdigest()
-        return ApiResponse(data={"hash": file_hash},status=HTTP_200_OK)
-    except Exception as e:
-        logger.exception("Hash generation failed")
-        return ApiResponse(err=f"Document hash generation failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
-
-#13. verify_document
-@api_view(["POST"])
-def verify_document(request):
-    """ Verify a document's hash and update its status in the blockchain.
-    Expected payload:
-    {
-        "license_id": 123,
-        "document_type": 0,
-    }
-    """
-    serializer = VerifyDocumentSerializer(data=request.data)
-    if not serializer.is_valid():
-        return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
-
-    validated_data = serializer.validated_data
-    try:
-        result = write_to_contract(
-            contract_name="LicenseSystemV1",
-            method_name="verifyDocument",
-            params=[
-                validated_data["license_id"],
-                validated_data["document_type"],
-                validated_data["document_hash"],
-                validated_data["is_verified"],
-                validated_data["remarks"]
-            ],
-            # address=validated_data.get("address"),
-            # private_key=validated_data.get("private_key")
-        )
-        if (
-                isinstance(result, dict) and
-                result.get("success") is False and
-                "Gas estimation failed" in result.get("error", "") and
-                "License not found" in result.get("details", "")
-        ):
-            return ApiResponse(err="License not found. Please check the license ID.", status=HTTP_400_BAD_REQUEST)
-        if not result.get("success"):
-            return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
-        return ApiResponse(data=result, status=HTTP_200_OK)
-    except Exception as e:
-        logger.exception("Document verification failed")
-        return ApiResponse(err=f"Document verification failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
-#13. Get All Document Statuses with type and license_id
-@api_view(["GET"])
-def get_document_status(request, license_id, document_type):
-    """ Fetch the status of a specific document for a given license.
-    """
-    try:
-        license_id = int(license_id)
-        document_type = int(document_type)
-
-        # Validate that the int value is in DoctypeEnum
-        try:
-            doc_enum = DoctypeEnum(document_type)
-        except ValueError:
-            return ApiResponse(
-                err=f"Invalid document_type: {document_type}. Must be between 0 and {len(DoctypeEnum) - 1}.",
-                status=HTTP_400_BAD_REQUEST
-            )
-
-        # Call contract
-        result = read_from_contract(
-            contract_name="LicenseSystemV1",
-            method_name="getDocumentStatus",
-            params=[license_id, document_type]
-        )
-
-        if not result.get("isVerified", False):
-            return ApiResponse(
-                err=f"{doc_enum.name} not verified yet.",
-                status=HTTP_404_NOT_FOUND
-            )
-
-        return ApiResponse(data=result, status=HTTP_200_OK)
-
-    except ValueError:
-        return ApiResponse(
-            err="Invalid license_id or document_type. Must be integers.",
-            status=HTTP_400_BAD_REQUEST
-        )
-    except Exception as e:
-        logger.exception("Fetch document status failed")
-        return ApiResponse(
-            err=f"Document status fetch failed: {str(e)}",
-            status=HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-#14. Get All Document Statuses for a License_id
-@api_view(["GET"])
-def get_all_document_status(request, license_id):
-    """ Fetch the status of all documents for a given license.
-    """
-    try:
-        license_id = int(license_id)
-    except ValueError:
-        return ApiResponse(err="Invalid license_id in URL", status=HTTP_400_BAD_REQUEST)
-
-    try:
-        result = read_from_contract(
-            contract_name="LicenseSystemV1",
-            method_name="getAllDocumentStatuses",
-            params=[license_id]
-        )
-
-        document_types = result.get("documentTypes", [])
-        statuses = result.get("verificationStatuses", [])
-        remarks = result.get("remarks", [])
-
-        # Check if all returned lists are empty
-        if not document_types and not statuses and not remarks:
-            return ApiResponse(
-                err="No documents verified yet for this license.",
-                status=HTTP_404_NOT_FOUND
-            )
-
-        return ApiResponse(data=result, status=HTTP_200_OK)
-
-    except Exception as e:
-        logger.exception("Fetch all document statuses failed")
-        return ApiResponse(
-            err=f"All document statuses fetch failed: {str(e)}",
-            status=HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
 #15. add_inspection_feedback
 @api_view(["POST"])
@@ -482,6 +314,8 @@ def add_inspection_feedback(request):
         logger.exception("Add inspection feedback failed")
         return ApiResponse(
             err=f"Inspection feedback submission failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 #16. Get All Inspection Feedback
 @api_view(["GET"])
 def get_all_inspection_feedback(request, license_id):
@@ -553,10 +387,7 @@ def count_feedback_by_type(request, license_id, feedback_type):
             status=HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-# ══════════════════════════════════════════════════════════════════════
 # Transaction Management
-# ══════════════════════════════════════════════════════════════════════
-
 @api_view(["GET"])
 def transaction_status_view(request, tx_hash):
     """Get transaction status and details by hash"""
@@ -568,10 +399,7 @@ def transaction_status_view(request, tx_hash):
         return ApiResponse(err=f"Failed to get transaction status: {str(e)}", status=500)
 
 
-# ══════════════════════════════════════════════════════════════════════
 # Contract Information & Utilities
-# ══════════════════════════════════════════════════════════════════════
-
 @api_view(["GET"])
 def contract_methods_view(request, contract_name):
     """Get all available methods for a contract"""
