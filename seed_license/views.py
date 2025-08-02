@@ -19,7 +19,7 @@ from .blockchain_services import (
 
 from .enums import LicenseStatusEnum, LICENSE_STATUS_REVERSE, REVERSE_OFFICER_ROLE
 
-from .serialzers import SubmitLicenseApplicationSerializer, UpdateLicenseStatusSerializer, VerifyDocumentSerializer, AddInspectionFeedbackSerializer
+from .serialzers import SubmitLicenseApplicationSerializer, UpdateLicenseStatusSerializer, VerifyLicenseSerializer, AddInspectionFeedbackSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,9 @@ def initialize_blockchain_contract(request):
         result = write_to_contract(
             contract_name="LicenseSystemV1",
             method_name="initialize",
-            params=[]
+            params=[],
+            # address=address,
+            # private_key=private_key
         )
         if not result.get("status", "") == "confirmed":
             return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
@@ -198,7 +200,6 @@ def get_license_action_history(request, license_id):
         return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-
 # 7. Update License Status
 @api_view(["POST"])
 def update_license_status_view(request):
@@ -219,7 +220,6 @@ def update_license_status_view(request):
         return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
 
     validated = serializer.validated_data
-    print("Validated data:", validated)  # Debugging line to check validated data
     license_id = validated["license_id"]
     new_status = validated["status"]            
     remarks = validated["remarks"]
@@ -267,6 +267,73 @@ def update_license_status_view(request):
     except Exception as e:
         logger.exception("Update license status failed")
         return ApiResponse(err=f"Update license status failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
+
+# 8. GET QR Code Data for License Verification
+@api_view(["GET"])
+def get_license_qr_data(request, license_id):
+    """ Fetch QR code data for a license by ID.
+    This data can be used to generate a QR code for easy verification.
+    """
+    try:
+        license_id = int(license_id)
+        if license_id <= 0:
+            return ApiResponse(err="License ID must be positive integer", status=HTTP_400_BAD_REQUEST)
+    except ValueError:
+        return ApiResponse(err="License ID must be a valid integer", status=HTTP_400_BAD_REQUEST)
+
+    try:
+        result = read_from_contract(
+            contract_name="LicenseSystemV1",
+            method_name="getLicenseQRData",
+            params=[license_id]
+        )
+
+        return ApiResponse(data=result, status=HTTP_200_OK)
+
+    except Exception as e:
+        logger.exception(f"QR data fetch failed for license ID {license_id}")
+        return ApiResponse(
+            err=f"QR data fetch failed: {str(e)}",
+            status=HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+
+# 9. Verify Integrity and Validity of License Document
+@api_view(["POST"])
+def verify_license_document(request):
+    """ Verify a license document using its hash.
+    Expected payload:
+    {
+        "license_number": "123",
+        "expected_hash": "0xabc123...",
+    }
+    """
+    serializer = VerifyLicenseSerializer(data=request.data)
+    if not serializer.is_valid():
+        return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
+
+    validated = serializer.validated_data
+    license_number = validated["license_number"]
+    expected_hash = validated["expected_hash"]
+
+    try:
+        result = write_to_contract(
+            contract_name="LicenseSystemV1",
+            method_name="verifyLicenseWithHash",
+            params=[
+                license_number,
+                expected_hash
+            ],
+        )
+
+        if not result.get("status", "") == "confirmed":
+            return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
+
+        return ApiResponse(data=result, status=HTTP_200_OK)
+
+    except Exception as e:
+        logger.exception("Verify document failed")
+        return ApiResponse(err=f"Verify document failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 #15. add_inspection_feedback

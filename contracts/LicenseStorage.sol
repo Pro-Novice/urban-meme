@@ -158,6 +158,7 @@ contract LicenseStorage {
         bool isExpired;
         bool isRevoked;
         string licenseNumber;
+        uint256 licenseId;
         string applicantName;
         string businessName;
         string businessAddress;

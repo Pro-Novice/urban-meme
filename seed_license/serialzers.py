@@ -99,25 +99,30 @@ class UpdateLicenseStatusSerializer(serializers.Serializer):
                 })
 
         return data
+    
+class VerifyLicenseSerializer(serializers.Serializer):
+    license_number = serializers.CharField()
+    expected_hash = serializers.CharField()
 
-# Serializers for verifying documents and adding inspection feedback
-class VerifyDocumentSerializer(serializers.Serializer):
-    license_id = serializers.IntegerField(min_value=1)
-    document_type = serializers.IntegerField(min_value=0)
-    document_hash = serializers.CharField()
-    is_verified = serializers.BooleanField()
-    remarks = serializers.CharField()
-
-    def validate_document_hash(self, value):
+    def validate_expected_hash(self, value):
         if not value.strip():
-            raise serializers.ValidationError("Document hash cannot be empty.")
-        return value
-
-    def validate_remarks(self, value):
-        if not value.strip():
-            raise serializers.ValidationError("Remarks cannot be empty.")
+            raise serializers.ValidationError("Expected hash cannot be empty.")
         return value
     
+    def validate_license_number(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("License number cannot be empty.")
+        return value
+
+    def validate(self, data):
+        license_id = data.get("license_number")
+        expected_hash = data.get("expected_hash")
+
+        if not license_id or not expected_hash:
+            raise serializers.ValidationError("Both license ID and expected hash are required.")
+
+        return data
+
 # Serializers for adding inspection feedback
 class AddInspectionFeedbackSerializer(serializers.Serializer):
     license_id = serializers.IntegerField(min_value=1)

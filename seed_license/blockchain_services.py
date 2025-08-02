@@ -79,7 +79,7 @@ def generic_transform(method_name: str, raw_data: Any) -> Any:
         else:
             transformed[field] = value
 
-    # 🌟 Remove irrelevant date fields based on status
+    # Remove irrelevant date fields based on status
     if status_str != "APPROVED":
        transformed.pop("approvalDate", None)
 
@@ -143,19 +143,14 @@ GENERIC_TRANSFORM_MAP = {
         },
         "timestamp_fields": ["timestamp"]
     },
-    "getLicenseStatusHistory": {
+    "getLicenseQRData": {
         "fields": [
-            "timestamp", "actionType", "actor", "actorName",
-            "actorRole", "department", "remarks", "dataHash"
+            "verificationHash", "licenseNumber", "status", "approvalDate", "expiryDate"
         ],
         "enum_mappings": {
-            "actionType": LICENSE_STATUSES,
-            "actorRole": USER_ROLE,
+            "status": LICENSE_STATUSES
         },
-        "timestamp_fields": ["timestamp"]
-    },
-    "listAllFunctions": {
-        "fields": []
+        "timestamp_fields": ["approvalDate", "expiryDate"]
     },
     "getAllInspectionFeedback": {
         "fields": [
@@ -183,6 +178,7 @@ def format_and_transform_response(result: Any, method_name: str, contract: Any) 
     base_formatted = format_contract_result(result, method_name, contract)
 
     config = GENERIC_TRANSFORM_MAP.get(method_name)
+    # print(f"Formatting method: {method_name} with config: {config}")
     if config:
        # If the method has a config, apply generic transformation
         if not isinstance(base_formatted, (list, tuple, dict)) and len(config.get("fields", [])) == 1:
@@ -508,114 +504,6 @@ def get_transaction_status(tx_hash: str):
         return {"tx_hash": tx_hash, "status": "PENDING", "error": str(exc)}
 
 
-# ══════════════════════════════════════════════════════════════════════
-# Enhanced Event Parsing
-# ══════════════════════════════════════════════════════════════════════
-# This function parses events from a transaction receipt
-# and extracts relevant data, including license IDs and other important fields.
-def parse_receipt_events(receipt: Any, contract: Any) -> List[Dict[str, Any]]:
-    """
-    Enhanced event parsing to extract license IDs and other important data
-    from transaction receipts.
-    Args:
-        receipt (Any): The transaction receipt to parse.
-        contract (Any): The contract instance used for parsing.
-    Returns:
-        List[Dict[str, Any]]: A list of parsed events with relevant data.
-    """
-    events = []
-    
-    try:
-        # Get all events from the contract ABI
-        contract_events = {}
-        
-        # Dynamically get all event names from contract ABI
-        for abi_item in contract.abi:
-            if abi_item.get('type') == 'event':
-                event_name = abi_item['name']
-                try:
-                    contract_events[event_name] = getattr(contract.events, event_name)
-                except AttributeError:
-                    logger.warning(f"Event {event_name} not found in contract.events")
-        
-        logger.info(f"Found {len(contract_events)} events in contract: {list(contract_events.keys())}")
-        
-        for log in receipt.logs:
-            event_parsed = False
-            for event_name, event_filter in contract_events.items():
-                try:
-                    decoded_log = event_filter().processLog(log)
-                    
-                    # Base event data
-                    event_data = {
-                        "event": event_name,
-                        "block_number": decoded_log.blockNumber,
-                        "transaction_hash": decoded_log.transactionHash.hex(),
-                        "log_index": decoded_log.logIndex,
-                        "address": decoded_log.address
-                    }
-                    
-                    # Parse specific events with their arguments
-                    if event_name == 'LicenseApplied':
-                        event_data.update({
-                            "license_id": decoded_log.args.licenseId,
-                            "farmer_address": decoded_log.args.farmerAddress,
-                            "license_type": decoded_log.args.licenseType
-                        })
-                    elif event_name == 'LicenseStatusUpdated':
-                        event_data.update({
-                            "license_id": decoded_log.args.licenseId,
-                            "previous_status": decoded_log.args.previousStatus,
-                            "new_status": decoded_log.args.newStatus,
-                            "officer_address": decoded_log.args.officerAddress
-                        })
-                    elif event_name == 'LicenseRevoked':
-                        event_data.update({
-                            "license_id": decoded_log.args.licenseId,
-                            "officer_address": decoded_log.args.officerAddress,
-                            "reason": decoded_log.args.reason
-                        })
-                    elif event_name == 'OfficerAdded':
-                        event_data.update({
-                            "officer_address": decoded_log.args.officerAddress,
-                            "role": decoded_log.args.role
-                        })
-                    elif event_name == 'OfficerRemoved':
-                        event_data.update({
-                            "officer_address": decoded_log.args.officerAddress
-                        })
-                    else:
-                        # Generic event parsing - add all arguments
-                        event_data["args"] = dict(decoded_log.args)
-                    
-                    events.append(event_data)
-                    logger.info(f"Parsed event: {event_name} - {event_data}")
-                    event_parsed = True
-                    break  # Successfully parsed, move to next log
-                    
-                except Exception as parse_error:
-                    # This log doesn't match this event type, continue to next
-                    continue
-            
-            # If no event matched, add raw log data
-            if not event_parsed:
-                try:
-                    events.append({
-                        "event": "Unknown",
-                        "topics": [topic.hex() for topic in log.get('topics', [])],
-                        "data": log.get('data', '').hex() if log.get('data') else '0x',
-                        "address": log.get('address', ''),
-                        "block_number": log.get('blockNumber'),
-                        "log_index": log.get('logIndex')
-                    })
-                except Exception as e:
-                    logger.warning(f"Could not parse unknown log: {e}")
-                    
-    except Exception as e:
-        logger.warning(f"Could not parse events: {e}")
-    
-    return events
-
 def _get_network_info():
     """Helper function to get network information for error responses"""
     try:
@@ -649,7 +537,6 @@ def _get_network_info():
 # ══════════════════════════════════════════════════════════════════════
 # Enhanced Write to Contract Function
 # ══════════════════════════════════════════════════════════════════════
-# unified function to write to smart contract
 def write_to_contract(contract_name: str, method_name: str, params: List[Any], 
                                address: Optional[str] = None, private_key: Optional[str] = None) -> Dict[str, Any]:
     """
@@ -875,6 +762,38 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
                                 "new_status": LICENSE_STATUS_REVERSE[decoded_log.args.newStatus],
                                 "changed_by": decoded_log.args.changedByOfficerName,
                                 "role": REVERSE_OFFICER_ROLE[decoded_log.args.changedByOfficerRole],
+                            })
+                            continue
+                        except Exception:
+                            pass
+
+                        try:
+                            decoded_log = contract.events.LicenseVerified().process_log(log)
+                            license_id = decoded_log.args.licenseId
+                            verified_date = format_unix_timestamp(decoded_log.args.verifiedDate)
+
+                            events.append({
+                                "event": "LicenseVerified",
+                                "license_id": license_id,
+                                "license_number": decoded_log.args.licenseNumber,
+                                "status": LICENSE_STATUS_REVERSE[decoded_log.args.status],
+                                "status_message": decoded_log.args.statusMessage,
+                                "verified_date": verified_date
+                            })
+                            continue
+                        except Exception:
+                            pass
+
+                        try: 
+                            decoded_log = contract.events.TamperAttemptDetected().process_log(log)
+                            license_id = decoded_log.args.licenseId
+                            detected_date = format_unix_timestamp(decoded_log.args.detectedDate)
+                            events.append({
+                                "event": "TamperAttemptDetected",
+                                "license_id": license_id,
+                                "license_number": decoded_log.args.licenseNumber,
+                                "status_message": decoded_log.args.statusMessage,
+                                "detected_date": detected_date
                             })
                             continue
                         except Exception:

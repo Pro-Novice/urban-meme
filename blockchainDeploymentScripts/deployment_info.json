@@ -1,11 +1,11 @@
 {
   "network": 1337,
   "networkName": "Ganache",
-  "deploymentTime": 1754138913,
-  "deploymentTimeFormatted": "2025-08-02 18:18:33",
+  "deploymentTime": 1754164426,
+  "deploymentTimeFormatted": "2025-08-03 01:23:46",
   "deployer": "0xFE3B557E8Fb62b89F4916B721be55cEb828dBd73",
-  "proxy": "0x5365098A72AdE678de35E69B50E11Da165Bf6b96",
-  "implementationV1": "0xE6BAb1eAc80e9d68BD76c3bb61abad86133109DD",
+  "proxy": "0x48b1dc3076A1c6d004B3B59d971FBE3B26b39124",
+  "implementationV1": "0xE39Fb55adeede73eB654E05933bE5b8a82ffe3C5",
   "implementationABI": [
     {
       "inputs": [],
@@ -254,6 +254,43 @@
       "inputs": [
         {
           "indexed": true,
+          "internalType": "uint256",
+          "name": "licenseId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "licenseNumber",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum LicenseStorage.LicenseStatus",
+          "name": "status",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "statusMessage",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "verifiedDate",
+          "type": "uint256"
+        }
+      ],
+      "name": "LicenseVerified",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
           "internalType": "address",
           "name": "previousOwner",
           "type": "address"
@@ -303,6 +340,37 @@
         }
       ],
       "name": "StatusChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "licenseId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "licenseNumber",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "statusMessage",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "detectedDate",
+          "type": "uint256"
+        }
+      ],
+      "name": "TamperAttemptDetected",
       "type": "event"
     },
     {
@@ -522,6 +590,45 @@
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_licenseId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getLicenseQRData",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "verificationHash",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "licenseNumber",
+          "type": "string"
+        },
+        {
+          "internalType": "enum LicenseStorage.LicenseStatus",
+          "name": "status",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint256",
+          "name": "approvalDate",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "expiryDate",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "initialize",
       "outputs": [],
@@ -536,25 +643,6 @@
           "internalType": "uint256",
           "name": "_counter",
           "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "_licenseId",
-          "type": "uint256"
-        }
-      ],
-      "name": "licenseIdExists",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
         }
       ],
       "stateMutability": "view",
@@ -728,6 +816,122 @@
       "outputs": [],
       "stateMutability": "payable",
       "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "_licenseNumber",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_expectedHash",
+          "type": "string"
+        }
+      ],
+      "name": "verifyLicenseWithHash",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "bool",
+              "name": "isValid",
+              "type": "bool"
+            },
+            {
+              "internalType": "bool",
+              "name": "isActive",
+              "type": "bool"
+            },
+            {
+              "internalType": "bool",
+              "name": "isExpired",
+              "type": "bool"
+            },
+            {
+              "internalType": "bool",
+              "name": "isRevoked",
+              "type": "bool"
+            },
+            {
+              "internalType": "string",
+              "name": "licenseNumber",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "licenseId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "applicantName",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "businessName",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "businessAddress",
+              "type": "string"
+            },
+            {
+              "internalType": "enum LicenseStorage.LicenseCategory",
+              "name": "category",
+              "type": "uint8"
+            },
+            {
+              "internalType": "enum LicenseStorage.LicenseLevel",
+              "name": "level",
+              "type": "uint8"
+            },
+            {
+              "internalType": "enum LicenseStorage.LicenseStatus",
+              "name": "status",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint256",
+              "name": "approvalDate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "expiryDate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "revokedDate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "verificationHash",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "statusMessage",
+              "type": "string"
+            }
+          ],
+          "internalType": "struct LicenseStorage.LicenseVerificationData",
+          "name": "",
+          "type": "tuple"
+        },
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
     }
   ],
   "gasUsed": {
@@ -736,6 +940,6 @@
   },
   "verification": {
     "success": true,
-    "timestamp": 1754138913
+    "timestamp": 1754164426
   }
 }

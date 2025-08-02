@@ -24,8 +24,8 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         string changedByOfficerName,
         userRole changedByOfficerRole
     );
-    event LicenseVerified(string licenseNumber, bool isValid, LicenseStatus status);
-    event TamperAttemptDetected(string licenseNumber, string suspiciousData);
+    event LicenseVerified(uint256 indexed licenseId, string licenseNumber, LicenseStatus status, string statusMessage, uint256 verifiedDate);
+    event TamperAttemptDetected(uint256 indexed licenseId, string licenseNumber, string statusMessage, uint256 detectedDate);
     event ApiCallerAuthorized(address indexed caller);
     event ApiCallerRevoked(address indexed caller);
 
@@ -222,10 +222,23 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         _emitStatusEvent(_licenseId, oldStatus, _newStatus, _officerName, _role, _remarks);
     }
 
-    // 5. Get License Verification Hash
-    function getLicenseVerificationHash(uint256 _licenseId) public view licenseExists(_licenseId) returns (string memory) {
+    // 5. Get QR Code data for License
+    function getLicenseQRData(
+        uint256 _licenseId
+    )
+        public
+        view
+        licenseExists(_licenseId)
+        returns (string memory verificationHash, string memory licenseNumber, LicenseStatus status, uint256 approvalDate, uint256 expiryDate)
+    {
         License storage license = licenses[_licenseId];
-        return _generateVerificationHash(license);
+        require(license.status == LicenseStatus.APPROVED, "License must be approved to generate QR data");
+
+        verificationHash = _generateVerificationHash(license);
+        approvalDate = license.approvalDate;
+        expiryDate = license.expiryDate;
+        status = license.status;
+        licenseNumber = license.licenseNumber;
     }
 
     // 6. Verify License Integrity and Validity
@@ -240,14 +253,15 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         bool isTampered = !_compareStrings(verificationData.verificationHash, _expectedHash);
 
         if (isTampered) {
-            verificationData.statusMessage = string(abi.encodePacked(verificationData.statusMessage, " - WARNING: Potential tampering detected!"));
-            emit TamperAttemptDetected(_licenseNumber, verificationData.verificationHash);
+            verificationData.statusMessage = "WARNING: Potential tampering detected!";
+            emit TamperAttemptDetected(verificationData.licenseId, _licenseNumber, verificationData.statusMessage, block.timestamp);
         } else {
-            emit LicenseVerified(_licenseNumber, verificationData.isValid, verificationData.status);
+            emit LicenseVerified(verificationData.licenseId, _licenseNumber, verificationData.status, verificationData.statusMessage, block.timestamp);
         }
 
         return (verificationData, isTampered);
     }
+
     // 7. Verify License by Number - Private function to be used internally
     function verifyLicenseByNumber(string memory _licenseNumber) private view returns (LicenseVerificationData memory) {
         uint256 licenseId = licenseNumberToId[_licenseNumber];
@@ -260,6 +274,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                     isExpired: false,
                     isRevoked: false,
                     licenseNumber: _licenseNumber,
+                    licenseId: 0,
                     applicantName: "",
                     businessName: "",
                     businessAddress: "",
@@ -299,6 +314,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                 isExpired: isExpired,
                 isRevoked: isRevoked,
                 licenseNumber: license.licenseNumber,
+                licenseId: license.licenseId,
                 applicantName: license.applicantName,
                 businessName: license.businessName,
                 businessAddress: license.businessAddress,

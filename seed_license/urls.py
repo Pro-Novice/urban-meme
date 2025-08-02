@@ -12,8 +12,10 @@ urlpatterns = [
      # License Management
      path('blockchain/license/create/', views.submit_license_application, name='submit-license-application'),
      path('blockchain/license/count/', views.check_total_license_count, name='license-count'),
+     path('blockchain/license/verify/', views.verify_license_document, name='verify-license-document'),
      path('blockchain/license/<str:license_id>/info/', views.get_license_basic_info, name='license-basic-info'),
      path('blockchain/license/<str:license_id>/history/', views.get_license_action_history, name='license-action-history'),
+     path('blockchain/license/<str:license_id>/qr/', views.get_license_qr_data, name='license-qr-data'),
      path('blockchain/license/<str:license_id>/inspection-feedback/', views.get_all_inspection_feedback, name='all-inspection-feedback'),
      path('blockchain/license/<str:license_id>/inspection-feedback/<str:feedback_type>/count/', views.count_feedback_by_type, name='feedback-count'),
      path('blockchain/license/update-status/', views.update_license_status_view, name='update-license-status'),
