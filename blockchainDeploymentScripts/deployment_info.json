@@ -1,11 +1,11 @@
 {
-  "network": 31337,
-  "networkName": "Hardhat Network",
-  "deploymentTime": 1752745068,
-  "deploymentTimeFormatted": "2025-07-17 15:07:48",
-  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "proxy": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-  "implementationV1": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "network": 1337,
+  "networkName": "Ganache",
+  "deploymentTime": 1754125928,
+  "deploymentTimeFormatted": "2025-08-02 14:42:08",
+  "deployer": "0xFE3B557E8Fb62b89F4916B721be55cEb828dBd73",
+  "proxy": "0x60fAF2C9364d68985244dd79E3c9cFbAe0b11b33",
+  "implementationV1": "0xC8a04069EfAeC7FB3449366ece88b4b12A999f1b",
   "implementationABI": [
     {
       "inputs": [],
@@ -77,22 +77,6 @@
       "type": "error"
     },
     {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "value",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "length",
-          "type": "uint256"
-        }
-      ],
-      "name": "StringsInsufficientHexLength",
-      "type": "error"
-    },
-    {
       "inputs": [],
       "name": "UUPSUnauthorizedCallContext",
       "type": "error"
@@ -112,31 +96,13 @@
       "anonymous": false,
       "inputs": [
         {
-          "indexed": false,
-          "internalType": "enum LicenseStorage.AdminLevel",
-          "name": "level",
-          "type": "uint8"
-        },
-        {
-          "indexed": false,
-          "internalType": "string",
-          "name": "state",
-          "type": "string"
-        },
-        {
-          "indexed": false,
-          "internalType": "string",
-          "name": "division",
-          "type": "string"
-        },
-        {
-          "indexed": false,
-          "internalType": "string",
-          "name": "district",
-          "type": "string"
+          "indexed": true,
+          "internalType": "address",
+          "name": "caller",
+          "type": "address"
         }
       ],
-      "name": "DebugInput",
+      "name": "ApiCallerAuthorized",
       "type": "event"
     },
     {
@@ -144,129 +110,12 @@
       "inputs": [
         {
           "indexed": true,
-          "internalType": "uint256",
-          "name": "licenseId",
-          "type": "uint256"
-        },
-        {
-          "indexed": true,
-          "internalType": "string",
-          "name": "documentType",
-          "type": "string"
-        },
-        {
-          "indexed": true,
           "internalType": "address",
-          "name": "officer",
+          "name": "caller",
           "type": "address"
         }
       ],
-      "name": "DocumentScrutinyStarted",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "licenseId",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "string",
-          "name": "documentType",
-          "type": "string"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "uploadedBy",
-          "type": "address"
-        }
-      ],
-      "name": "DocumentUploaded",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "licenseId",
-          "type": "uint256"
-        },
-        {
-          "indexed": true,
-          "internalType": "enum LicenseStorage.StandardDocumentType",
-          "name": "documentType",
-          "type": "uint8"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "officer",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "string",
-          "name": "documentHash",
-          "type": "string"
-        },
-        {
-          "indexed": false,
-          "internalType": "bool",
-          "name": "isVerified",
-          "type": "bool"
-        },
-        {
-          "indexed": false,
-          "internalType": "string",
-          "name": "remarks",
-          "type": "string"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "timestamp",
-          "type": "uint256"
-        }
-      ],
-      "name": "DocumentVerificationResult",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "licenseId",
-          "type": "uint256"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "inspector",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "string",
-          "name": "remarks",
-          "type": "string"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "timestamp",
-          "type": "uint256"
-        }
-      ],
-      "name": "FeedbackAdded",
+      "name": "ApiCallerRevoked",
       "type": "event"
     },
     {
@@ -292,10 +141,10 @@
           "type": "uint256"
         },
         {
-          "indexed": true,
-          "internalType": "address",
-          "name": "applicant",
-          "type": "address"
+          "indexed": false,
+          "internalType": "string",
+          "name": "licenseNumber",
+          "type": "string"
         },
         {
           "indexed": false,
@@ -304,7 +153,7 @@
           "type": "uint8"
         }
       ],
-      "name": "LicenseCreated",
+      "name": "LicenseApplicationSubmitted",
       "type": "event"
     },
     {
@@ -319,17 +168,23 @@
         {
           "indexed": false,
           "internalType": "string",
-          "name": "field",
+          "name": "changedByOfficerName",
           "type": "string"
         },
         {
-          "indexed": true,
-          "internalType": "address",
-          "name": "updatedBy",
-          "type": "address"
+          "indexed": false,
+          "internalType": "enum LicenseStorage.userRole",
+          "name": "changedByOfficerRole",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "expiryDate",
+          "type": "uint256"
         }
       ],
-      "name": "LicenseUpdated",
+      "name": "LicenseApproved",
       "type": "event"
     },
     {
@@ -337,18 +192,61 @@
       "inputs": [
         {
           "indexed": true,
-          "internalType": "address",
-          "name": "officer",
-          "type": "address"
+          "internalType": "uint256",
+          "name": "licenseId",
+          "type": "uint256"
         },
         {
           "indexed": false,
-          "internalType": "enum LicenseStorage.OfficerRole",
-          "name": "role",
+          "internalType": "string",
+          "name": "changedByOfficerName",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum LicenseStorage.userRole",
+          "name": "changedByOfficerRole",
           "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newExpiryDate",
+          "type": "uint256"
         }
       ],
-      "name": "OfficerAdded",
+      "name": "LicenseRenewed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "licenseId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "changedByOfficerName",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum LicenseStorage.userRole",
+          "name": "changedByOfficerRole",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "LicenseRevoked",
       "type": "event"
     },
     {
@@ -392,10 +290,16 @@
           "type": "uint8"
         },
         {
-          "indexed": true,
-          "internalType": "address",
-          "name": "changedBy",
-          "type": "address"
+          "indexed": false,
+          "internalType": "string",
+          "name": "changedByOfficerName",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum LicenseStorage.userRole",
+          "name": "changedByOfficerRole",
+          "type": "uint8"
         }
       ],
       "name": "StatusChanged",
@@ -430,330 +334,14 @@
     {
       "inputs": [
         {
-          "internalType": "uint256",
-          "name": "_licenseId",
-          "type": "uint256"
-        },
-        {
           "internalType": "address",
-          "name": "_inspector",
+          "name": "newAdmin",
           "type": "address"
-        },
-        {
-          "internalType": "enum LicenseStorage.InspectionFeedbackType",
-          "name": "_feedbackType",
-          "type": "uint8"
-        },
-        {
-          "internalType": "string",
-          "name": "_remarks",
-          "type": "string"
         }
       ],
-      "name": "addInspectionFeedback",
+      "name": "addAdmin",
       "outputs": [],
       "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_officer",
-          "type": "address"
-        },
-        {
-          "internalType": "string",
-          "name": "_name",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "_employeeId",
-          "type": "string"
-        },
-        {
-          "internalType": "enum LicenseStorage.OfficerRole",
-          "name": "_role",
-          "type": "uint8"
-        },
-        {
-          "internalType": "string",
-          "name": "_department",
-          "type": "string"
-        },
-        {
-          "internalType": "enum LicenseStorage.AdminLevel",
-          "name": "_level",
-          "type": "uint8"
-        },
-        {
-          "internalType": "string",
-          "name": "_state",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "_district",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "_division",
-          "type": "string"
-        }
-      ],
-      "name": "addOfficer",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "admin",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "_admin",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "_licenseId",
-          "type": "uint256"
-        },
-        {
-          "internalType": "enum LicenseStorage.InspectionFeedbackType",
-          "name": "_type",
-          "type": "uint8"
-        }
-      ],
-      "name": "countFeedbackByType",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "count",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "enum LicenseStorage.LicenseCategory",
-          "name": "_category",
-          "type": "uint8"
-        },
-        {
-          "internalType": "enum LicenseStorage.AdminLevel",
-          "name": "_level",
-          "type": "uint8"
-        },
-        {
-          "internalType": "string",
-          "name": "_applicantName",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "_aadhaarNumber",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "_businessName",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "_state",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "_district",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "_division",
-          "type": "string"
-        }
-      ],
-      "name": "createLicense",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "name": "documentTypes",
-      "outputs": [
-        {
-          "internalType": "enum LicenseStorage.StandardDocumentType",
-          "name": "",
-          "type": "uint8"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "_licenseId",
-          "type": "uint256"
-        }
-      ],
-      "name": "getAllDocumentStatuses",
-      "outputs": [
-        {
-          "internalType": "string[]",
-          "name": "documentTypes",
-          "type": "string[]"
-        },
-        {
-          "internalType": "bool[]",
-          "name": "verificationStatuses",
-          "type": "bool[]"
-        },
-        {
-          "internalType": "string[]",
-          "name": "remarks",
-          "type": "string[]"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "_licenseId",
-          "type": "uint256"
-        }
-      ],
-      "name": "getAllInspectionFeedback",
-      "outputs": [
-        {
-          "components": [
-            {
-              "internalType": "address",
-              "name": "inspector",
-              "type": "address"
-            },
-            {
-              "internalType": "string",
-              "name": "inspectorName",
-              "type": "string"
-            },
-            {
-              "internalType": "string",
-              "name": "remarks",
-              "type": "string"
-            },
-            {
-              "internalType": "uint256",
-              "name": "completedDate",
-              "type": "uint256"
-            },
-            {
-              "internalType": "enum LicenseStorage.InspectionFeedbackType",
-              "name": "feedbackType",
-              "type": "uint8"
-            }
-          ],
-          "internalType": "struct LicenseStorage.getAllFeedback[]",
-          "name": "",
-          "type": "tuple[]"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "_licenseId",
-          "type": "uint256"
-        },
-        {
-          "internalType": "enum LicenseStorage.StandardDocumentType",
-          "name": "_documentType",
-          "type": "uint8"
-        }
-      ],
-      "name": "getDocumentStatus",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "isVerified",
-          "type": "bool"
-        },
-        {
-          "internalType": "address",
-          "name": "verifiedBy",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "verificationDate",
-          "type": "uint256"
-        },
-        {
-          "internalType": "string",
-          "name": "remarks",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "documentHash",
-          "type": "string"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "enum LicenseStorage.InspectionFeedbackType",
-          "name": "_type",
-          "type": "uint8"
-        }
-      ],
-      "name": "getFeedbackTypeName",
-      "outputs": [
-        {
-          "internalType": "string",
-          "name": "",
-          "type": "string"
-        }
-      ],
-      "stateMutability": "pure",
       "type": "function"
     },
     {
@@ -774,14 +362,9 @@
               "type": "uint256"
             },
             {
-              "internalType": "uint8",
+              "internalType": "enum LicenseStorage.ActionType",
               "name": "actionType",
               "type": "uint8"
-            },
-            {
-              "internalType": "string",
-              "name": "actor",
-              "type": "string"
             },
             {
               "internalType": "string",
@@ -789,14 +372,9 @@
               "type": "string"
             },
             {
-              "internalType": "enum LicenseStorage.OfficerRole",
+              "internalType": "enum LicenseStorage.userRole",
               "name": "actorRole",
               "type": "uint8"
-            },
-            {
-              "internalType": "string",
-              "name": "department",
-              "type": "string"
             },
             {
               "internalType": "string",
@@ -809,7 +387,7 @@
               "type": "string"
             }
           ],
-          "internalType": "struct LicenseStorage.FormattedAction[]",
+          "internalType": "struct LicenseStorage.Action[]",
           "name": "",
           "type": "tuple[]"
         }
@@ -836,6 +414,11 @@
             },
             {
               "internalType": "string",
+              "name": "licenseNumber",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
               "name": "applicantName",
               "type": "string"
             },
@@ -845,7 +428,7 @@
               "type": "uint8"
             },
             {
-              "internalType": "enum LicenseStorage.AdminLevel",
+              "internalType": "enum LicenseStorage.LicenseLevel",
               "name": "level",
               "type": "uint8"
             },
@@ -855,13 +438,13 @@
               "type": "uint8"
             },
             {
-              "internalType": "address",
-              "name": "applicant",
-              "type": "address"
+              "internalType": "string",
+              "name": "businessName",
+              "type": "string"
             },
             {
               "internalType": "string",
-              "name": "businessName",
+              "name": "businessAddress",
               "type": "string"
             },
             {
@@ -913,79 +496,26 @@
               "internalType": "bool",
               "name": "isActive",
               "type": "bool"
+            },
+            {
+              "internalType": "bool",
+              "name": "isPaid",
+              "type": "bool"
+            },
+            {
+              "internalType": "bool",
+              "name": "documentsVerified",
+              "type": "bool"
+            },
+            {
+              "internalType": "bool",
+              "name": "inspectionPassed",
+              "type": "bool"
             }
           ],
           "internalType": "struct LicenseStorage.LicenseBasicInfo",
           "name": "",
           "type": "tuple"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_officer",
-          "type": "address"
-        }
-      ],
-      "name": "getOfficerDetails",
-      "outputs": [
-        {
-          "internalType": "string",
-          "name": "name",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "employeeId",
-          "type": "string"
-        },
-        {
-          "internalType": "enum LicenseStorage.OfficerRole",
-          "name": "role",
-          "type": "uint8"
-        },
-        {
-          "internalType": "string",
-          "name": "department",
-          "type": "string"
-        },
-        {
-          "internalType": "enum LicenseStorage.AdminLevel",
-          "name": "level",
-          "type": "uint8"
-        },
-        {
-          "internalType": "bool",
-          "name": "isActive",
-          "type": "bool"
-        },
-        {
-          "internalType": "uint256",
-          "name": "addedDate",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_officer",
-          "type": "address"
-        }
-      ],
-      "name": "getOfficerRole",
-      "outputs": [
-        {
-          "internalType": "enum LicenseStorage.OfficerRole",
-          "name": "",
-          "type": "uint8"
         }
       ],
       "stateMutability": "view",
@@ -1012,16 +542,22 @@
       "type": "function"
     },
     {
-      "inputs": [],
-      "name": "listAllFunctions",
-      "outputs": [
+      "inputs": [
         {
-          "internalType": "string[]",
-          "name": "",
-          "type": "string[]"
+          "internalType": "uint256",
+          "name": "_licenseId",
+          "type": "uint256"
         }
       ],
-      "stateMutability": "pure",
+      "name": "licenseIdExists",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -1051,6 +587,19 @@
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "adminToRemove",
+          "type": "address"
+        }
+      ],
+      "name": "removeAdmin",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "renounceOwnership",
       "outputs": [],
@@ -1060,20 +609,55 @@
     {
       "inputs": [
         {
-          "internalType": "enum LicenseStorage.StandardDocumentType",
-          "name": "_type",
+          "internalType": "enum LicenseStorage.LicenseCategory",
+          "name": "_category",
           "type": "uint8"
-        }
-      ],
-      "name": "toDocTypeString",
-      "outputs": [
+        },
+        {
+          "internalType": "enum LicenseStorage.LicenseLevel",
+          "name": "_level",
+          "type": "uint8"
+        },
         {
           "internalType": "string",
-          "name": "",
+          "name": "_applicantName",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_aadhaarNumber",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_businessName",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_businessAddress",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_district",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_division",
           "type": "string"
         }
       ],
-      "stateMutability": "pure",
+      "name": "submitLicenseApplication",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -1103,11 +687,26 @@
         },
         {
           "internalType": "string",
+          "name": "_officerName",
+          "type": "string"
+        },
+        {
+          "internalType": "enum LicenseStorage.userRole",
+          "name": "_role",
+          "type": "uint8"
+        },
+        {
+          "internalType": "string",
           "name": "_remarks",
           "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_renewalPeriodDays",
+          "type": "uint256"
         }
       ],
-      "name": "updateStatus",
+      "name": "updateLicenseStatus",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -1129,39 +728,6 @@
       "outputs": [],
       "stateMutability": "payable",
       "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "_licenseId",
-          "type": "uint256"
-        },
-        {
-          "internalType": "enum LicenseStorage.StandardDocumentType",
-          "name": "_documentType",
-          "type": "uint8"
-        },
-        {
-          "internalType": "string",
-          "name": "_documentHash",
-          "type": "string"
-        },
-        {
-          "internalType": "bool",
-          "name": "_isVerified",
-          "type": "bool"
-        },
-        {
-          "internalType": "string",
-          "name": "_remarks",
-          "type": "string"
-        }
-      ],
-      "name": "verifyDocument",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
     }
   ],
   "gasUsed": {
@@ -1170,6 +736,6 @@
   },
   "verification": {
     "success": true,
-    "timestamp": 1752745068
+    "timestamp": 1754125928
   }
 }

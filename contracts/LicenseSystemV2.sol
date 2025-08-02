@@ -13,19 +13,19 @@ contract LicenseSystemV2 is LicenseSystemV1 {
     event BulkOperationPerformed(uint256[] licenseIds, string operation);
     
     // New function in V2
-    function bulkUpdateStatus(
-        uint256[] memory _licenseIds,
-        LicenseStatus _newStatus,
-        string memory _remarks
-    ) public onlyOfficerOrAdmin {
-        for (uint i = 0; i < _licenseIds.length; i++) {
-            if (licenses[_licenseIds[i]].applicant != address(0)) {
-                updateStatus(_licenseIds[i], _newStatus, _remarks);
-            }
-        }
+    // function bulkUpdateStatus(
+    //     uint256[] memory _licenseIds,
+    //     LicenseStatus _newStatus,
+    //     string memory _remarks
+    // ) public {
+    //     for (uint i = 0; i < _licenseIds.length; i++) {
+    //         if (licenses[_licenseIds[i]].applicant != address(0)) {
+    //             updateStatus(_licenseIds[i], _newStatus, _remarks);
+    //         }
+    //     }
         
-        emit BulkOperationPerformed(_licenseIds, "bulkStatusUpdate");
-    }
+    //     emit BulkOperationPerformed(_licenseIds, "bulkStatusUpdate");
+    // }
     
     // Override existing function with new logic
     //function createLicense(
@@ -68,20 +68,4 @@ contract LicenseSystemV2 is LicenseSystemV1 {
        // }
      //   return address(0);
   //  }
-    
-    function _autoAssignOfficer(uint256 _licenseId, address _officer) internal {
-        License storage license = licenses[_licenseId];
-        license.assignedOfficers.push(_officer);
-        license.officerAssignments[_officer] = OfficerAssignment({
-            officer: _officer,
-            role: officers[_officer].role,
-            department: officers[_officer].department,
-            assignedDate: block.timestamp,
-            assignedBy: address(this),
-            isActive: true,
-            remarks: "Auto-assigned"
-        });
-        
-        officerAssignedLicenses[_officer].push(_licenseId);
-    }
 }

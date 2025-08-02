@@ -15,26 +15,14 @@ urlpatterns = [
     # check owner
     path('blockchain/owner/', views.check_owner_blockchain, name='check_owner_blockchain'),
 
-    # check admin
-    path('blockchain/admin/', views.check_admin_blockchain, name='check_admin_blockchain'),
-
     # count total License
     path('blockchain/license/count/', views.check_total_license_count, name='check_total_license_count'),
 
-    # add officer
-    path('blockchain/officer/add/', views.add_officer_view, name='add_officer_view'),
-
-    # get officer role
-    path('blockchain/officer/role/<str:address>/', views.get_officer_role, name='get_officer_role'),
-
-    #get officer details
-    path('blockchain/officer/details/<str:address>/', views.get_officer_details, name='get_officer_details'),
-
-    #create License
-    path('blockchain/license/create/',  views.create_license_view, name='create_license_view'),
+    # Create License Application
+    path('blockchain/license/create/',  views.submit_license_application, name='submit_license_application'),
 
     #update license status view
-    path('blockchain/license/update-Status/', views.update_license_status_view, name='update_license_status_view'),
+    path('blockchain/license/update-status/', views.update_license_status_view, name='update_license_status_view'),
 
     #get license action history
     path('blockchain/license-history/<str:license_id>/', views.get_license_action_history, name='get_license_action_history'),

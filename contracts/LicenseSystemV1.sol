@@ -9,51 +9,65 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
  * @title LicenseSystemV1
- * @dev Implementation contract with business logic
+ * @dev Implementation contract optimized for API integration
  */
-contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, OwnableUpgradeable {
-
+contract LicenseSystemV1 is
+    LicenseStorage,
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable
+{
     // Events
-    event LicenseCreated(uint256 indexed licenseId, address indexed applicant, LicenseCategory category);
-    event LicenseUpdated(uint256 indexed licenseId, string field, address indexed updatedBy);
-    event StatusChanged(uint256 indexed licenseId, LicenseStatus oldStatus, LicenseStatus newStatus, address indexed changedBy);
-    event DocumentUploaded(uint256 indexed licenseId, string documentType, address indexed uploadedBy);
-    event OfficerAdded(address indexed officer, OfficerRole role);
-    event FeedbackAdded(uint256 indexed licenseId, address indexed inspector, string remarks, uint256 timestamp);
-    event DebugInput(AdminLevel level,string state,string division,string district);
-    event DocumentVerificationResult(
-    uint256 indexed licenseId,
-    StandardDocumentType indexed documentType,
-    address indexed officer,
-    string documentHash,
-    bool isVerified,
-    string remarks,
-    uint256 timestamp
-    );
-    event DocumentScrutinyStarted(
+    event LicenseApplicationSubmitted(
         uint256 indexed licenseId,
-        string indexed documentType,
-        address indexed officer
+        string licenseNumber,
+        LicenseCategory category
     );
+    event LicenseApproved(
+        uint256 indexed licenseId,
+        string changedByOfficerName,
+        userRole changedByOfficerRole,
+        uint256 expiryDate
+    );
+    event LicenseRevoked(
+        uint256 indexed licenseId,
+        string changedByOfficerName,
+        userRole changedByOfficerRole,
+        string reason
+    );
+    event LicenseRenewed(
+        uint256 indexed licenseId,
+        string changedByOfficerName,
+        userRole changedByOfficerRole,
+        uint256 newExpiryDate
+    );
+    event StatusChanged(
+        uint256 indexed licenseId,
+        LicenseStatus oldStatus,
+        LicenseStatus newStatus,
+        string changedByOfficerName,
+        userRole changedByOfficerRole
+    );
+    event ApiCallerAuthorized(address indexed caller);
+    event ApiCallerRevoked(address indexed caller);
 
     // Modifiers
-    modifier onlyAdmin() {
-        require(msg.sender == admin(), "Only admin");
+    modifier onlyAdmins() {
+        require(
+            msg.sender == owner() || admins[msg.sender],
+            "Only authorized addresses can perform this action"
+        );
         _;
     }
 
-    modifier onlyOfficerOrAdmin() {
-        require(isOfficer[msg.sender] || msg.sender == admin(), "Only officer or admin");
-        _;
-    }
-
-    modifier onlyOfficers() {
-        require(isOfficer[msg.sender], "Only officers can call this function");
-        _;
-    }
-    
     modifier licenseExists(uint256 _licenseId) {
-        require(licenses[_licenseId].applicant != address(0), "License not found");
+        string memory errorMessage = string(
+            abi.encodePacked(
+                "License not found: ",
+                Strings.toString(_licenseId)
+            )
+        );
+        require(licenseIdExists(_licenseId), errorMessage);
         _;
     }
 
@@ -65,145 +79,304 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     function initialize() public initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
-        _setAdmin(msg.sender);
-        _incrementLicenseCounter(); // Start from 1
+        admins[msg.sender] = true; // also add to admin mapping
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 
-    // Business Logic Functions
-    // add Officer -- all level- state, division, district
-    function addOfficer(
-    address _officer,
-    string memory _name,
-    string memory _employeeId,
-    OfficerRole _role,
-    string memory _department,
-    AdminLevel _level,
-    string memory _state,
-    string memory _district,
-    string memory _division
-) public onlyAdmin {
-    require(!isOfficer[_officer], "Already an officer");
+    function addAdmin(address newAdmin) public {
+        require(msg.sender == owner(), "Only owner can add admins");
+        require(newAdmin != address(0), "Invalid address");
+        admins[newAdmin] = true;
+        emit ApiCallerAuthorized(newAdmin);
+    }
 
-    officers[_officer] = Officer({
-        officerAddress: _officer,
-        name: _name,
-        employeeId: _employeeId,
-        role: _role,
-        department: _department,
-        level: _level,
-        state: _state,
-        district: _district,
-        division: _division,
-        isActive: true,
-        addedDate: block.timestamp
+    function removeAdmin(address adminToRemove) public {
+        require(msg.sender == owner(), "Only owner can remove admins");
+        require(adminToRemove != address(0), "Invalid address");
+        require(adminToRemove != owner(), "Cannot remove owner");
+        admins[adminToRemove] = false;
+        emit ApiCallerRevoked(adminToRemove);
+    }
 
-    });
-
-    isOfficer[_officer] = true;
-    allOfficers.push(_officer);
-
-    emit OfficerAdded(_officer, _role);
-}
-
-// create license -- for all levels and for all types
-    function createLicense(
+    // 1. Submit License Application - To be used by citizens
+    function submitLicenseApplication(
         LicenseCategory _category,
-        AdminLevel _level,
+        LicenseLevel _level,
         string memory _applicantName,
         string memory _aadhaarNumber,
         string memory _businessName,
-        string memory _state,
+        string memory _businessAddress,
         string memory _district,
         string memory _division
-    ) public virtual returns (uint256) {
-        uint256 newLicenseId = licenseIdCounter();
+    ) public virtual onlyAdmins returns (uint256) {
         _incrementLicenseCounter();
+        uint256 newLicenseId = licenseIdCounter();
 
         License storage newLicense = licenses[newLicenseId];
         newLicense.licenseId = newLicenseId;
         newLicense.category = _category;
         newLicense.level = _level;
-        newLicense.status = LicenseStatus.DRAFT;
-        newLicense.applicant = msg.sender;
+        newLicense.status = LicenseStatus.SUBMITTED;
         newLicense.applicantName = _applicantName;
-        newLicense.aadhaarNumber = _aadhaarNumber;
+        newLicense.aadhaarNumber = _hashAadhaar(_aadhaarNumber); // hashed
         newLicense.businessName = _businessName;
-        newLicense.state = _state;
+        newLicense.businessAddress = _businessAddress;
+        newLicense.state = "RAJASTHAN";
         newLicense.district = _district;
         newLicense.division = _division;
         newLicense.applicationDate = block.timestamp;
         newLicense.lastModifiedDate = block.timestamp;
-        newLicense.isActive = true;
+        newLicense.isActive = false;
+
+        newLicense.actionHistory.push(
+            Action({
+                timestamp: block.timestamp,
+                actionType: ActionType.SUBMITTED,
+                actorName: _applicantName,
+                actorRole: userRole.CITIZEN,
+                remarks: "License Application Successfully Submitted",
+                dataHash: _toHexString(
+                    keccak256(
+                        abi.encodePacked(
+                            _applicantName,
+                            _businessName,
+                            block.timestamp
+                        )
+                    )
+                )
+            })
+        );
+
+        newLicense.licenseNumber = _generateLicenseNumber(
+            _category,
+            _level,
+            newLicenseId
+        );
 
         // Update tracking
         allLicenseIds.push(newLicenseId);
         applicantLicenses[msg.sender].push(newLicenseId);
-        licensesByStatus[LicenseStatus.DRAFT].push(newLicenseId);
+        licensesByStatus[LicenseStatus.SUBMITTED].push(newLicenseId);
         licensesByCategory[_category].push(newLicenseId);
         licensesByLevel[_level].push(newLicenseId);
         licensesByDistrict[_district].push(newLicenseId);
+        licenseNumberToId[newLicense.licenseNumber] = newLicenseId;
 
-        emit LicenseCreated(newLicenseId, msg.sender, _category);
+        emit LicenseApplicationSubmitted(
+            newLicenseId,
+            newLicense.licenseNumber,
+            _category
+        );
 
         return newLicenseId;
     }
 
-    // for update status for license -
-    function updateStatus(
-    uint256 _licenseId,
-    LicenseStatus _newStatus,
-    string memory _remarks
-) public onlyOfficers licenseExists(_licenseId) {
-    License storage license = licenses[_licenseId];
-    LicenseStatus oldStatus = license.status;
+    // 2. Get License Basic Info - to be performed by citizens/officers
+    function getLicenseBasicInfo(
+        uint256 _licenseId
+    ) public view licenseExists(_licenseId) returns (LicenseBasicInfo memory) {
+        License storage license = licenses[_licenseId];
 
-    // Enforce level match between officer and license
-    //require(
-        //officers[msg.sender].level == license.level,
-        //"Officer level mismatch with license level"
- //   );
+        return
+            LicenseBasicInfo({
+                licenseId: license.licenseId,
+                licenseNumber: license.licenseNumber,
+                applicantName: license.applicantName,
+                category: license.category,
+                level: license.level,
+                status: license.status,
+                businessName: license.businessName,
+                businessAddress: license.businessAddress,
+                district: license.district,
+                state: license.state,
+                division: license.division,
+                applicationDate: license.applicationDate,
+                approvalDate: license.approvalDate,
+                rejectionDate: license.rejectionDate,
+                expiryDate: license.expiryDate,
+                revokedDate: license.revokedDate,
+                renewalDate: license.renewalDate,
+                isActive: license.isActive,
+                isPaid: license.isPaid,
+                documentsVerified: license.documentsVerified,
+                inspectionPassed: license.inspectionPassed
+            });
+    }
 
-    // Remove from old status array
-    _removeFromStatusArray(oldStatus, _licenseId);
+    // 3. Get License Action History
+    function getLicenseActionHistory(
+        uint256 _licenseId
+    ) public view licenseExists(_licenseId) returns (Action[] memory) {
+        return licenses[_licenseId].actionHistory;
+    }
 
-    // Add to new status array
-    licensesByStatus[_newStatus].push(_licenseId);
+    // 4. Update Status for submitted License Applications - to be performed by officers
+    function updateLicenseStatus(
+        uint256 _licenseId,
+        LicenseStatus _newStatus,
+        string memory _officerName,
+        userRole _role,
+        string memory _remarks,
+        uint256 _renewalPeriodDays // Optional parameter for renewals and approvals
+    ) public onlyAdmins licenseExists(_licenseId) {
+        License storage license = licenses[_licenseId];
+        LicenseStatus oldStatus = license.status;
 
-    // Update license
-    license.status = _newStatus;
-    license.lastModifiedDate = block.timestamp;
+        require(
+            oldStatus != _newStatus,
+            "License status already set to requested status"
+        );
 
-    // Record action
-    _recordAction(_licenseId, ActionType.STATUS_UPDATED, _remarks);
+        // Update common fields
+        license.status = _newStatus;
+        license.lastModifiedDate = block.timestamp;
 
-    emit StatusChanged(_licenseId, oldStatus, _newStatus, msg.sender);
-}
+        // Handle specific status updates
+        if (_newStatus == LicenseStatus.APPROVED) {
+            // For approvals (new or renewals)
+            require(
+                _renewalPeriodDays > 0,
+                "Renewal period must be greater than 0"
+            );
+            license.approvalDate = block.timestamp;
+            license.expiryDate =
+                block.timestamp +
+                (_renewalPeriodDays * 1 days);
+            license.isActive = true;
 
-    // Internal helper functions
+            // If this was a renewal (from EXPIRED status)
+            if (oldStatus == LicenseStatus.EXPIRED) {
+                license.renewalDate = block.timestamp;
+            }
+        } else if (_newStatus == LicenseStatus.REVOKED) {
+            // For revocations
+            require(
+                oldStatus == LicenseStatus.APPROVED,
+                "Only approved licenses can be revoked"
+            );
+            license.revokedDate = block.timestamp;
+            license.isActive = false;
+        } else if (_newStatus == LicenseStatus.EXPIRED) {
+            // For expirations
+            license.expiryDate = block.timestamp;
+            license.isActive = false;
+        } else if (_newStatus == LicenseStatus.REJECTED) {
+            license.rejectionDate = block.timestamp;
+            license.isActive = false;
+        } else {
+            // For other statuses (SUBMITTED, UNDER_REVIEW, etc.)
+            license.isActive = false;
+        }
+
+        // Update tracking arrays
+        _removeFromStatusArray(oldStatus, _licenseId);
+        licensesByStatus[_newStatus].push(_licenseId);
+
+        // Record action with appropriate action type
+        ActionType actionType = _getActionTypeForStatus(_newStatus, oldStatus);
+        string memory actionDescription = _buildActionDescription(
+            oldStatus,
+            _newStatus,
+            _remarks
+        );
+
+        _recordAction(
+            _licenseId,
+            actionType,
+            _role,
+            actionDescription,
+            _officerName
+        );
+
+        // Emit appropriate events
+        _emitStatusEvent(
+            _licenseId,
+            oldStatus,
+            _newStatus,
+            _officerName,
+            _role,
+            _remarks
+        );
+    }
+
+    // 5.
+
+    // Internal functions
+    function _hashAadhaar(
+        string memory _aadhaarNumber
+    ) internal pure returns (string memory) {
+        return _toHexString(keccak256(abi.encodePacked(_aadhaarNumber)));
+    }
+
+    function _toHexString(bytes32 data) internal pure returns (string memory) {
+        bytes memory alphabet = "0123456789abcdef";
+        bytes memory str = new bytes(64);
+        for (uint256 i = 0; i < 32; i++) {
+            str[i * 2] = alphabet[uint8(data[i] >> 4)];
+            str[1 + i * 2] = alphabet[uint8(data[i] & 0x0f)];
+        }
+        return string(str);
+    }
+
     function _recordAction(
         uint256 _licenseId,
         ActionType _actionType,
-        string memory _remarks
+        userRole _userRole,
+        string memory _remarks,
+        string memory _officerName
     ) internal {
         License storage license = licenses[_licenseId];
 
-        license.actionHistory.push(Action({
-            timestamp: block.timestamp,
-            actionType: _actionType,
-            actor: msg.sender,
-            actorName: isOfficer[msg.sender] ? officers[msg.sender].name : license.applicantName,
-            actorRole: isOfficer[msg.sender] ? officers[msg.sender].role : OfficerRole.AGRICULTURE_OFFICER,
-            department: isOfficer[msg.sender] ? officers[msg.sender].department : "",
-            remarks: _remarks,
-            dataHash: keccak256(abi.encodePacked(_remarks, block.timestamp))
-        }));
+        license.actionHistory.push(
+            Action({
+                timestamp: block.timestamp,
+                actionType: _actionType,
+                actorName: _officerName,
+                actorRole: _userRole,
+                remarks: _remarks,
+                dataHash: _toHexString(
+                    keccak256(abi.encodePacked(_remarks, block.timestamp))
+                )
+            })
+        );
     }
 
-    function _removeFromStatusArray(LicenseStatus _status, uint256 _licenseId) internal {
+    function _generateLicenseNumber(
+        LicenseCategory _category,
+        LicenseLevel _level,
+        uint256 _licenseId
+    ) internal pure returns (string memory) {
+        string memory categoryCode = _category == LicenseCategory.SEED
+            ? "SD"
+            : _category == LicenseCategory.FERTILIZER
+                ? "FT"
+                : "IN";
+        string memory levelCode = _level == LicenseLevel.STATE
+            ? "ST"
+            : _level == LicenseLevel.DIVISION
+                ? "DV"
+                : "DT";
+
+        return
+            string(
+                abi.encodePacked(
+                    "RJ",
+                    categoryCode,
+                    levelCode,
+                    Strings.toString(_licenseId)
+                )
+            );
+    }
+
+    function _removeFromStatusArray(
+        LicenseStatus _status,
+        uint256 _licenseId
+    ) internal {
         uint256[] storage statusArray = licensesByStatus[_status];
-        for (uint i = 0; i < statusArray.length; i++) {
+        for (uint256 i = 0; i < statusArray.length; i++) {
             if (statusArray[i] == _licenseId) {
                 statusArray[i] = statusArray[statusArray.length - 1];
                 statusArray.pop();
@@ -212,332 +385,133 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         }
     }
 
-    function getLicenseBasicInfo(uint256 _licenseId) public view returns (LicenseBasicInfo memory) {
-        License storage license = licenses[_licenseId];
-        return LicenseBasicInfo({
-            licenseId: license.licenseId,
-            applicantName: license.applicantName,
-            category: license.category,
-            level: license.level,
-            status: license.status,
-            applicant: license.applicant,
-            businessName: license.businessName,
-            district: license.district,
-            state:license.state,
-            division:license.division,
-            applicationDate: license.applicationDate,
-            approvalDate: license.approvalDate,
-            rejectionDate: license.rejectionDate,
-            expiryDate: license.expiryDate,
-            revokedDate: license.revokedDate,
-            renewalDate: license.renewalDate,
-            isActive: license.isActive
-        });
-    }
-
-    function getOfficerRole(address _officer) public view returns (OfficerRole) {
-    require(isOfficer[_officer], "Address is not an officer");
-    return officers[_officer].role;
-}
-    function getOfficerDetails(address _officer) public view returns (
-    string memory name,
-    string memory employeeId,
-    OfficerRole role,
-    string memory department,
-    AdminLevel level,
-    bool isActive,
-    uint256 addedDate
-) {
-    require(isOfficer[_officer], "Address is not an officer");
-    Officer storage officer = officers[_officer];
-    return (
-        officer.name,
-        officer.employeeId,
-        officer.role,
-        officer.department,
-        officer.level,
-        officer.isActive,
-        officer.addedDate
-    );
-}
-    function listAllFunctions() public pure returns (string[] memory) {
-    string[] memory functions = new string[](14);
-    functions[0] = "getOfficerRole(address)";
-    functions[1] = "getOfficerDetails(address)";
-    functions[2] = "addOfficer(address,string,string,string,string,uint8,string)";
-    functions[3] = "createLicense(uint8,uint8,string,string,string,string,string)";
-    functions[4] = "updateStatus(uint256,uint8,string)";
-    functions[5] = "getLicenseBasicInfo(uint256)";
-    functions[6] = "getLicenseActionHistory(uint256)";
-    functions[7] = "verifyDocument(uint256,uint256,string ,bool ,string )";
-    functions[8] = "toDocTypeString(uint256)";
-    functions[9] = " getDocumentStatus(uint256,uint256)";
-    functions[10] = "addInspectionFeedback(uint256,address,uint256, string)";
-    functions[11] = "getFeedbackTypeName(uint256)";
-    functions[12] = "countFeedbackByType(uint256,uint256)";
-    functions[13] = "getAllInspectionFeedback(uint256)";
-
-    return functions;
-}
-
-
-    function getLicenseActionHistory(uint256 _licenseId)
-        public
-        view
-        licenseExists(_licenseId)
-        returns (FormattedAction[] memory)
-    {
-        License storage license = licenses[_licenseId];
-        FormattedAction[] memory actions = new FormattedAction[](license.actionHistory.length);
-
-        for (uint i = 0; i < license.actionHistory.length; i++) {
-            Action storage action = license.actionHistory[i];
-            actions[i] = FormattedAction({
-                timestamp: action.timestamp,
-                actionType: uint8(action.actionType),
-                actor: toHexString(action.actor),
-                actorName: action.actorName,
-                actorRole:  action.actorRole,
-                department: action.department,
-                remarks: action.remarks,
-                dataHash: toHexString(action.dataHash)
-            });
-        }
-
-        return actions;
-    }
-
-    // Proper hex conversion functions
-    function toHexString(address account) internal pure returns (string memory) {
-        return Strings.toHexString(uint256(uint160(account)), 20);
-    }
-
-    function toHexString(bytes32 value) internal pure returns (string memory) {
-        bytes memory alphabet = "0123456789abcdef";
-        bytes memory str = new bytes(64);
-
-        for (uint i = 0; i < 32; i++) {
-            str[i*2] = alphabet[uint8(value[i] >> 4)];
-            str[i*2+1] = alphabet[uint8(value[i] & 0x0f)];
-        }
-        return string(str);
-    }
-
-
-       // Add the document verification function
-   function verifyDocument(
-    uint256 _licenseId,
-    StandardDocumentType _documentType,
-    string memory _documentHash,
-    bool _isVerified,
-    string memory _remarks
-) public onlyOfficers licenseExists(_licenseId) {
-    License storage license = licenses[_licenseId];
-
-    Document storage doc = license.documents[_documentType];
-    require(!doc.isVerified, "Document already verified");
-    require(bytes(_documentHash).length > 0, "Document hash is required");
-
-    doc.documentType = _documentType;
-    doc.documentHash = _documentHash;
-    doc.isVerified = _isVerified;
-    doc.verifiedBy = msg.sender;
-    doc.verificationDate = block.timestamp;
-    doc.remarks = _remarks;
-
-    // Track the document type if new
-    bool exists = false;
-    for (uint i = 0; i < license.documentTypes.length; i++) {
-        if (license.documentTypes[i] == _documentType) {
-            exists = true;
-            break;
-        }
-    }
-    if (!exists) {
-        license.documentTypes.push(_documentType);
-    }
-
-    string memory actionRemark = string(
-        abi.encodePacked(toDocTypeString(_documentType), _isVerified ? " verified: " : " rejected: ", _remarks)
-    );
-
-    _recordAction(
-        _licenseId,
-        _isVerified ? ActionType.DOCUMENT_VERIFIED : ActionType.DOCUMENT_REJECTED,
-        actionRemark
-    );
-
-    emit DocumentVerificationResult(
-        _licenseId,
-        _documentType,
-        msg.sender,
-        _documentHash,
-        _isVerified,
-        _remarks,
-        block.timestamp
-    );
-
-    _checkAllDocumentsVerified(_licenseId);
-}
-    function toDocTypeString(StandardDocumentType _type) public pure returns (string memory) {
-    if (_type == StandardDocumentType.AFFIDAVIT_SEED_QUALITY) return "Affidavit Seed Quality";
-    if (_type == StandardDocumentType.ID_PROOF) return "ID Proof";
-    if (_type == StandardDocumentType.SHOP_MAP) return "Shop Map";
-    if (_type == StandardDocumentType.REGISTRATION_CERTIFICATE) return "Registration Certificate";
-    if (_type == StandardDocumentType.MEMORANDUM_ARTICLES) return "Memorandum of Articles";
-    if (_type == StandardDocumentType.PASSPORT_PHOTO) return "Passport Photo";
-    if (_type == StandardDocumentType.AUTHORIZATION_LETTER) return "Authorization Letter";
-    return "Unknown";
-}
-
-
-      // Add helper function to check all documents
-    function _checkAllDocumentsVerified(uint256 _licenseId) internal {
-        License storage license = licenses[_licenseId];
-        bool allVerified = true;
-
-        for (uint i = 0; i < license.documentTypes.length; i++) {
-            if (!license.documents[license.documentTypes[i]].isVerified) {
-                allVerified = false;
-                break;
+    function _getActionTypeForStatus(
+        LicenseStatus _newStatus,
+        LicenseStatus _oldStatus
+    ) private pure returns (ActionType) {
+        if (_newStatus == LicenseStatus.APPROVED) {
+            if (_oldStatus == LicenseStatus.EXPIRED) {
+                return ActionType.RENEWED;
+            } else {
+                return ActionType.APPROVED;
             }
         }
 
-        if (allVerified && !license.documentsVerified) {
-            license.documentsVerified = true;
-            _recordAction(_licenseId, ActionType.DOCUMENT_VERIFIED, "All documents verified");
-
-            if (license.status == LicenseStatus.DOCUMENTS_VERIFIED) {
-                updateStatus(_licenseId, LicenseStatus.INSPECTION_SCHEDULED, "Documents verified, inspection scheduled");
-            }
+        if (_newStatus == LicenseStatus.REJECTED) {
+            return ActionType.REJECTED;
         }
+
+        if (_newStatus == LicenseStatus.REVOKED) {
+            return ActionType.REVOKED;
+        }
+
+        // For all other status changes (SUBMITTED → UNDER_REVIEW, etc.)
+        return ActionType.STATUS_UPDATED;
     }
 
-    function getDocumentStatus(
-    uint256 _licenseId,
-    StandardDocumentType _documentType
-) public view licenseExists(_licenseId) returns (
-    bool isVerified,
-    address verifiedBy,
-    uint256 verificationDate,
-    string memory remarks,
-    string memory documentHash
-) {
-    Document storage doc = licenses[_licenseId].documents[_documentType];
-    return (
-        doc.isVerified,
-        doc.verifiedBy,
-        doc.verificationDate,
-        doc.remarks,
-        doc.documentHash
-    );
-}
-    function getAllDocumentStatuses(
-    uint256 _licenseId
-) public view licenseExists(_licenseId) returns (
-    string[] memory documentTypes,
-    bool[] memory verificationStatuses,
-    string[] memory remarks
-) {
-    License storage license = licenses[_licenseId];
-    uint256 count = license.documentTypes.length;
-
-    documentTypes = new string[](count);
-    verificationStatuses = new bool[](count);
-    remarks = new string[](count);
-
-    for (uint i = 0; i < count; i++) {
-        StandardDocumentType docType = license.documentTypes[i];
-        documentTypes[i] = toDocTypeString(docType);  // Use your converter function here
-        verificationStatuses[i] = license.documents[docType].isVerified;
-        remarks[i] = license.documents[docType].remarks;
-    }
-
-    return (documentTypes, verificationStatuses, remarks);
-}
-    /// New function to add inspection feedback
-    function addInspectionFeedback(
-        uint256 _licenseId,
-        address _inspector,
-        InspectionFeedbackType _feedbackType,
+    function _buildActionDescription(
+        LicenseStatus _oldStatus,
+        LicenseStatus _newStatus,
         string memory _remarks
-    )
-        public
-        onlyOfficers
-        licenseExists(_licenseId)
-    {
-        require(isOfficer[_inspector], "Inspector is not a registered officer");
-        require(_feedbackType != InspectionFeedbackType.NONE, "Invalid feedback type");
-
-        License storage license = licenses[_licenseId];
-
-        uint256 inspectionIndex = license.inspections.length;
-        if (
-            inspectionIndex == 0 ||
-            license.inspections[inspectionIndex - 1].completedDate != 0
-        ) {
-            license.inspections.push();
-            inspectionIndex++;
-        }
-
-        Inspection storage inspection = license.inspections[inspectionIndex - 1];
-        inspection.inspector = _inspector;
-        inspection.inspectorName = officers[_inspector].name;
-        inspection.completedDate = block.timestamp;
-        inspection.feedbackType = _feedbackType;
-        inspection.remarks = _remarks;
-        inspection.passed = (_feedbackType == InspectionFeedbackType.SATISFACTORY);
-
-        _recordAction(_licenseId, ActionType.COMMENT_ADDED, _remarks);
-
-        emit FeedbackAdded(_licenseId, _inspector, _remarks, block.timestamp);
-    }
-
-    function getFeedbackTypeName(InspectionFeedbackType _type) public pure returns (string memory) {
-        if (_type == InspectionFeedbackType.SATISFACTORY) return "Satisfactory";
-        if (_type == InspectionFeedbackType.UNSATISFACTORY) return "Unsatisfactory";
-        if (_type == InspectionFeedbackType.NEEDS_REINSPECTION) return "Needs Reinspection";
-        return "None";
-    }
-
-    function countFeedbackByType(uint256 _licenseId, InspectionFeedbackType _type)
-        public
-        view
-        licenseExists(_licenseId)
-        returns (uint256 count)
-        {
-            Inspection[] storage inspections = licenses[_licenseId].inspections;
-            for (uint i = 0; i < inspections.length; i++) {
-                if (inspections[i].feedbackType == _type) {
-                    count++;
-                }
+    ) private pure returns (string memory) {
+        if (_newStatus == LicenseStatus.REVOKED) {
+            return string(abi.encodePacked("License revoked: ", _remarks));
+        } else if (_newStatus == LicenseStatus.APPROVED) {
+            if (_oldStatus == LicenseStatus.EXPIRED) {
+                return "License renewed";
+            } else {
+                return "License approved";
             }
+        } else {
+            return
+                string(
+                    abi.encodePacked(
+                        "Status changed from ",
+                        _licenseStatusToString(_oldStatus),
+                        " to ",
+                        _licenseStatusToString(_newStatus),
+                        ": ",
+                        _remarks
+                    )
+                );
         }
-
-    function getAllInspectionFeedback(uint256 _licenseId)
-        public
-        view
-        licenseExists(_licenseId)
-        returns (getAllFeedback[] memory)
-    {
-        License storage license = licenses[_licenseId];
-        uint256 count = license.inspections.length;
-
-        getAllFeedback[] memory feedback = new getAllFeedback[](count);
-
-        for (uint i = 0; i < count; i++) {
-            Inspection storage ins = license.inspections[i];
-            feedback[i] = getAllFeedback({
-                inspector: ins.inspector,
-                inspectorName: ins.inspectorName,
-                remarks: ins.remarks,
-                completedDate: ins.completedDate,
-                feedbackType: ins.feedbackType
-            });
-        }
-
-        return feedback;
     }
 
+    function _emitStatusEvent(
+        uint256 _licenseId,
+        LicenseStatus _oldStatus,
+        LicenseStatus _newStatus,
+        string memory _officerName,
+        userRole _role,
+        string memory _remarks
+    ) private {
+        if (
+            _newStatus == LicenseStatus.APPROVED &&
+            _oldStatus == LicenseStatus.EXPIRED
+        ) {
+            emit LicenseRenewed(
+                _licenseId,
+                _officerName,
+                _role,
+                licenses[_licenseId].expiryDate
+            );
+        } else if (_newStatus == LicenseStatus.REVOKED) {
+            emit LicenseRevoked(_licenseId, _officerName, _role, _remarks);
+        } else if (_newStatus == LicenseStatus.APPROVED) {
+            emit LicenseApproved(
+                _licenseId,
+                _officerName,
+                _role,
+                licenses[_licenseId].expiryDate
+            );
+        } else {
+            emit StatusChanged(
+                _licenseId,
+                _oldStatus,
+                _newStatus,
+                _officerName,
+                _role
+            );
+        }
+    }
 
+    function _licenseStatusToString(
+        LicenseStatus status
+    ) internal pure returns (string memory) {
+        if (status == LicenseStatus.DRAFT) return "DRAFT";
+        if (status == LicenseStatus.SUBMITTED) return "SUBMITTED";
+        if (status == LicenseStatus.UNDER_REVIEW) return "UNDER_REVIEW";
+        if (status == LicenseStatus.DOCUMENTS_VERIFIED)
+            return "DOCUMENTS_VERIFIED";
+        if (status == LicenseStatus.INSPECTION_SCHEDULED)
+            return "INSPECTION_SCHEDULED";
+        if (status == LicenseStatus.INSPECTION_COMPLETED)
+            return "INSPECTION_COMPLETED";
+        if (status == LicenseStatus.APPROVED) return "APPROVED";
+        if (status == LicenseStatus.REJECTED) return "REJECTED";
+        if (status == LicenseStatus.REVOKED) return "REVOKED";
+        if (status == LicenseStatus.EXPIRED) return "EXPIRED";
+        if (status == LicenseStatus.RENEWED) return "RENEWED";
+        return "UNKNOWN";
+    }
+
+    function _userRoleToString(
+        userRole role
+    ) internal pure returns (string memory) {
+        if (role == userRole.CITIZEN) return "CITIZEN";
+        if (role == userRole.AGRICULTURE_OFFICER) return "AGRICULTURE_OFFICER";
+        if (role == userRole.ASSISTANT_AGRICULTURE_OFFICER)
+            return "ASSISTANT_AGRICULTURE_OFFICER";
+        if (role == userRole.ASSISTANT_DIRECTOR) return "ASSISTANT_DIRECTOR";
+        if (role == userRole.DEPUTY_DIRECTOR) return "DEPUTY_DIRECTOR";
+        if (role == userRole.JOINT_DIRECTOR) return "JOINT_DIRECTOR";
+        if (role == userRole.JOINT_DIRECTOR_INPUT)
+            return " JOINT_DIRECTOR_INPUT";
+        if (role == userRole.FIELD_INSPECTOR) return "FIELD_INSPECTOR";
+        return "UNKNOWN_ROLE";
+    }
+
+    function licenseIdExists(uint256 _licenseId) public view returns (bool) {
+        return bytes(licenses[_licenseId].licenseNumber).length > 0;
+    }
 }

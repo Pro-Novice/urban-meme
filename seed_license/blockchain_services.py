@@ -5,7 +5,7 @@ from web3 import Web3
 from web3.exceptions import ContractLogicError
 from datetime import datetime
 from .models import BlockchainEvent
-from seed_license.enums import OfficerRole, DivisionEnum
+from seed_license.enums import OfficerRole, DivisionEnum, REVERSE_OFFICER_ROLE, LICENSE_STATUS_REVERSE, REVERSE_LEVEL_MAP, REVERSE_LICENSE_CATEGORY
 
 logger = logging.getLogger(__name__)
 
@@ -28,40 +28,23 @@ CONTRACTS_DIR = os.path.join(BASE_DIR, "Services", "blockchain", "contracts")
 
 # Matches LicenseCategory enum in smart contract
 LICENSE_CATEGORIES = ["SEED", "FERTILIZER", "INSECTICIDE"]
-
-# Action types for license events
 ACTION_TYPES = [
-    "CREATED", "SUBMITTED", "DOCUMENT_UPLOADED", "DOCUMENT_VERIFIED",
+    "CREATED", "SUBMITTED", "DOCUMENT_UPLOADED", "DOCUMENT_VERIFIED", "DOCUMENT_REJECTED",
     "PAYMENT_RECORDED", "INSPECTION_SCHEDULED", "INSPECTION_COMPLETED",
     "STATUS_UPDATED", "APPROVED", "REJECTED", "REVOKED", "RENEWED",
-    "COMMENT_ADDED", "OFFICER_ASSIGNED"
 ]
-
-#Admin levels as per smart contract
-ADMIN_LEVELS = ["STATE", "DIVISION", "DISTRICT"]
-
-# Matches LicenseStatus enum in smart contract
-# Note: Ensure this matches the enum in your Solidity contract
+USER_ROLE = ["CITIZEN", "AGRICULTURE_OFFICER", "ASSISTANT_AGRICULTURE_OFFICER", "ASSISTANT_DIRECTOR", "DEPUTY_DIRECTOR", "JOINT_DIRECTOR", "JOINT_DIRECTOR_INPUT", "FIELD_INSPECTOR"]
+LICENSE_LEVELS = ["STATE", "DIVISION", "DISTRICT"]
 LICENSE_STATUSES = [
     "DRAFT", "SUBMITTED", "UNDER_REVIEW", "DOCUMENTS_VERIFIED", "INSPECTION_SCHEDULED",
     "INSPECTION_COMPLETED", "APPROVED", "REJECTED", "REVOKED",
-    "EXPIRED", "RENEWAL_PENDING"
+    "EXPIRED", "RENEWED"
 ]
-
-# Feedback types for inspection
 FEEDBACK_TYPES = ["None", "Satisfactory", "Unsatisfactory", "Needs Reinspection"]
 
 # generic transform map for contract methods
 # This map defines how to transform raw data from contract methods into a more usable format.
 def generic_transform(method_name: str, raw_data: Any) -> Any:
-    """    Generic transformation function to apply field names, enum mappings, and timestamp formatting.
-           This function handles both single objects and lists of objects.
-           Args:
-            method_name (str): The name of the contract method being called.
-            raw_data (Any): The raw data returned from the contract call, can be a dict or list.
-            Returns:
-            Any: Transformed data with field names, enum mappings, and formatted timestamps.
-    """
     if isinstance(raw_data, (list, tuple)) and all(isinstance(item, (list, tuple)) for item in raw_data):
         # Handle array responses
         return [generic_transform(method_name, item) for item in raw_data]
@@ -121,28 +104,13 @@ def generic_transform(method_name: str, raw_data: Any) -> Any:
 
 # convert timestamp to readable format
 def format_unix_timestamp(ts: int) -> str:
-    """    Convert a Unix timestamp to a human-readable date string.
-        Args:
-            ts (int): Unix timestamp in seconds.
-        Returns:
-            str: Formatted date string in "DD Month YYYY" format.
-    """
     if not ts or ts == 0:
         return None
     return datetime.utcfromtimestamp(ts).strftime("%d %B %Y")
 
+
 # Format contract result based on method name and contract ABI
 def format_api_response(success: bool, data: Any = None, error: str = None, extra: Dict = None) -> Dict:
-    """    Format a standard API response structure.
-        Args:
-            success (bool): Whether the operation was successful.
-            data (Any): The data to return if successful.
-            error (str): Error message if the operation failed.
-            extra (Dict): Any additional data to include in the response.
-        Returns:
-            Dict: Formatted response dictionary.
-    """
-    # Auto unwrap if already wrapped (defensive)
     if isinstance(data, dict) and "success" in data and "data" in data:
         return data
     response = {"success": success}
@@ -159,57 +127,36 @@ def format_api_response(success: bool, data: Any = None, error: str = None, extr
 GENERIC_TRANSFORM_MAP = {
     "getLicenseBasicInfo": {
         "fields": [
-            "licenseId", "applicantName", "category", "level", "status",
-            "applicant", "businessName", "district","state","division","applicationDate", "approvalDate","rejectionDate",  "expiryDate", "revokedDate", "renewalDate", "isActive",
+            "licenseId", "licenseNumber", "applicantName", "category", "level", "status",
+            "businessName", "businessAddress", "district", "state", "division", "applicationDate", "approvalDate", "rejectionDate", "expiryDate", "revokedDate", "renewalDate", "isActive",
         ],
         "enum_mappings": {
             "category": LICENSE_CATEGORIES,
-            "level": ADMIN_LEVELS,
+            "level": LICENSE_LEVELS,
             "status": LICENSE_STATUSES
         },
         "timestamp_fields": ["applicationDate", "approvalDate", "rejectionDate", "expiryDate", "revokedDate", "renewalDate"]
     },
-    "getOfficerInfo": {
+    "getLicenseActionHistory": {
         "fields": [
-            "officerAddress", "name", "employeeId", "role",
-            "department", "level", "jurisdiction", "isActive", "addedDate"
+            "timestamp", "actionType", "actorName", "actorRole", "remarks", "dataHash"
         ],
-        "enum_mappings": {"level": ADMIN_LEVELS},
-        "timestamp_fields": ["addedDate"]
-    },
-    "getOfficerDetails": {
-        "fields": [
-            "name", "employeeId", "role", "department", "level",
-            "jurisdiction", "isActive", "addedDate"
-        ],
-        "enum_mappings": {"level": ADMIN_LEVELS},
-        "timestamp_fields": ["addedDate"]
+        "enum_mappings": {
+            "actionType": ACTION_TYPES,
+            "actorRole": USER_ROLE,
+        },
+        "timestamp_fields": ["timestamp"]
     },
     "getLicenseStatusHistory": {
         "fields": [
             "timestamp", "actionType", "actor", "actorName",
             "actorRole", "department", "remarks", "dataHash"
         ],
-        "enum_mappings": {"actionType": ACTION_TYPES},
+        "enum_mappings": {
+            "actionType": ACTION_TYPES,
+            "actorRole": USER_ROLE,
+        },
         "timestamp_fields": ["timestamp"]
-    },
-    "getLicenseActionHistory": {
-        "fields": [
-            "timestamp", "actionType", "actor", "actorName",
-            "actorRole", "department", "remarks", "dataHash"
-        ],
-        "enum_mappings": {"actionType": ACTION_TYPES},
-        "timestamp_fields": ["timestamp"]
-    },
-    "getOfficerAssignment": {
-        "fields": [
-            "officer", "role", "department", "assignedDate",
-            "assignedBy", "isActive", "remarks"
-        ],
-        "timestamp_fields": ["assignedDate"]
-    },
-    "getOfficerRole": {
-        "fields": ["role"]
     },
     "listAllFunctions": {
         "fields": []
@@ -354,17 +301,6 @@ def _sign_and_send(tx: dict, private_key: str) -> str:
 # Call a contract function
 # This function builds, signs, and sends a transaction to the blockchain.
 def call_function(function, *args, address=None, private_key=None) -> Tuple[Any, Any]:
-    """
-    Enhanced function to build, sign & send a state-changing transaction and wait for receipt.
-    Now returns both receipt and return value.
-    Args:
-        function: The contract function to call.
-        *args: Arguments for the function.
-        address (str): Optional address to send from, defaults to DEFAULT_ADDRESS.
-        private_key (str): Optional private key to sign the transaction, defaults to DEFAULT_PRIVATE_KEY.
-    Returns:
-        Tuple[Any, Any]: The transaction receipt and the return value from the function call.
-    """
     sender = address or DEFAULT_ADDRESS
     key = private_key or DEFAULT_PRIVATE_KEY
     
@@ -810,55 +746,6 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
             address=Web3.to_checksum_address(contract_address),
             abi=abi
         )
-        if method_name == "addOfficer":
-            # Convert role param (index 3)
-            try:
-                role_param = params[3]
-                if isinstance(role_param, str):
-                    role_enum = OfficerRole.from_string(role_param).value
-                    params[3] = role_enum
-            except (IndexError, ValueError) as e:
-                return {
-                    "success": False,
-                    "error": "Invalid role parameter",
-                    "details": str(e)
-                }
-
-            # Convert based on level param (index 5)
-            level = params[5]
-
-            if level == 0:  # STATE
-                params[6] = "RAJASTHAN" # Rajasthan enum value, adjust as needed
-                params[7] = -1  # division empty
-                params[8] = -1  #district empty
-
-            elif level == 1:  # DIVISION
-                try:
-                    division_param = params[8]
-                    if isinstance(division_param, str):
-                        division_enum = DivisionEnum.from_string(division_param)
-                        params[8] = division_enum
-                except (IndexError, ValueError) as e:
-                    return {
-                        "success": False,
-                        "error": "Invalid division parameter",
-                        "details": str(e)
-                    }
-
-            # elif level == 2:  # DISTRICT
-            #     try:
-            #         district_param = params[8]
-            #         if isinstance(district_param, str):
-            #             district_enum = CityEnum.from_string(district_param).value
-            #             params[8] = district_enum
-            #         params[6] = -1  # state empty
-            #         params[7] = -1  # division empty
-            #     except (IndexError, ValueError) as e:
-            #         return {
-            #             "success": False,
-            #             "error": "Invalid district parameter",
-            #             "details": str(e)
-            #         }
 
         # Get the function
         contract_function = getattr(contract.functions, method_name)
@@ -913,43 +800,98 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
         
         # =============== PARSE EVENTS FOR LICENSE ID ===============
         license_id = None
+        expiry_date = None
         events = []
 
         try:
             for log in receipt.logs:
                 if log.address.lower() == contract_address.lower():
-                    # Try to parse known events
                     try:
-                        if len(log.topics) > 0:
-                            # LicenseCreated event has license ID in first indexed parameter
-                            decoded_log = contract.events.LicenseCreated().process_log(log)
+                        if len(log.topics) == 0:
+                            continue  # Skip logs without topics (not events)
+                        
+                        # Try each known event
+                        try:
+                            decoded_log = contract.events.LicenseApplicationSubmitted().process_log(log)
                             license_id = decoded_log.args.licenseId
                             events.append({
-                                "event": "LicenseCreated",
+                                "event": "LicenseApplicationSubmitted",
                                 "license_id": license_id,
-                                "applicant": decoded_log.args.applicant,
-                                "category": decoded_log.args.category
+                                "license_number": decoded_log.args.licenseNumber,
+                                "category": REVERSE_LICENSE_CATEGORY[decoded_log.args.category],
                             })
-                            break
-                    except:
-                        # Try other events
+                            continue
+                        except Exception:
+                            pass
+
+                        try:
+                            decoded_log = contract.events.LicenseApproved().process_log(log)
+                            license_id = decoded_log.args.licenseId
+                            expiry_date = format_unix_timestamp(decoded_log.args.expiryDate)
+                            events.append({
+                                "event": "LicenseApproved",
+                                "license_id": license_id,
+                                "approved_by": decoded_log.args.changedByOfficerName,
+                                "role": REVERSE_OFFICER_ROLE[decoded_log.args.changedByOfficerRole],
+                                "expiry_date": expiry_date,
+                            })
+                            continue
+                        except Exception:
+                            pass
+
+                        try:
+                            decoded_log = contract.events.LicenseRevoked().process_log(log)
+                            license_id = decoded_log.args.licenseId
+                            events.append({
+                                "event": "LicenseRevoked",
+                                "license_id": license_id,
+                                "revoked_by": decoded_log.args.changedByOfficerName,
+                                "role": REVERSE_OFFICER_ROLE[decoded_log.args.changedByOfficerRole],
+                                "reason": decoded_log.args.reason,
+                            })
+                            continue
+                        except Exception:
+                            pass
+
+                        try:
+                            decoded_log = contract.events.LicenseRenewed().process_log(log)
+                            license_id = decoded_log.args.licenseId
+                            expiry_date = format_unix_timestamp(decoded_log.args.newExpiryDate)
+
+                            events.append({
+                                "event": "LicenseRenewed",
+                                "license_id": license_id,
+                                "renewed_by": decoded_log.args.changedByOfficerName,
+                                "role": REVERSE_OFFICER_ROLE[decoded_log.args.changedByOfficerRole],
+                                "new_expiry_date": expiry_date,
+                            })
+                            continue
+                        except Exception:
+                            pass
+
                         try:
                             decoded_log = contract.events.StatusChanged().process_log(log)
+                            license_id = decoded_log.args.licenseId
                             events.append({
-                                "event": "StatusChanged", 
-                                "license_id": decoded_log.args.licenseId,
+                                "event": "StatusChanged",
+                                "license_id": license_id,
                                 "old_status": decoded_log.args.oldStatus,
                                 "new_status": decoded_log.args.newStatus,
-                                "changed_by": decoded_log.args.changedBy
+                                "changed_by": decoded_log.args.changedByOfficerName,
+                                "role": REVERSE_OFFICER_ROLE[decoded_log.args.changedByOfficerRole],
                             })
-                        except:
                             continue
+                        except Exception:
+                            pass
+
+                    except Exception as e_inner:
+                        logger.warning(f"Error decoding log: {e_inner}")
         except Exception as e:
             logger.warning(f"Could not parse events: {e}")
+
         
         # =============== BUILD CLEAN RESPONSE ===============
         response = {
-            "success": receipt.status == 1,
             "transaction_hash": receipt.transactionHash.hex(),
             "block_number": receipt.blockNumber,
             "gas_used": receipt.gasUsed,
@@ -962,6 +904,10 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
         # Add license ID if found
         if license_id is not None:
             response["license_id"] = license_id
+
+        # Add expiry date if found
+        if expiry_date is not None:
+            response["expiry_date"] = expiry_date
         
         # Add events if any
         if events:

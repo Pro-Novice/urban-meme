@@ -5,12 +5,14 @@ class OfficerRole(Enum):
     Enum for Officer Roles in the licensing system.
     Used for validating and serializing officer roles.
     """
-    AGRICULTURE_OFFICER = 0
-    ASSISTANT_AGRICULTURE_OFFICER = 1
-    ASSISTANT_DIRECTOR = 2
-    DEPUTY_DIRECTOR = 3
-    JOINT_DIRECTOR = 4
-    JOINT_DIRECTOR_INPUT = 5
+    CITIZEN = 0
+    AGRICULTURE_OFFICER = 1
+    ASSISTANT_AGRICULTURE_OFFICER = 2
+    ASSISTANT_DIRECTOR = 3
+    DEPUTY_DIRECTOR = 4
+    JOINT_DIRECTOR = 5
+    JOINT_DIRECTOR_INPUT = 6
+    FIELD_INSPECTOR = 7
 
     @staticmethod
     def from_string(role_str: str):
@@ -20,12 +22,14 @@ class OfficerRole(Enum):
         """
         normalized = role_str.strip().lower().replace(" ", "_")
         mapping = {
+            "citizen": OfficerRole.CITIZEN,
             "agriculture_officer": OfficerRole.AGRICULTURE_OFFICER,
             "assistant_agriculture_officer": OfficerRole.ASSISTANT_AGRICULTURE_OFFICER,
             "assistant_director": OfficerRole.ASSISTANT_DIRECTOR,
             "deputy_director": OfficerRole.DEPUTY_DIRECTOR,
             "joint_director": OfficerRole.JOINT_DIRECTOR,
             "joint_director_input": OfficerRole.JOINT_DIRECTOR_INPUT,
+            "field_inspector": OfficerRole.FIELD_INSPECTOR,
         }
         if normalized not in mapping:
             raise ValueError(f"Invalid officer role string: '{role_str}'")
@@ -80,7 +84,7 @@ class LicenseStatusEnum(Enum):
     REJECTED = 7
     REVOKED = 8
     EXPIRED = 9
-    RENEWAL = 10
+    RENEWED = 10
 
     @classmethod
     def from_string(cls, value: str):
@@ -108,74 +112,27 @@ class DoctypeEnum(Enum):
     AUTHORIZATION_LETTER = 6
 
 
-# Reverse mapping from integer status code to status name (for response serialization)
+# Reverse mapping from integer status code to status name
 LICENSE_STATUS_REVERSE = {
     status.value: status.name for status in LicenseStatusEnum
 }
 
+REVERSE_OFFICER_ROLE = {
+    role.value: role.name for role in OfficerRole
+}
 
-# The CityEnum is commented out for now. Uncomment and use if city-level granularity is needed.
-# It follows the same pattern with from_string conversion logic.
-#
-# class CityEnum(Enum):
-#     # Cities grouped by administrative divisions
-#     AJMER = 0
-#     BEAWAR = 1
-#     BHILWARA = 2
-#     DIDWANA_KUCHAMAN = 3
-#     NAGAUR = 4
-#     TONK = 5
-#
-#     # Bharatpur Division
-#     BHARATPUR = 6
-#     DEEG = 7
-#     DHOLPUR = 8
-#     KARAULI = 9
-#     SAWAI_MADHOPUR = 10
-#
-#     # Bikaner Division
-#     BIKANER = 11
-#     CHURU = 12
-#     HANUMANGARH = 13
-#     SRI_GANGANAGAR = 14
-#
-#     # Jaipur Division
-#     ALWAR = 15
-#     DAUSA = 16
-#     JAIPUR = 17
-#     JHUNJHUNU = 18
-#     KHAIRTHAL_TIARA = 19
-#     KOTPUTLI_BEHROR = 20
-#     SIKAR = 21
-#
-#     # Jodhpur Division
-#     BALOTRA = 22
-#     BARMER = 23
-#     JAISALMER = 24
-#     JALORE = 25
-#     JODHPUR = 26
-#     PALI = 27
-#     PHALODI = 28
-#     SIROHI = 29
-#
-#     # Kota Division
-#     BARAN = 30
-#     BUNDI = 31
-#     JHALAWAR = 32
-#     KOTA = 33
-#
-#     # Udaipur Division
-#     BANSWARA = 34
-#     CHITTORGARH = 35
-#     DUNGARPUR = 36
-#     PRATAPGARH = 37
-#     RAJSAMAND = 38
-#     SALUMBAR = 39
-#
-#     @staticmethod
-#     def from_string(city_str: str):
-#         normalized = city_str.strip().lower().replace(" ", "_").replace("-", "_")
-#         mapping = {c.name.lower(): c for c in CityEnum}
-#         if normalized not in mapping:
-#             raise ValueError(f"Invalid city string: '{city_str}'")
-#         return mapping[normalized]
+LICENSE_CATEGORY_MAP = {
+    "SEED": 0,
+    "FERTILIZER": 1,
+    "INSECTICIDE": 2
+}
+
+LEVEL_MAP = {
+    "DISTRICT": 0,
+    "DIVISION": 1,
+    "STATE": 2
+}
+
+REVERSE_LICENSE_CATEGORY = {v: k for k, v in LICENSE_CATEGORY_MAP.items()}
+
+REVERSE_LEVEL_MAP = {v: k for k, v in LEVEL_MAP.items()}
