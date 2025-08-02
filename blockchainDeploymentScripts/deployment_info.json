@@ -1,11 +1,11 @@
 {
   "network": 1337,
   "networkName": "Ganache",
-  "deploymentTime": 1754127616,
-  "deploymentTimeFormatted": "2025-08-02 15:10:16",
+  "deploymentTime": 1754138913,
+  "deploymentTimeFormatted": "2025-08-02 18:18:33",
   "deployer": "0xFE3B557E8Fb62b89F4916B721be55cEb828dBd73",
-  "proxy": "0x97756B4B1a23c451FC0543204eA98C12c12Dc888",
-  "implementationV1": "0x780c6F5e4f56e84Fd1F3E3471F3AFff179Fd80cb",
+  "proxy": "0x5365098A72AdE678de35E69B50E11Da165Bf6b96",
+  "implementationV1": "0xE6BAb1eAc80e9d68BD76c3bb61abad86133109DD",
   "implementationABI": [
     {
       "inputs": [],
@@ -362,7 +362,7 @@
               "type": "uint256"
             },
             {
-              "internalType": "enum LicenseStorage.ActionType",
+              "internalType": "enum LicenseStorage.LicenseStatus",
               "name": "actionType",
               "type": "uint8"
             },
@@ -736,6 +736,6 @@
   },
   "verification": {
     "success": true,
-    "timestamp": 1754127616
+    "timestamp": 1754138913
   }
 }

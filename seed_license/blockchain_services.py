@@ -29,15 +29,10 @@ CONTRACTS_DIR = os.path.join(BASE_DIR, "Services", "blockchain", "contracts")
 
 # Matches LicenseCategory enum in smart contract
 LICENSE_CATEGORIES = ["SEED", "FERTILIZER", "INSECTICIDE"]
-ACTION_TYPES = [
-    "CREATED", "SUBMITTED", "DOCUMENT_UPLOADED", "DOCUMENT_VERIFIED", "DOCUMENT_REJECTED",
-    "PAYMENT_RECORDED", "INSPECTION_SCHEDULED", "INSPECTION_COMPLETED",
-    "STATUS_UPDATED", "APPROVED", "REJECTED", "REVOKED", "RENEWED",
-]
 USER_ROLE = ["CITIZEN", "AGRICULTURE_OFFICER", "ASSISTANT_AGRICULTURE_OFFICER", "ASSISTANT_DIRECTOR", "DEPUTY_DIRECTOR", "JOINT_DIRECTOR", "JOINT_DIRECTOR_INPUT", "FIELD_INSPECTOR"]
 LICENSE_LEVELS = ["STATE", "DIVISION", "DISTRICT"]
 LICENSE_STATUSES = [
-    "DRAFT", "SUBMITTED", "UNDER_REVIEW", "DOCUMENTS_VERIFIED", "INSPECTION_SCHEDULED",
+    "SUBMITTED", "UNDER_REVIEW", "DOCUMENTS_VERIFIED", "INSPECTION_SCHEDULED",
     "INSPECTION_COMPLETED", "APPROVED", "REJECTED", "REVOKED",
     "EXPIRED", "RENEWED"
 ]
@@ -143,7 +138,7 @@ GENERIC_TRANSFORM_MAP = {
             "timestamp", "actionType", "actorName", "actorRole", "remarks", "dataHash"
         ],
         "enum_mappings": {
-            "actionType": ACTION_TYPES,
+            "actionType": LICENSE_STATUSES,
             "actorRole": USER_ROLE,
         },
         "timestamp_fields": ["timestamp"]
@@ -154,7 +149,7 @@ GENERIC_TRANSFORM_MAP = {
             "actorRole", "department", "remarks", "dataHash"
         ],
         "enum_mappings": {
-            "actionType": ACTION_TYPES,
+            "actionType": LICENSE_STATUSES,
             "actorRole": USER_ROLE,
         },
         "timestamp_fields": ["timestamp"]
@@ -876,8 +871,8 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
                             events.append({
                                 "event": "StatusChanged",
                                 "license_id": license_id,
-                                "old_status": decoded_log.args.oldStatus,
-                                "new_status": decoded_log.args.newStatus,
+                                "old_status": LICENSE_STATUS_REVERSE[decoded_log.args.oldStatus],
+                                "new_status": LICENSE_STATUS_REVERSE[decoded_log.args.newStatus],
                                 "changed_by": decoded_log.args.changedByOfficerName,
                                 "role": REVERSE_OFFICER_ROLE[decoded_log.args.changedByOfficerRole],
                             })

@@ -100,7 +100,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         newLicense.actionHistory.push(
             Action({
                 timestamp: block.timestamp,
-                actionType: ActionType.SUBMITTED,
+                actionType: LicenseStatus.SUBMITTED,
                 actorName: _applicantName,
                 actorRole: userRole.CITIZEN,
                 remarks: "License Application Successfully Submitted",
@@ -211,7 +211,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         licensesByStatus[_newStatus].push(_licenseId);
 
         // Record action with appropriate action type
-        ActionType actionType = _getActionTypeForStatus(_newStatus, oldStatus);
+        LicenseStatus actionType = _getActionTypeForStatus(_newStatus, oldStatus);
         string memory actionDescription = _buildActionDescription(oldStatus, _newStatus, _remarks);
 
         _recordAction(_licenseId, actionType, _role, actionDescription, _officerName);
@@ -237,7 +237,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
 
     function _recordAction(
         uint256 _licenseId,
-        ActionType _actionType,
+        LicenseStatus _actionType,
         userRole _userRole,
         string memory _remarks,
         string memory _officerName
@@ -282,25 +282,29 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         }
     }
 
-    function _getActionTypeForStatus(LicenseStatus _newStatus, LicenseStatus _oldStatus) private pure returns (ActionType) {
+    function _getActionTypeForStatus(LicenseStatus _newStatus, LicenseStatus _oldStatus) private pure returns (LicenseStatus) {
         if (_newStatus == LicenseStatus.APPROVED) {
             if (_oldStatus == LicenseStatus.EXPIRED) {
-                return ActionType.RENEWED;
+                return LicenseStatus.RENEWED;
             } else {
-                return ActionType.APPROVED;
+                return LicenseStatus.APPROVED;
             }
+        } else if (_newStatus == LicenseStatus.REJECTED) {
+            return LicenseStatus.REJECTED;
+        } else if (_newStatus == LicenseStatus.REVOKED) {
+            return LicenseStatus.REVOKED;
+        } else if (_newStatus == LicenseStatus.EXPIRED) {
+            return LicenseStatus.EXPIRED;
+        } else if (_newStatus == LicenseStatus.UNDER_REVIEW) {
+            return LicenseStatus.UNDER_REVIEW;
+        } else if (_newStatus == LicenseStatus.DOCUMENTS_VERIFIED) {
+            return LicenseStatus.DOCUMENTS_VERIFIED;
+        } else if (_newStatus == LicenseStatus.INSPECTION_SCHEDULED) {
+            return LicenseStatus.INSPECTION_SCHEDULED;
+        } else if (_newStatus == LicenseStatus.INSPECTION_COMPLETED) {
+            return LicenseStatus.INSPECTION_COMPLETED;
         }
-
-        if (_newStatus == LicenseStatus.REJECTED) {
-            return ActionType.REJECTED;
-        }
-
-        if (_newStatus == LicenseStatus.REVOKED) {
-            return ActionType.REVOKED;
-        }
-
-        // For all other status changes (SUBMITTED → UNDER_REVIEW, etc.)
-        return ActionType.STATUS_UPDATED;
+        return LicenseStatus.INSPECTION_COMPLETED;
     }
 
     function _buildActionDescription(
@@ -351,7 +355,6 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     }
 
     function _licenseStatusToString(LicenseStatus status) internal pure returns (string memory) {
-        if (status == LicenseStatus.DRAFT) return "DRAFT";
         if (status == LicenseStatus.SUBMITTED) return "SUBMITTED";
         if (status == LicenseStatus.UNDER_REVIEW) return "UNDER_REVIEW";
         if (status == LicenseStatus.DOCUMENTS_VERIFIED) return "DOCUMENTS_VERIFIED";

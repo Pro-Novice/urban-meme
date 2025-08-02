@@ -1,10 +1,6 @@
 from enum import Enum
 
 class OfficerRole(Enum):
-    """
-    Enum for Officer Roles in the licensing system.
-    Used for validating and serializing officer roles.
-    """
     CITIZEN = 0
     AGRICULTURE_OFFICER = 1
     ASSISTANT_AGRICULTURE_OFFICER = 2
@@ -16,10 +12,6 @@ class OfficerRole(Enum):
 
     @staticmethod
     def from_string(role_str: str):
-        """
-        Convert a human-readable string into a valid OfficerRole enum.
-        Raises ValueError if input is invalid.
-        """
         normalized = role_str.strip().lower().replace(" ", "_")
         mapping = {
             "citizen": OfficerRole.CITIZEN,
@@ -37,9 +29,6 @@ class OfficerRole(Enum):
 
 
 class DivisionEnum(Enum):
-    """
-    Enum representing all administrative divisions in Rajasthan.
-    """
     AJMER = 0
     BHARATPUR = 1
     BIKANER = 2
@@ -50,10 +39,6 @@ class DivisionEnum(Enum):
 
     @staticmethod
     def from_string(div_str: str):
-        """
-        Convert a human-readable string into a DivisionEnum value.
-        Returns division name as string. Raises ValueError if not found.
-        """
         normalized = div_str.strip().lower().replace(" ", "_")
         mapping = {
             "ajmer": "AJMER",
@@ -70,28 +55,19 @@ class DivisionEnum(Enum):
 
 
 class LicenseStatusEnum(Enum):
-    """
-    Enum representing the various statuses a license can be in.
-    Helps in controlling status transitions and validations.
-    """
-    DRAFT = 0
-    SUBMITTED = 1
-    UNDER_REVIEW = 2
-    DOCUMENTS_VERIFIED = 3
-    INSPECTION_SCHEDULED = 4
-    INSPECTION_COMPLETED = 5
-    APPROVED = 6
-    REJECTED = 7
-    REVOKED = 8
-    EXPIRED = 9
-    RENEWED = 10
+    SUBMITTED = 0
+    UNDER_REVIEW = 1
+    DOCUMENTS_VERIFIED = 2
+    INSPECTION_SCHEDULED = 3
+    INSPECTION_COMPLETED = 4
+    APPROVED = 5
+    REJECTED = 6
+    REVOKED = 7
+    EXPIRED = 8
+    RENEWED = 9
 
     @classmethod
     def from_string(cls, value: str):
-        """
-        Convert a string to a valid LicenseStatusEnum value.
-        Returns the corresponding integer value.
-        """
         normalized = value.strip().upper().replace(" ", "_")
         try:
             return cls[normalized].value
@@ -100,9 +76,6 @@ class LicenseStatusEnum(Enum):
 
 
 class DoctypeEnum(Enum):
-    """
-    Enum for document types required in license application/verification.
-    """
     AFFIDAVIT_SEED_QUALITY = 0
     ID_PROOF = 1
     SHOP_MAP = 2

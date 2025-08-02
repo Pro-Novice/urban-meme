@@ -21,7 +21,6 @@ contract LicenseStorage {
         DISTRICT
     }
     enum LicenseStatus {
-        DRAFT,
         SUBMITTED,
         UNDER_REVIEW,
         DOCUMENTS_VERIFIED,
@@ -31,21 +30,6 @@ contract LicenseStorage {
         REJECTED,
         REVOKED,
         EXPIRED,
-        RENEWED
-    }
-    enum ActionType {
-        CREATED,
-        SUBMITTED,
-        DOCUMENT_UPLOADED,
-        DOCUMENT_VERIFIED,
-        DOCUMENT_REJECTED,
-        PAYMENT_RECORDED,
-        INSPECTION_SCHEDULED,
-        INSPECTION_COMPLETED,
-        STATUS_UPDATED,
-        APPROVED,
-        REJECTED,
-        REVOKED,
         RENEWED
     }
     enum userRole {
@@ -67,15 +51,7 @@ contract LicenseStorage {
         KOTA_DIVISION,
         UDAIPUR_DIVISION
     }
-    enum StandardDocumentType {
-        AFFIDAVIT_SEED_QUALITY,
-        ID_PROOF,
-        SHOP_MAP,
-        REGISTRATION_CERTIFICATE,
-        MEMORANDUM_ARTICLES,
-        PASSPORT_PHOTO,
-        AUTHORIZATION_LETTER
-    }
+
     enum InspectionFeedbackType {
         NONE,
         SATISFACTORY,
@@ -103,9 +79,7 @@ contract LicenseStorage {
         string district;
         mapping(string => string) customFields;
         string[] customFieldKeys;
-        mapping(StandardDocumentType => Document) documents;
-        StandardDocumentType[] documentTypes;
-        Payment paymentDetails;
+        // Payment paymentDetails;
         Inspection[] inspections;
         uint256 applicationDate;
         uint256 lastModifiedDate;
@@ -121,24 +95,11 @@ contract LicenseStorage {
         bool inspectionPassed;
     }
 
-    struct Document {
-        StandardDocumentType documentType;
-        string documentName;
-        string documentHash;
-        bool isVerified;
-        string verifiedByOfficerId; // Store officer ID instead of address
-        uint256 verificationDate;
-        string remarks;
-    }
-
     struct Payment {
         uint256 amount;
         string transactionId;
         string paymentMode;
         uint256 paymentDate;
-        string recordedByOfficerId; // Store officer ID instead of address
-        bool isVerified;
-        string receiptNumber;
     }
 
     struct Inspection {
@@ -159,7 +120,7 @@ contract LicenseStorage {
 
     struct Action {
         uint256 timestamp;
-        ActionType actionType;
+        LicenseStatus actionType;
         string actorName;
         userRole actorRole;
         string remarks;
