@@ -7,8 +7,7 @@ pragma solidity ^0.8.0;
  */
 contract LicenseStorage {
     // Storage slot positions as constants to avoid collisions
-    bytes32 private constant LICENSE_COUNTER_SLOT =
-        keccak256("license.storage.licenseCounter");
+    bytes32 private constant LICENSE_COUNTER_SLOT = keccak256("license.storage.licenseCounter");
 
     // Enums
     enum LicenseCategory {
@@ -84,7 +83,7 @@ contract LicenseStorage {
         NEEDS_REINSPECTION
     }
 
-    // Core License Structure 
+    // Core License Structure
     struct License {
         uint256 licenseId;
         string licenseNumber;

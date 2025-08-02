@@ -14,24 +14,9 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, OwnableUpgradeable {
     // Events
     event LicenseApplicationSubmitted(uint256 indexed licenseId, string licenseNumber, LicenseCategory category);
-    event LicenseApproved(
-        uint256 indexed licenseId,
-        string changedByOfficerName,
-        userRole changedByOfficerRole,
-        uint256 expiryDate
-    );
-    event LicenseRevoked(
-        uint256 indexed licenseId,
-        string changedByOfficerName,
-        userRole changedByOfficerRole,
-        string reason
-    );
-    event LicenseRenewed(
-        uint256 indexed licenseId,
-        string changedByOfficerName,
-        userRole changedByOfficerRole,
-        uint256 newExpiryDate
-    );
+    event LicenseApproved(uint256 indexed licenseId, string changedByOfficerName, userRole changedByOfficerRole, uint256 expiryDate);
+    event LicenseRevoked(uint256 indexed licenseId, string changedByOfficerName, userRole changedByOfficerRole, string reason);
+    event LicenseRenewed(uint256 indexed licenseId, string changedByOfficerName, userRole changedByOfficerRole, uint256 newExpiryDate);
     event StatusChanged(
         uint256 indexed licenseId,
         LicenseStatus oldStatus,
@@ -140,9 +125,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     }
 
     // 2. Get License Basic Info - to be performed by citizens/officers
-    function getLicenseBasicInfo(
-        uint256 _licenseId
-    ) public view licenseExists(_licenseId) returns (LicenseBasicInfo memory) {
+    function getLicenseBasicInfo(uint256 _licenseId) public view licenseExists(_licenseId) returns (LicenseBasicInfo memory) {
         License storage license = licenses[_licenseId];
 
         return
@@ -172,9 +155,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     }
 
     // 3. Get License Action History
-    function getLicenseActionHistory(
-        uint256 _licenseId
-    ) public view licenseExists(_licenseId) returns (Action[] memory) {
+    function getLicenseActionHistory(uint256 _licenseId) public view licenseExists(_licenseId) returns (Action[] memory) {
         return licenses[_licenseId].actionHistory;
     }
 
@@ -275,11 +256,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         );
     }
 
-    function _generateLicenseNumber(
-        LicenseCategory _category,
-        LicenseLevel _level,
-        uint256 _licenseId
-    ) internal pure returns (string memory) {
+    function _generateLicenseNumber(LicenseCategory _category, LicenseLevel _level, uint256 _licenseId) internal pure returns (string memory) {
         string memory categoryCode = _category == LicenseCategory.SEED
             ? "SD"
             : _category == LicenseCategory.FERTILIZER
@@ -305,10 +282,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         }
     }
 
-    function _getActionTypeForStatus(
-        LicenseStatus _newStatus,
-        LicenseStatus _oldStatus
-    ) private pure returns (ActionType) {
+    function _getActionTypeForStatus(LicenseStatus _newStatus, LicenseStatus _oldStatus) private pure returns (ActionType) {
         if (_newStatus == LicenseStatus.APPROVED) {
             if (_oldStatus == LicenseStatus.EXPIRED) {
                 return ActionType.RENEWED;
