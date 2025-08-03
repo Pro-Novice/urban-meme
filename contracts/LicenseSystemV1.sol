@@ -13,16 +13,36 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  */
 contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, OwnableUpgradeable {
     // Events
-    event LicenseApplicationSubmitted(uint256 indexed licenseId, string licenseNumber, LicenseCategory category);
-    event LicenseApproved(uint256 indexed licenseId, string changedByOfficerName, userRole changedByOfficerRole, uint256 expiryDate);
-    event LicenseRevoked(uint256 indexed licenseId, string changedByOfficerName, userRole changedByOfficerRole, string reason);
-    event LicenseRenewed(uint256 indexed licenseId, string changedByOfficerName, userRole changedByOfficerRole, uint256 newExpiryDate);
+    event LicenseApplicationSubmitted(uint256 indexed licenseId, string licenseNumber, LicenseCategory category, uint256 applicationDate);
+    event LicenseApproved(
+        uint256 indexed licenseId,
+        string changedByOfficerName,
+        userRole changedByOfficerRole,
+        uint256 approvalDate,
+        uint256 expiryDate
+    );
+    event LicenseRevoked(uint256 indexed licenseId, string changedByOfficerName, userRole changedByOfficerRole, string reason, uint256 revokedDate);
+    event LicenseRejected(
+        uint256 indexed licenseId,
+        string changedByOfficerName,
+        userRole changedByOfficerRole,
+        string reason,
+        uint256 rejectionDate
+    );
+    event LicenseRenewed(
+        uint256 indexed licenseId,
+        string changedByOfficerName,
+        userRole changedByOfficerRole,
+        uint256 renewalDate,
+        uint256 expiryDate
+    );
     event StatusChanged(
         uint256 indexed licenseId,
         LicenseStatus oldStatus,
         LicenseStatus newStatus,
         string changedByOfficerName,
-        userRole changedByOfficerRole
+        userRole changedByOfficerRole,
+        uint256 lastModifiedDate
     );
     event LicenseVerified(uint256 indexed licenseId, string licenseNumber, LicenseStatus status, string statusMessage, uint256 verifiedDate);
     event TamperAttemptDetected(uint256 indexed licenseId, string licenseNumber, string statusMessage, uint256 detectedDate);
@@ -79,7 +99,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         string memory _businessAddress,
         string memory _district,
         string memory _division
-    ) public virtual onlyAdmins returns (uint256) {
+    ) public virtual onlyAdmins {
         _incrementLicenseCounter();
         uint256 newLicenseId = licenseIdCounter();
 
@@ -121,9 +141,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         licensesByDistrict[_district].push(newLicenseId);
         licenseNumberToId[newLicense.licenseNumber] = newLicenseId;
 
-        emit LicenseApplicationSubmitted(newLicenseId, newLicense.licenseNumber, _category);
-
-        return newLicenseId;
+        emit LicenseApplicationSubmitted(newLicenseId, newLicense.licenseNumber, _category, newLicense.applicationDate);
     }
 
     // 2. Get License Basic Info - to be performed by citizens/officers
@@ -180,7 +198,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         license.lastModifiedDate = block.timestamp;
 
         // Handle specific status updates
-        if (_newStatus == LicenseStatus.APPROVED) {
+        if (_newStatus == LicenseStatus.APPROVED || _newStatus == LicenseStatus.RENEWED) {
             // For approvals (new or renewals)
             require(_renewalPeriodDays > 0, "Renewal period must be greater than 0");
             license.approvalDate = block.timestamp;
@@ -225,28 +243,26 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     // 5. Get QR Code data for License
     function getLicenseQRData(
         uint256 _licenseId
-    )
-        public
-        view
-        licenseExists(_licenseId)
-        returns (string memory verificationHash, string memory licenseNumber, LicenseStatus status, uint256 approvalDate, uint256 expiryDate)
-    {
+    ) public view licenseExists(_licenseId) returns (string memory verificationHash, string memory licenseNumber) {
         License storage license = licenses[_licenseId];
-        require(license.status == LicenseStatus.APPROVED, "License must be approved to generate QR data");
+        require(license.isActive, "License must be active to generate QR data");
 
         verificationHash = _generateVerificationHash(license);
-        approvalDate = license.approvalDate;
-        expiryDate = license.expiryDate;
-        status = license.status;
         licenseNumber = license.licenseNumber;
     }
 
     // 6. Verify License Integrity and Validity
-    function verifyLicenseWithHash(string memory _licenseNumber, string memory _expectedHash) public returns (LicenseVerificationData memory, bool) {
+    function verifyLicenseWithHash(string memory _licenseNumber, string memory _expectedHash) public {
         LicenseVerificationData memory verificationData = verifyLicenseByNumber(_licenseNumber);
 
         if (!verificationData.isValid) {
-            return (verificationData, false);
+            emit LicenseVerified(
+                verificationData.licenseId,
+                _licenseNumber,
+                verificationData.status,
+                verificationData.statusMessage,
+                block.timestamp
+            );
         }
 
         // Check for tampering by comparing hashes
@@ -256,10 +272,14 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             verificationData.statusMessage = "WARNING: Potential tampering detected!";
             emit TamperAttemptDetected(verificationData.licenseId, _licenseNumber, verificationData.statusMessage, block.timestamp);
         } else {
-            emit LicenseVerified(verificationData.licenseId, _licenseNumber, verificationData.status, verificationData.statusMessage, block.timestamp);
+            emit LicenseVerified(
+                verificationData.licenseId,
+                _licenseNumber,
+                verificationData.status,
+                verificationData.statusMessage,
+                block.timestamp
+            );
         }
-
-        return (verificationData, isTampered);
     }
 
     // 7. Verify License by Number - Private function to be used internally
@@ -400,7 +420,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     }
 
     function _getActionTypeForStatus(LicenseStatus _newStatus, LicenseStatus _oldStatus) private pure returns (LicenseStatus) {
-        if (_newStatus == LicenseStatus.APPROVED) {
+        if (_newStatus == LicenseStatus.APPROVED || _newStatus == LicenseStatus.RENEWED) {
             if (_oldStatus == LicenseStatus.EXPIRED) {
                 return LicenseStatus.RENEWED;
             } else {
@@ -460,14 +480,16 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         userRole _role,
         string memory _remarks
     ) private {
-        if (_newStatus == LicenseStatus.APPROVED && _oldStatus == LicenseStatus.EXPIRED) {
-            emit LicenseRenewed(_licenseId, _officerName, _role, licenses[_licenseId].expiryDate);
+        if (_newStatus == LicenseStatus.RENEWED && _oldStatus == LicenseStatus.EXPIRED) {
+            emit LicenseRenewed(_licenseId, _officerName, _role, licenses[_licenseId].renewalDate, licenses[_licenseId].expiryDate);
         } else if (_newStatus == LicenseStatus.REVOKED) {
-            emit LicenseRevoked(_licenseId, _officerName, _role, _remarks);
+            emit LicenseRevoked(_licenseId, _officerName, _role, _remarks, licenses[_licenseId].revokedDate);
         } else if (_newStatus == LicenseStatus.APPROVED) {
-            emit LicenseApproved(_licenseId, _officerName, _role, licenses[_licenseId].expiryDate);
+            emit LicenseApproved(_licenseId, _officerName, _role, licenses[_licenseId].approvalDate, licenses[_licenseId].expiryDate);
+        } else if (_newStatus == LicenseStatus.REJECTED) {
+            emit LicenseRejected(_licenseId, _officerName, _role, _remarks, licenses[_licenseId].rejectionDate);
         } else {
-            emit StatusChanged(_licenseId, _oldStatus, _newStatus, _officerName, _role);
+            emit StatusChanged(_licenseId, _oldStatus, _newStatus, _officerName, _role, block.timestamp);
         }
     }
 

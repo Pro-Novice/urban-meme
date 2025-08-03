@@ -2,43 +2,34 @@ import json, logging, os
 from typing import Any, List, Dict, Union, Optional, Tuple
 from django.conf import settings
 from web3 import Web3
+from web3._utils.events import get_event_data
 from web3.exceptions import ContractLogicError
-from datetime import datetime
+from datetime import datetime, timezone
 from .models import BlockchainEvent
-from seed_license.enums import OfficerRole, DivisionEnum, REVERSE_OFFICER_ROLE, LICENSE_STATUS_REVERSE, REVERSE_LEVEL_MAP, REVERSE_LICENSE_CATEGORY
+from seed_license.enums import REVERSE_OFFICER_ROLE, LICENSE_STATUS_REVERSE, REVERSE_LICENSE_CATEGORY, \
+LICENSE_CATEGORIES, LICENSE_LEVELS, LICENSE_STATUSES, FEEDBACK_TYPES, USER_ROLE
 
 
 logger = logging.getLogger(__name__)
 
-# ── connect ───────────────────────────────────────────────────────────
+# Connect to the blockchain node
 w3 = Web3(Web3.HTTPProvider(settings.BLOCKCHAIN_URL))
 if not w3.is_connected():
     raise ConnectionError("Cannot connect to blockchain node")
 
-# ── single signer (service account) ───────────────────────────────────
+# Default account and private key
 DEFAULT_PRIVATE_KEY = settings.PRIVATE_KEY
 if not DEFAULT_PRIVATE_KEY:
-    raise RuntimeError("settings.PRIVATE_KEY is missing – add it to .env")
+    raise RuntimeError("settings.PRIVATE_KEY is missing - add it to .env")
 DEFAULT_ACCOUNT = w3.eth.account.from_key(DEFAULT_PRIVATE_KEY)
 DEFAULT_ADDRESS = DEFAULT_ACCOUNT.address
 
-# ── helpers ───────────────────────────────────────────────────────────
-
+# Base directory for contracts
 BASE_DIR = settings.BASE_DIR
 CONTRACTS_DIR = os.path.join(BASE_DIR, "Services", "blockchain", "contracts")
 
-# Matches LicenseCategory enum in smart contract
-LICENSE_CATEGORIES = ["SEED", "FERTILIZER", "INSECTICIDE"]
-USER_ROLE = ["CITIZEN", "AGRICULTURE_OFFICER", "ASSISTANT_AGRICULTURE_OFFICER", "ASSISTANT_DIRECTOR", "DEPUTY_DIRECTOR", "JOINT_DIRECTOR", "JOINT_DIRECTOR_INPUT", "FIELD_INSPECTOR"]
-LICENSE_LEVELS = ["STATE", "DIVISION", "DISTRICT"]
-LICENSE_STATUSES = [
-    "SUBMITTED", "UNDER_REVIEW", "DOCUMENTS_VERIFIED", "INSPECTION_SCHEDULED",
-    "INSPECTION_COMPLETED", "APPROVED", "REJECTED", "REVOKED",
-    "EXPIRED", "RENEWED"
-]
-FEEDBACK_TYPES = ["None", "Satisfactory", "Unsatisfactory", "Needs Reinspection"]
 
-# generic transform map for contract methods
+# Generic transform map for contract methods
 # This map defines how to transform raw data from contract methods into a more usable format.
 def generic_transform(method_name: str, raw_data: Any) -> Any:
     if isinstance(raw_data, (list, tuple)) and all(isinstance(item, (list, tuple)) for item in raw_data):
@@ -83,7 +74,7 @@ def generic_transform(method_name: str, raw_data: Any) -> Any:
     if status_str != "APPROVED":
        transformed.pop("approvalDate", None)
 
-    if status_str not in {"APPROVED", "EXPIRED"}:
+    if status_str not in {"APPROVED", "EXPIRED", "RENEWED"}:
         transformed.pop("expiryDate", None)
 
     if status_str != "REJECTED":
@@ -92,7 +83,7 @@ def generic_transform(method_name: str, raw_data: Any) -> Any:
     if status_str != "REVOKED":
         transformed.pop("revokedDate", None)
 
-    if status_str not in {"RENEWAL_PENDING", "RENEWED"}:
+    if status_str != "RENEWED":
         transformed.pop("renewalDate", None)
 
     return transformed
@@ -102,7 +93,7 @@ def generic_transform(method_name: str, raw_data: Any) -> Any:
 def format_unix_timestamp(ts: int) -> str:
     if not ts or ts == 0:
         return None
-    return datetime.utcfromtimestamp(ts).strftime("%d %B %Y")
+    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%d %B %Y")
 
 
 # Format contract result based on method name and contract ABI
@@ -119,12 +110,13 @@ def format_api_response(success: bool, data: Any = None, error: str = None, extr
         response.update(extra)
     return response
 
+
 # Unified transformation map for all methods
 GENERIC_TRANSFORM_MAP = {
     "getLicenseBasicInfo": {
         "fields": [
-            "licenseId", "licenseNumber", "applicantName", "category", "level", "status",
-            "businessName", "businessAddress", "district", "state", "division", "applicationDate", "approvalDate", "rejectionDate", "expiryDate", "revokedDate", "renewalDate", "isActive",
+            "licenseId", "licenseNumber", "applicantName", "category", "level", "status", "businessName", "businessAddress", "district", 
+            "state", "division", "applicationDate", "approvalDate", "rejectionDate", "expiryDate", "revokedDate", "renewalDate", "isActive",
         ],
         "enum_mappings": {
             "category": LICENSE_CATEGORIES,
@@ -145,12 +137,8 @@ GENERIC_TRANSFORM_MAP = {
     },
     "getLicenseQRData": {
         "fields": [
-            "verificationHash", "licenseNumber", "status", "approvalDate", "expiryDate"
+            "verificationHash", "licenseNumber",
         ],
-        "enum_mappings": {
-            "status": LICENSE_STATUSES
-        },
-        "timestamp_fields": ["approvalDate", "expiryDate"]
     },
     "getAllInspectionFeedback": {
         "fields": [
@@ -162,6 +150,7 @@ GENERIC_TRANSFORM_MAP = {
 
     # add more methods as needed
 }
+
 
 # Format contract result based on method name and contract ABI
 def format_and_transform_response(result: Any, method_name: str, contract: Any) -> Any:
@@ -201,14 +190,6 @@ def clear_contract_cache():
 # Get contract instance by name 
 # This function retrieves a contract instance by its name, loading the ABI and address from deployment info.
 def get_contract(contract_name: str):
-    """Load ABI + address and return web3 Contract.
-    Args:
-        contract_name (str): Name of the contract to load.
-        Returns:
-        Contract: Web3 contract instance.
-        Raises:
-        ValueError: If the contract configuration is not found.
-    """
     # Check cache first
     if contract_name in _contract_cache:
         return _contract_cache[contract_name]
@@ -229,7 +210,6 @@ def get_contract(contract_name: str):
             raise ValueError(f"No proxy address found in deployment_info.json")
         
         # Determine ABI to use
-        # Check if we have a mapping for this contract name
         abi_found = False
 
         # Always use proxy address for upgradeable contracts
@@ -534,27 +514,10 @@ def _get_network_info():
         }
 
 
-# ══════════════════════════════════════════════════════════════════════
-# Enhanced Write to Contract Function
-# ══════════════════════════════════════════════════════════════════════
-def write_to_contract(contract_name: str, method_name: str, params: List[Any], 
-                               address: Optional[str] = None, private_key: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Optimized function to write to smart contract
-    - Validates method and parameters against ABI from deployment_info.json
-    - Executes transaction with minimal overhead
-    - Returns clean response
-    Args:
-        contract_name (str): Name of the contract to interact with. 
-        method_name (str): Name of the method to call.
-        params (List[Any]): List of parameters to pass to the method.
-        address (Optional[str]): Address to send the transaction from. Defaults to DEFAULT_ADDRESS.
-        private_key (Optional[str]): Private key to sign the transaction. Defaults to DEFAULT_PRIVATE_KEY.
-    Returns:
-        Dict[str, Any]: Response dictionary with success status, data or error message.
-    """
+# Universal function to write to any smart contract method
+def write_to_contract(contract_name: str, method_name: str, params: List[Any], address: Optional[str] = None, private_key: Optional[str] = None) -> Dict[str, Any]:
     try:
-        # =============== LOAD CONTRACT FROM DEPLOYMENT INFO ===============
+        # Load contract instance from cache or deployment info
         deployment_info_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", "deployment_info.json")
         
         if not os.path.exists(deployment_info_path):
@@ -683,124 +646,51 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
         
         # =============== PARSE EVENTS FOR LICENSE ID ===============
         license_id = None
-        expiry_date = None
         events = []
+
+        timestamp_fields = ["approvalDate", "expiryDate", "renewalDate", "rejectionDate", "revokedDate", "applicationDate", "verifiedDate", "detectedDate", "lastModifiedDate"]
 
         try:
             for log in receipt.logs:
-                if log.address.lower() == contract_address.lower():
+                if log.address.lower() != contract_address.lower():
+                    continue
+
+                for abi_event in abi:
+                    if abi_event.get("type") != "event":
+                        continue
                     try:
-                        if len(log.topics) == 0:
-                            continue  # Skip logs without topics (not events)
-                        
-                        # Try each known event
-                        try:
-                            decoded_log = contract.events.LicenseApplicationSubmitted().process_log(log)
-                            license_id = decoded_log.args.licenseId
-                            events.append({
-                                "event": "LicenseApplicationSubmitted",
-                                "license_id": license_id,
-                                "license_number": decoded_log.args.licenseNumber,
-                                "category": REVERSE_LICENSE_CATEGORY[decoded_log.args.category],
-                            })
+                        event_topic = w3.keccak(text=f"{abi_event['name']}({','.join(i['type'] for i in abi_event['inputs'])})").hex()
+                        if log.topics[0].hex() != event_topic:
                             continue
-                        except Exception:
-                            pass
+                        decoded = get_event_data(w3.codec, abi_event, log)
+                        event_name = abi_event["name"]
+                        event_args = dict(decoded["args"])
 
-                        try:
-                            decoded_log = contract.events.LicenseApproved().process_log(log)
-                            license_id = decoded_log.args.licenseId
-                            expiry_date = format_unix_timestamp(decoded_log.args.expiryDate)
-                            events.append({
-                                "event": "LicenseApproved",
-                                "license_id": license_id,
-                                "approved_by": decoded_log.args.changedByOfficerName,
-                                "role": REVERSE_OFFICER_ROLE[decoded_log.args.changedByOfficerRole],
-                                "expiry_date": expiry_date,
-                            })
-                            continue
-                        except Exception:
-                            pass
+                        # Post-process event arguments
+                        for field in timestamp_fields:
+                            if field in event_args:
+                                event_args[field] = format_unix_timestamp(event_args[field])
+                        if "category" in event_args:
+                            event_args["category"] = REVERSE_LICENSE_CATEGORY.get(event_args["category"], event_args["category"])
+                        if "oldStatus" in event_args:
+                            event_args["oldStatus"] = LICENSE_STATUS_REVERSE.get(event_args["oldStatus"], event_args["oldStatus"])
+                        if "newStatus" in event_args:
+                            event_args["newStatus"] = LICENSE_STATUS_REVERSE.get(event_args["newStatus"], event_args["newStatus"])
+                        if "status" in event_args:
+                            event_args["status"] = LICENSE_STATUS_REVERSE.get(event_args["status"], event_args["status"])
+                        if "changedByOfficerRole" in event_args:
+                            event_args["changedByOfficerRole"] = REVERSE_OFFICER_ROLE.get(event_args["changedByOfficerRole"], event_args["changedByOfficerRole"])   
+                
+                        if "licenseId" in event_args:
+                            license_id = event_args["licenseId"]
 
-                        try:
-                            decoded_log = contract.events.LicenseRevoked().process_log(log)
-                            license_id = decoded_log.args.licenseId
-                            events.append({
-                                "event": "LicenseRevoked",
-                                "license_id": license_id,
-                                "revoked_by": decoded_log.args.changedByOfficerName,
-                                "role": REVERSE_OFFICER_ROLE[decoded_log.args.changedByOfficerRole],
-                                "reason": decoded_log.args.reason,
-                            })
-                            continue
-                        except Exception:
-                            pass
-
-                        try:
-                            decoded_log = contract.events.LicenseRenewed().process_log(log)
-                            license_id = decoded_log.args.licenseId
-                            expiry_date = format_unix_timestamp(decoded_log.args.newExpiryDate)
-
-                            events.append({
-                                "event": "LicenseRenewed",
-                                "license_id": license_id,
-                                "renewed_by": decoded_log.args.changedByOfficerName,
-                                "role": REVERSE_OFFICER_ROLE[decoded_log.args.changedByOfficerRole],
-                                "new_expiry_date": expiry_date,
-                            })
-                            continue
-                        except Exception:
-                            pass
-
-                        try:
-                            decoded_log = contract.events.StatusChanged().process_log(log)
-                            license_id = decoded_log.args.licenseId
-                            events.append({
-                                "event": "StatusChanged",
-                                "license_id": license_id,
-                                "old_status": LICENSE_STATUS_REVERSE[decoded_log.args.oldStatus],
-                                "new_status": LICENSE_STATUS_REVERSE[decoded_log.args.newStatus],
-                                "changed_by": decoded_log.args.changedByOfficerName,
-                                "role": REVERSE_OFFICER_ROLE[decoded_log.args.changedByOfficerRole],
-                            })
-                            continue
-                        except Exception:
-                            pass
-
-                        try:
-                            decoded_log = contract.events.LicenseVerified().process_log(log)
-                            license_id = decoded_log.args.licenseId
-                            verified_date = format_unix_timestamp(decoded_log.args.verifiedDate)
-
-                            events.append({
-                                "event": "LicenseVerified",
-                                "license_id": license_id,
-                                "license_number": decoded_log.args.licenseNumber,
-                                "status": LICENSE_STATUS_REVERSE[decoded_log.args.status],
-                                "status_message": decoded_log.args.statusMessage,
-                                "verified_date": verified_date
-                            })
-                            continue
-                        except Exception:
-                            pass
-
-                        try: 
-                            decoded_log = contract.events.TamperAttemptDetected().process_log(log)
-                            license_id = decoded_log.args.licenseId
-                            detected_date = format_unix_timestamp(decoded_log.args.detectedDate)
-                            events.append({
-                                "event": "TamperAttemptDetected",
-                                "license_id": license_id,
-                                "license_number": decoded_log.args.licenseNumber,
-                                "status_message": decoded_log.args.statusMessage,
-                                "detected_date": detected_date
-                            })
-                            continue
-                        except Exception:
-                            pass
-
-                    except Exception as e_inner:
-                        logger.warning(f"Error decoding log: {e_inner}")
+                        events.append({
+                            "event": event_name,
+                            **event_args
+                        })
+                        break
+                    except Exception as decode_err:
+                        logger.debug(f"Failed to decode event: {decode_err}")
         except Exception as e:
             logger.warning(f"Could not parse events: {e}")
 
@@ -820,10 +710,6 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
         if license_id is not None:
             response["license_id"] = license_id
 
-        # Add expiry date if found
-        if expiry_date is not None:
-            response["expiry_date"] = expiry_date
-        
         # Add events if any
         if events:
             response["events"] = events
@@ -888,7 +774,6 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
 
 
 # Universal function to read from any smart contract method
-
 def read_from_contract(contract_name: str, method_name: str, params: List[Any]) -> Any:
     """
     Universal function to read from any smart contract method
@@ -1008,8 +893,8 @@ def process_params_for_abi(params: List[Any], contract_function: Any, contract: 
     return processed
 
 
-# formats the result of a contract call based on its type
-# this is used to format the result of a contract call
+# Formats the result of a contract call based on its type
+# This is used to format the result of a contract call
 def format_contract_result(result: Any, method_name: str, contract: Any) -> Any:
     """
     Format the result based on the method's return type
@@ -1024,7 +909,6 @@ def format_contract_result(result: Any, method_name: str, contract: Any) -> Any:
         contract (Any): The contract instance used for the call.
     Returns:    
         Any: The formatted result, either as a simple type, list, or dict with named outputs.
-
     """
     if result is None:
         return None
@@ -1063,7 +947,7 @@ def format_contract_result(result: Any, method_name: str, contract: Any) -> Any:
     
     return result
 
-# formats the result of a contract call
+# Formats the result of a contract call
 def format_single_value(value: Any, value_type: str) -> Any:
     """
     Format a single value based on its type
@@ -1093,7 +977,6 @@ def get_contract_abi(contract_name: str) -> List[Dict]:
 
 
 # Get all deployed contract addresses
-# This function reads the deployment_info.json file and returns all contract addresses
 def get_all_contract_addresses() -> dict:
     """
     Get all deployed contract addresses
@@ -1124,8 +1007,7 @@ def get_all_contract_addresses() -> dict:
             addresses["LicenseSystemV2"] = deployment_info["implementationV2"]
         
         # Add any other contract addresses found in deployment_info
-        excluded_keys = {"network", "networkName", "deploymentTime", "deploymentTimeFormatted", 
-                        "deployer", "implementationABI", "gasUsed", "verification"}
+        excluded_keys = {"network", "networkName", "deploymentTime", "deploymentTimeFormatted", "deployer", "implementationABI", "gasUsed", "verification"}
         
         for key, value in deployment_info.items():
             if key not in excluded_keys and isinstance(value, str) and value.startswith("0x"):
@@ -1147,8 +1029,7 @@ def get_all_contract_addresses() -> dict:
             "addresses": {}
         }
 
-# get the address of a specific contract by name
-# this is used to get the address of a contract by its name
+# Get the address of a specific contract by name
 def get_contract_address(contract_name: str) -> str:
     """
     Get the address for a specific contract
@@ -1198,7 +1079,6 @@ def get_contract_address(contract_name: str) -> str:
             raise ValueError(f"Contract address not found for {contract_name}: {str(e)}")
 
 # Get all available methods for a contract
-# This function retrieves all methods from the contract ABI and categorizes them into read and write methods
 def get_available_methods(contract_name: str) -> Dict[str, List[Dict]]:
     """Get all available methods for a contract with details"""
     contract = get_contract(contract_name)
@@ -1231,7 +1111,6 @@ def get_available_methods(contract_name: str) -> Dict[str, List[Dict]]:
     }
 
 # Estimate gas for a contract method call
-# This function estimates the gas required for a specific method call on a contract
 def estimate_gas_for_method(contract_name: str, method_name: str, 
                            params: List[Any], from_address: Optional[str] = None) -> Dict[str, Any]:
     """Estimate gas for a contract method call"""
