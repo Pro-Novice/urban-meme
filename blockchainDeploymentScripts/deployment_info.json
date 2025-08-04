@@ -1,11 +1,11 @@
 {
   "network": 1337,
   "networkName": "Ganache",
-  "deploymentTime": 1754308878,
-  "deploymentTimeFormatted": "2025-08-04 17:31:18",
+  "deploymentTime": 1754324247,
+  "deploymentTimeFormatted": "2025-08-04 21:47:27",
   "deployer": "0xFE3B557E8Fb62b89F4916B721be55cEb828dBd73",
-  "proxy": "0xCb59E712f70bf3Ab57dc615F628834668EEDF4a0",
-  "implementationV1": "0xd5A40380180568665F46B70E48C29A81CAB7Ff11",
+  "proxy": "0xfCd7761aD32674076c3C0EFc5e76048ae91C30eD",
+  "implementationV1": "0xD3e4702db965B10F86F44229691BC1cD6059db1F",
   "implementationABI": [
     {
       "inputs": [],
@@ -862,11 +862,6 @@
               "internalType": "string",
               "name": "cropVariety",
               "type": "string"
-            },
-            {
-              "internalType": "bool",
-              "name": "isSeedSelfProduced",
-              "type": "bool"
             }
           ],
           "internalType": "struct LicenseStorage.LicenseApplicationInput",
@@ -938,11 +933,6 @@
           "internalType": "string",
           "name": "_cropVariety",
           "type": "string"
-        },
-        {
-          "internalType": "bool",
-          "name": "_isSeedSelfProduced",
-          "type": "bool"
         },
         {
           "internalType": "enum LicenseStorage.userRole",
@@ -1036,6 +1026,6 @@
   },
   "verification": {
     "success": true,
-    "timestamp": 1754308878
+    "timestamp": 1754324247
   }
 }

@@ -9,22 +9,10 @@ import "./LicenseSystemV1.sol";
  */
 contract LicenseSystemV2 is LicenseSystemV1 {
     // New events for V2
-    event BulkOperationPerformed(uint256[] licenseIds, string operation);
+    event FeedbackAdded(uint256 indexed licenseId, address indexed inspector, string remarks, uint256 timestamp);
 
     // New function in V2
-    // function bulkUpdateStatus(
-    //     uint256[] memory _licenseIds,
-    //     LicenseStatus _newStatus,
-    //     string memory _remarks
-    // ) public {
-    //     for (uint i = 0; i < _licenseIds.length; i++) {
-    //         if (licenses[_licenseIds[i]].applicant != address(0)) {
-    //             updateStatus(_licenseIds[i], _newStatus, _remarks);
-    //         }
-    //     }
-
-    //     emit BulkOperationPerformed(_licenseIds, "bulkStatusUpdate");
-    // }
+    
 
     // Override existing function with new logic
     // function submitLicenseApplication(

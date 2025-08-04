@@ -19,7 +19,7 @@ from .blockchain_services import (
 
 from .enums import LicenseStatusEnum, LICENSE_STATUS_REVERSE, REVERSE_OFFICER_ROLE
 
-from .serialzers import SubmitLicenseApplicationSerializer, UpdateLicenseStatusSerializer, VerifyLicenseSerializer, AddInspectionFeedbackSerializer
+from .serialzers import SubmitLicenseApplicationSerializer, UpdateLicenseStatusSerializer, VerifyLicenseSerializer, UpdateLicenseDetailsSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +132,6 @@ def submit_license_application(request):
         "productionCompany": validated["production_company"],
         "cropName": validated["crop_name"],
         "cropVariety": validated["crop_variety"],
-        "isSeedSelfProduced": validated["is_seed_self_produced"],
     }
 
     try:
@@ -275,6 +274,7 @@ def update_license_status_view(request):
         logger.exception("Update license status failed")
         return ApiResponse(err=f"Update license status failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
 
+
 # 8. GET QR Code Data for License Verification
 @api_view(["GET"])
 def get_license_qr_data(request, license_id):
@@ -312,7 +312,7 @@ def verify_license_document(request):
     Expected payload:
     {
         "license_number": "123",
-        "expected_hash": "0xabc123...",
+        "expected_hash": "abc123897834377",
     }
     """
     serializer = VerifyLicenseSerializer(data=request.data)
@@ -343,123 +343,68 @@ def verify_license_document(request):
         return ApiResponse(err=f"Verify document failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-#15. add_inspection_feedback
+# 10. Update License Details
 @api_view(["POST"])
-def add_inspection_feedback(request):
-    """ Add feedback from an inspection for a license.
+def update_license_details(request):
+    """ Update details of an existing license.
     Expected payload:
     {
         "license_id": 123,
-        "inspector": "John Doe",
-        "feedback_type": 0,
-        "remarks": "Inspection passed"
+        "firm_name": "New Firm Name",
+        "firm_type": "New Firm Type",
+        "firm_address": "New Firm Address",
+        "sale_point_address": "New Sale Point Address",
+        "sale_storage_address": "New Sale Storage Address",
+        "production_company": "New Production Company",
+        "crop_name": "New Crop Name",
+        "crop_variety": "New Crop Variety",
+        "role": "JOINT_DIRECTOR"
     }
     """
-    serializer = AddInspectionFeedbackSerializer(data=request.data)
+    serializer = UpdateLicenseDetailsSerializer(data=request.data)
     if not serializer.is_valid():
         return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
 
-    data = serializer.validated_data
+    validated = serializer.validated_data
+    license_id = validated["license_id"]
+    firm_name = validated.get("firm_name", "")
+    firm_type = validated.get("firm_type", "")
+    firm_address = validated.get("firm_address", "")
+    sale_point_address = validated.get("sale_point_address", "")
+    sale_storage_address = validated.get("sale_storage_address", "")
+    production_company = validated.get("production_company", "")
+    crop_name = validated.get("crop_name", "")
+    crop_variety = validated.get("crop_variety", "")
+    role = validated["role"]
 
     try:
+        # Call contract method to update license details
         result = write_to_contract(
             contract_name="LicenseSystemV1",
-            method_name="addInspectionFeedback",
+            method_name="updateLicenseDetails",
             params=[
-                data["license_id"],
-                data["inspector"],
-                data["feedback_type"],
-                data["remarks"]
+                license_id,
+                firm_name,
+                firm_type,
+                firm_address,
+                sale_point_address,
+                sale_storage_address,
+                production_company,
+                crop_name,
+                crop_variety,
+                role
             ],
-            # address=data.get("address"),
-            # private_key=data.get("private_key")
         )
-        if (
-                isinstance(result, dict) and
-                result.get("success") is False and
-                "Gas estimation failed" in result.get("error", "") and
-                "License not found" in result.get("details", "")
-        ):
-            return ApiResponse(err=f"License not found. Please check the license ID: ", status=HTTP_400_BAD_REQUEST)
-        if not result.get("success"):
+
+        if not result.get("status", "") == "confirmed":
             return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
-        return ApiResponse(data=result, status=HTTP_200_OK)
-    except Exception as e:
-        logger.exception("Add inspection feedback failed")
-        return ApiResponse(
-            err=f"Inspection feedback submission failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-#16. Get All Inspection Feedback
-@api_view(["GET"])
-def get_all_inspection_feedback(request, license_id):
-    """ Fetch all inspection feedback for a given license.
-    """
-    try:
-        license_id = int(license_id)
-    except ValueError:
-        return ApiResponse(err="Invalid license_id in URL", status=HTTP_400_BAD_REQUEST)
-
-    try:
-        result = read_from_contract(
-            contract_name="LicenseSystemV1",
-            method_name="getAllInspectionFeedback",
-            params=[license_id]
-        )
-
-        # ✅ Check if result is empty or count is zero
-        if not result:
-            return ApiResponse(
-                err="Physical verification not yet done for this license.",
-                status=HTTP_404_NOT_FOUND
-            )
 
         return ApiResponse(data=result, status=HTTP_200_OK)
 
     except Exception as e:
-        logger.exception("Fetch inspection feedback failed")
-        return ApiResponse(
-            err=f"Inspection feedback fetch failed: {str(e)}",
-            status=HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        logger.exception("Update license details failed")
+        return ApiResponse(err=f"Update license details failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-#17. Count Feedback by Type
-@api_view(["GET"])
-def count_feedback_by_type(request, license_id, feedback_type):
-    """ Count the number of feedback entries for a specific type on a license.
-    """
-    try:
-        license_id = int(license_id)
-        feedback_type = int(feedback_type)
-    except (ValueError, TypeError):
-        return ApiResponse(
-            err="Invalid license_id or feedback_type (must be integers).",
-            status=HTTP_400_BAD_REQUEST
-        )
-
-    try:
-        result = read_from_contract(
-            contract_name="LicenseSystemV1",
-            method_name="countFeedbackByType",
-            params=[license_id, feedback_type]
-        )
-
-        # Assume 0 count means no feedback submitted for that type
-        if result == 0:
-            return ApiResponse(
-                err=f"No feedback of type: {FEEDBACK_TYPES[feedback_type]} submitted for license ID {license_id}.",
-                status=HTTP_404_NOT_FOUND
-            )
-
-        return ApiResponse(data={"count": result}, status=HTTP_200_OK)
-
-    except Exception as e:
-        logger.exception("Count feedback by type failed")
-        return ApiResponse(
-            err=f"Count feedback fetch failed: {str(e)}",
-            status=HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
 # Transaction Management
 @api_view(["GET"])

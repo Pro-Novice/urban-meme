@@ -3,7 +3,7 @@ import re
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
 
-from .enums import DivisionEnum, LicenseStatusEnum, OfficerRole, LICENSE_CATEGORY_MAP, LEVEL_MAP
+from .enums import LicenseStatusEnum, OfficerRole, LICENSE_CATEGORY_MAP, LEVEL_MAP
 
 # Serializers for license application
 class SubmitLicenseApplicationSerializer(serializers.Serializer):
@@ -22,7 +22,6 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
     production_company = serializers.CharField(required=False, allow_blank=True)
     crop_name = serializers.CharField()
     crop_variety = serializers.CharField()
-    is_seed_self_produced = serializers.BooleanField()
 
     def validate_license_category(self, value):
         enum_value = LICENSE_CATEGORY_MAP.get(value.upper())
@@ -40,16 +39,6 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
         if not re.match(r"^[1-9]{1}[0-9]{11}$", value):
             raise ValidationError("Invalid Aadhaar number. Must be 12 digits starting with non-zero.")
         return value
-    def validate(self, data):
-        if data.get("is_seed_self_produced") is False:
-            if not data.get("production_company"):
-                raise serializers.ValidationError({
-                    "production_company": "This field is required when seed is not self-produced."
-                })
-        else:
-            # Auto-fill with firm_name when self-produced
-            data["production_company"] = data.get("firm_name", "")
-        return data
 
 
 # Serializers for updating license status
@@ -96,6 +85,7 @@ class UpdateLicenseStatusSerializer(serializers.Serializer):
 
         return data
     
+
 class VerifyLicenseSerializer(serializers.Serializer):
     license_number = serializers.CharField()
     expected_hash = serializers.CharField()
@@ -119,19 +109,42 @@ class VerifyLicenseSerializer(serializers.Serializer):
 
         return data
 
-# Serializers for adding inspection feedback
-class AddInspectionFeedbackSerializer(serializers.Serializer):
+
+class UpdateLicenseDetailsSerializer(serializers.Serializer):
     license_id = serializers.IntegerField(min_value=1)
-    inspector = serializers.CharField()
-    feedback_type = serializers.IntegerField(min_value=0)
-    remarks = serializers.CharField()
+    firm_name = serializers.CharField(required=False, allow_blank=True)
+    firm_type = serializers.CharField(required=False, allow_blank=True)
+    firm_address = serializers.CharField(required=False, allow_blank=True)
+    sale_point_address = serializers.CharField(required=False, allow_blank=True)
+    sale_storage_address = serializers.CharField(required=False, allow_blank=True)
+    production_company = serializers.CharField(required=False, allow_blank=True)
+    crop_name = serializers.CharField(required=False, allow_blank=True)
+    crop_variety = serializers.CharField(required=False, allow_blank=True)
+    role = serializers.CharField()
 
-    def validate_inspector(self, value):
-        if not value.strip():
-            raise serializers.ValidationError("Inspector name cannot be empty.")
+    def validate_license_id(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("License ID must be a positive integer.")
         return value
+    
+    def validate_role(self, value):
+        try:
+            role_enum = OfficerRole.from_string(value)
+            return role_enum.value
+        except ValueError as e:
+            raise serializers.ValidationError(str(e))
 
-    def validate_remarks(self, value):
-        if not value.strip():
-            raise serializers.ValidationError("Remarks cannot be empty.")
-        return value
+    def validate(self, data):
+        license_id = data.get("license_id")
+        if not license_id:
+            raise serializers.ValidationError("License ID is required.")
+
+        # Ensure at least one field is provided for update
+        if not any(data.get(field) for field in [
+            "firm_name", "firm_type", "firm_address", 
+            "sale_point_address", "sale_storage_address", 
+            "production_company", "crop_name", "crop_variety"
+        ]):
+            raise serializers.ValidationError("At least one field must be provided for update.")
+
+        return data

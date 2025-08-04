@@ -95,7 +95,6 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         newLicense.productionCompany = input.productionCompany;
         newLicense.cropName = input.cropName;
         newLicense.cropVariety = input.cropVariety;
-        newLicense.isSeedSelfProduced = input.isSeedSelfProduced;
         newLicense.applicationDate = block.timestamp;
         newLicense.lastModifiedDate = block.timestamp;
         newLicense.isActive = false;
@@ -317,23 +316,22 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         string memory _productionCompany,
         string memory _cropName,
         string memory _cropVariety,
-        bool _isSeedSelfProduced,
         userRole _role
     ) public virtual onlyAdmins {
         License storage license = licenses[_licenseId];
         require(license.licenseId != 0, "License does not exist");
         require(license.status == LicenseStatus.APPROVED, "Only approved licenses can be edited");
 
-        // Update license fields
-        license.firmName = _firmName;
-        license.firmType = _firmType;
-        license.firmAddress = _firmAddress;
-        license.salePointAddress = _salePointAddress;
-        license.saleStorageAddress = _saleStorageAddress;
-        license.productionCompany = _productionCompany;
-        license.cropName = _cropName;
-        license.cropVariety = _cropVariety;
-        license.isSeedSelfProduced = _isSeedSelfProduced;
+        // Only update if non-empty
+        if (bytes(_firmName).length > 0) license.firmName = _firmName;
+        if (bytes(_firmType).length > 0) license.firmType = _firmType;
+        if (bytes(_firmAddress).length > 0) license.firmAddress = _firmAddress;
+        if (bytes(_salePointAddress).length > 0) license.salePointAddress = _salePointAddress;
+        if (bytes(_saleStorageAddress).length > 0) license.saleStorageAddress = _saleStorageAddress;
+        if (bytes(_productionCompany).length > 0) license.productionCompany = _productionCompany;
+        if (bytes(_cropName).length > 0) license.cropName = _cropName;
+        if (bytes(_cropVariety).length > 0) license.cropVariety = _cropVariety;
+
         license.lastModifiedDate = block.timestamp;
 
         // Add to action history

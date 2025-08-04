@@ -42,12 +42,6 @@ contract LicenseStorage {
         JOINT_DIRECTOR_INPUT,
         FIELD_INSPECTOR
     }
-    enum InspectionFeedbackType {
-        NONE,
-        SATISFACTORY,
-        UNSATISFACTORY,
-        NEEDS_REINSPECTION
-    }
 
     // Core License Structure
     struct License {
@@ -78,7 +72,6 @@ contract LicenseStorage {
         mapping(string => string) customFields;
         string[] customFieldKeys;
         // Payment paymentDetails;
-        Inspection[] inspections;
         uint256 applicationDate;
         uint256 lastModifiedDate;
         uint256 approvalDate;
@@ -98,22 +91,6 @@ contract LicenseStorage {
         string transactionId;
         string paymentMode;
         uint256 paymentDate;
-    }
-
-    struct Inspection {
-        uint256 inspectionId;
-        uint256 scheduledDate;
-        uint256 completedDate;
-        string inspectorOfficerId;
-        string inspectorName;
-        string gpsLocation;
-        bytes32[] photoHashes;
-        mapping(string => string) findings;
-        string[] findingKeys;
-        bool passed;
-        InspectionFeedbackType feedbackType;
-        string remarks;
-        string reportHash;
     }
 
     struct Action {
@@ -185,15 +162,6 @@ contract LicenseStorage {
         string productionCompany;
         string cropName;
         string cropVariety;
-        bool isSeedSelfProduced;
-    }
-
-    struct InspectionFeedback {
-        string inspectorOfficerId;
-        string inspectorName;
-        string remarks;
-        uint256 completedDate;
-        InspectionFeedbackType feedbackType;
     }
 
     // Main storage mappings
