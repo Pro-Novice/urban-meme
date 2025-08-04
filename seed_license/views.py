@@ -116,22 +116,30 @@ def submit_license_application(request):
         return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
 
     validated = serializer.validated_data
-    params = [
-        validated["license_category"],
-        validated["license_level"],
-        validated["applicant_name"],
-        validated["aadhaar_number"],
-        validated["business_name"],
-        validated["business_address"],
-        validated["district"],
-        validated["division"]
-    ]
+    struct_input = {
+        "category": validated["license_category"],
+        "level": validated["license_level"],
+        "registeringAuthority": validated["registering_authority"],
+        "registeringOfficeName": validated["registering_office_name"],
+        "applicantName": validated["applicant_name"],
+        "aadhaarNumber": validated["aadhaar_number"],
+        "applicantPermanentAddress": validated["applicant_permanent_address"],
+        "firmName": validated["firm_name"],
+        "firmType": validated["firm_type"],
+        "firmAddress": validated["firm_address"],
+        "salePointAddress": validated["sale_point_address"],
+        "saleStorageAddress": validated["sale_storage_address"],
+        "productionCompany": validated["production_company"],
+        "cropName": validated["crop_name"],
+        "cropVariety": validated["crop_variety"],
+        "isSeedSelfProduced": validated["is_seed_self_produced"],
+    }
 
     try:
         result = write_to_contract(
             contract_name="LicenseSystemV1",
             method_name="submitLicenseApplication",
-            params=params
+            params=[struct_input]
         )
        
         if not result.get("status", "") == "confirmed":
@@ -141,7 +149,6 @@ def submit_license_application(request):
     except Exception as e:
         logger.exception("Create license failed")
         return ApiResponse(err=f"Create license failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 # 5. get_license_basic_info
 @api_view(["GET"])

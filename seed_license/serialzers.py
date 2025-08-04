@@ -9,50 +9,46 @@ from .enums import DivisionEnum, LicenseStatusEnum, OfficerRole, LICENSE_CATEGOR
 class SubmitLicenseApplicationSerializer(serializers.Serializer):
     license_category = serializers.CharField()
     license_level = serializers.CharField()
+    registering_authority = serializers.CharField()
+    registering_office_name = serializers.CharField()
     applicant_name = serializers.CharField()
     aadhaar_number = serializers.CharField()
-    business_name = serializers.CharField()
-    business_address = serializers.CharField()
-    district = serializers.CharField()
-    division = serializers.CharField()
+    applicant_permanent_address = serializers.CharField()
+    firm_name = serializers.CharField()
+    firm_type = serializers.CharField()
+    firm_address = serializers.CharField()
+    sale_point_address = serializers.CharField()
+    sale_storage_address = serializers.CharField()
+    production_company = serializers.CharField(required=False, allow_blank=True)
+    crop_name = serializers.CharField()
+    crop_variety = serializers.CharField()
+    is_seed_self_produced = serializers.BooleanField()
 
     def validate_license_category(self, value):
-        if isinstance(value, str):
-            enum_value = LICENSE_CATEGORY_MAP.get(value.upper())
-            if enum_value is None:
-                raise serializers.ValidationError("Invalid license category")
-            return enum_value
-        return value
+        enum_value = LICENSE_CATEGORY_MAP.get(value.upper())
+        if enum_value is None:
+            raise serializers.ValidationError("Invalid license category")
+        return enum_value
 
     def validate_license_level(self, value):
-        if isinstance(value, str):
-            enum_value = LEVEL_MAP.get(value.upper())
-            if enum_value is None:
-                raise serializers.ValidationError("Invalid license level")
-            return enum_value
-        return value
+        enum_value = LEVEL_MAP.get(value.upper())
+        if enum_value is None:
+            raise serializers.ValidationError("Invalid license level")
+        return enum_value
 
     def validate_aadhaar_number(self, value):
         if not re.match(r"^[1-9]{1}[0-9]{11}$", value):
-            raise ValidationError("Not a valid Aadhaar number. Format: XXXXXXXXXXXX")
+            raise ValidationError("Invalid Aadhaar number. Must be 12 digits starting with non-zero.")
         return value
-
-    def validate_division(self, value):
-        if not value:
-            return ""
-        try:
-            return DivisionEnum.from_string(value)
-        except ValueError as e:
-            raise serializers.ValidationError(str(e))
-
     def validate(self, data):
-        division = data.get("division")
-        if division:
-            try:
-                data["division"] = DivisionEnum.from_string(division)
-            except ValueError as e:
-                raise serializers.ValidationError({"division": str(e)})
-
+        if data.get("is_seed_self_produced") is False:
+            if not data.get("production_company"):
+                raise serializers.ValidationError({
+                    "production_company": "This field is required when seed is not self-produced."
+                })
+        else:
+            # Auto-fill with firm_name when self-produced
+            data["production_company"] = data.get("firm_name", "")
         return data
 
 

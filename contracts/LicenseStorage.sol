@@ -42,16 +42,6 @@ contract LicenseStorage {
         JOINT_DIRECTOR_INPUT,
         FIELD_INSPECTOR
     }
-    enum Division {
-        AJMER_DIVISION,
-        BHARATPUR_DIVISION,
-        BIKANER_DIVISION,
-        JAIPUR_DIVISION,
-        JODHPUR_DIVISION,
-        KOTA_DIVISION,
-        UDAIPUR_DIVISION
-    }
-
     enum InspectionFeedbackType {
         NONE,
         SATISFACTORY,
@@ -61,22 +51,30 @@ contract LicenseStorage {
 
     // Core License Structure
     struct License {
+        // Unique identifier
         uint256 licenseId;
         string licenseNumber;
         LicenseCategory category;
-        LicenseLevel level;
         LicenseStatus status;
+        LicenseLevel level;
+        // Registering authority details---
+        string registeringAuthority;
+        string registeringOfficeName;
+        // Applicant details
         string applicantName;
         string aadhaarNumber;
-        string panNumber;
-        string gstNumber;
-        string mobileNumber;
-        string businessName;
-        string businessType;
-        string businessAddress;
-        string state;
-        string division;
-        string district;
+        string applicantPermanentAddress;
+        // Firm details
+        string firmName;
+        string firmType; // Private Ltd, Public Ltd, Partnership Firm, Proprietor Firm, etc.
+        string firmAddress;
+        string salePointAddress;
+        string saleStorageAddress;
+        // Crop details
+        bool isSeedSelfProduced;
+        string productionCompany;
+        string cropName;
+        string cropVariety;
         mapping(string => string) customFields;
         string[] customFieldKeys;
         // Payment paymentDetails;
@@ -106,7 +104,7 @@ contract LicenseStorage {
         uint256 inspectionId;
         uint256 scheduledDate;
         uint256 completedDate;
-        string inspectorOfficerId; // Store officer ID instead of address
+        string inspectorOfficerId;
         string inspectorName;
         string gpsLocation;
         bytes32[] photoHashes;
@@ -135,11 +133,16 @@ contract LicenseStorage {
         LicenseCategory category;
         LicenseLevel level;
         LicenseStatus status;
-        string businessName;
-        string businessAddress;
-        string district;
-        string state;
-        string division;
+        string firmName;
+        string firmType;
+        string firmAddress;
+        string salePointAddress;
+        string saleStorageAddress;
+        string productionCompany;
+        string cropName;
+        string cropVariety;
+        string registeringOfficeName;
+        string registeringAuthority;
         uint256 applicationDate;
         uint256 approvalDate;
         uint256 rejectionDate;
@@ -159,17 +162,30 @@ contract LicenseStorage {
         bool isRevoked;
         string licenseNumber;
         uint256 licenseId;
-        string applicantName;
-        string businessName;
-        string businessAddress;
-        LicenseCategory category;
-        LicenseLevel level;
-        LicenseStatus status;
         uint256 approvalDate;
         uint256 expiryDate;
         uint256 revokedDate;
         string verificationHash;
         string statusMessage;
+    }
+
+    struct LicenseApplicationInput {
+        LicenseCategory category;
+        LicenseLevel level;
+        string registeringAuthority;
+        string registeringOfficeName;
+        string applicantName;
+        string aadhaarNumber;
+        string applicantPermanentAddress;
+        string firmName;
+        string firmType;
+        string firmAddress;
+        string salePointAddress;
+        string saleStorageAddress;
+        string productionCompany;
+        string cropName;
+        string cropVariety;
+        bool isSeedSelfProduced;
     }
 
     struct InspectionFeedback {
@@ -187,11 +203,9 @@ contract LicenseStorage {
 
     // Tracking arrays
     uint256[] internal allLicenseIds;
-    mapping(address => uint256[]) internal applicantLicenses;
     mapping(LicenseStatus => uint256[]) internal licensesByStatus;
     mapping(LicenseCategory => uint256[]) internal licensesByCategory;
     mapping(LicenseLevel => uint256[]) internal licensesByLevel;
-    mapping(string => uint256[]) internal licensesByDistrict;
     mapping(address => bool) internal admins;
 
     // Gap for future storage variables

@@ -27,25 +27,25 @@ contract LicenseSystemV2 is LicenseSystemV1 {
     // }
 
     // Override existing function with new logic
-    function submitLicenseApplication(
-        LicenseCategory _category,
-        LicenseLevel _level,
-        string memory _applicantName,
-        string memory _aadhaarNumber,
-        string memory _businessName,
-        string memory _businessAddress,
-        string memory _district,
-        string memory _division
-    ) public override {
-        // Call parent function
-        super.submitLicenseApplication(_category, _level, _applicantName, _aadhaarNumber, _businessName, _businessAddress, _district, _division);
+    // function submitLicenseApplication(
+    //     LicenseCategory _category,
+    //     LicenseLevel _level,
+    //     string memory _applicantName,
+    //     string memory _aadhaarNumber,
+    //     string memory _businessName,
+    //     string memory _businessAddress,
+    //     string memory _district,
+    //     string memory _division
+    // ) public override {
+    //     // Call parent function
+    //     super.submitLicenseApplication(_category, _level, _applicantName, _aadhaarNumber, _businessName, _businessAddress, _district, _division);
 
-        // New V2 logic: Auto-assign to district officer
-        // address districtOfficer = _getDistrictOfficer(_district);
-        // if (districtOfficer != address(0)) {
-        //     _autoAssignOfficer(licenseId, districtOfficer);
-        // }
-    }
+    //     // New V2 logic: Auto-assign to district officer
+    //     // address districtOfficer = _getDistrictOfficer(_district);
+    //     // if (districtOfficer != address(0)) {
+    //     //     _autoAssignOfficer(licenseId, districtOfficer);
+    //     // }
+    // }
 
     // New internal function for V2
     // function _getDistrictOfficer(string memory _district) internal view returns (address) {

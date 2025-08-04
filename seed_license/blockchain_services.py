@@ -115,8 +115,9 @@ def format_api_response(success: bool, data: Any = None, error: str = None, extr
 GENERIC_TRANSFORM_MAP = {
     "getLicenseBasicInfo": {
         "fields": [
-            "licenseId", "licenseNumber", "applicantName", "category", "level", "status", "businessName", "businessAddress", "district", 
-            "state", "division", "applicationDate", "approvalDate", "rejectionDate", "expiryDate", "revokedDate", "renewalDate", "isActive",
+            "licenseId", "licenseNumber", "applicantName", "category", "level", "status", "firmName", "firmType", "firmAddress", 
+            "salePointAddress", "saleStorageAddress", "productionCompany", "cropName", "cropVariety", "registeringOfficeName", 
+            "registeringAuthority", "applicationDate", "approvalDate", "rejectionDate", "expiryDate", "revokedDate", "renewalDate", "isActive",
         ],
         "enum_mappings": {
             "category": LICENSE_CATEGORIES,
@@ -678,8 +679,8 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any], a
                             event_args["newStatus"] = LICENSE_STATUS_REVERSE.get(event_args["newStatus"], event_args["newStatus"])
                         if "status" in event_args:
                             event_args["status"] = LICENSE_STATUS_REVERSE.get(event_args["status"], event_args["status"])
-                        if "changedByOfficerRole" in event_args:
-                            event_args["changedByOfficerRole"] = REVERSE_OFFICER_ROLE.get(event_args["changedByOfficerRole"], event_args["changedByOfficerRole"])   
+                        if "changedByRole" in event_args:
+                            event_args["changedByRole"] = REVERSE_OFFICER_ROLE.get(event_args["changedByRole"], event_args["changedByRole"])   
                 
                         if "licenseId" in event_args:
                             license_id = event_args["licenseId"]

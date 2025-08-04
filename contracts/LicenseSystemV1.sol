@@ -14,38 +14,21 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, OwnableUpgradeable {
     // Events
     event LicenseApplicationSubmitted(uint256 indexed licenseId, string licenseNumber, LicenseCategory category, uint256 applicationDate);
-    event LicenseApproved(
-        uint256 indexed licenseId,
-        string changedByOfficerName,
-        userRole changedByOfficerRole,
-        uint256 approvalDate,
-        uint256 expiryDate
-    );
-    event LicenseRevoked(uint256 indexed licenseId, string changedByOfficerName, userRole changedByOfficerRole, string reason, uint256 revokedDate);
-    event LicenseRejected(
-        uint256 indexed licenseId,
-        string changedByOfficerName,
-        userRole changedByOfficerRole,
-        string reason,
-        uint256 rejectionDate
-    );
-    event LicenseRenewed(
-        uint256 indexed licenseId,
-        string changedByOfficerName,
-        userRole changedByOfficerRole,
-        uint256 renewalDate,
-        uint256 expiryDate
-    );
+    event LicenseApproved(uint256 indexed licenseId, string changedBy, userRole changedByRole, uint256 approvalDate, uint256 expiryDate);
+    event LicenseRevoked(uint256 indexed licenseId, string changedBy, userRole changedByRole, string reason, uint256 revokedDate);
+    event LicenseRejected(uint256 indexed licenseId, string changedBy, userRole changedByRole, string reason, uint256 rejectionDate);
+    event LicenseRenewed(uint256 indexed licenseId, string changedBy, userRole changedByRole, uint256 renewalDate, uint256 expiryDate);
     event StatusChanged(
         uint256 indexed licenseId,
         LicenseStatus oldStatus,
         LicenseStatus newStatus,
-        string changedByOfficerName,
-        userRole changedByOfficerRole,
+        string changedBy,
+        userRole changedByRole,
         uint256 lastModifiedDate
     );
-    event LicenseVerified(uint256 indexed licenseId, string licenseNumber, LicenseStatus status, string statusMessage, uint256 verifiedDate);
+    event LicenseVerified(uint256 indexed licenseId, string licenseNumber, string statusMessage, uint256 verifiedDate);
     event TamperAttemptDetected(uint256 indexed licenseId, string licenseNumber, string statusMessage, uint256 detectedDate);
+    event LicenseDetailsUpdated(uint256 indexed licenseId, uint256 lastModifiedDate);
     event ApiCallerAuthorized(address indexed caller);
     event ApiCallerRevoked(address indexed caller);
 
@@ -90,31 +73,29 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     }
 
     // 1. Submit License Application - To be used by citizens
-    function submitLicenseApplication(
-        LicenseCategory _category,
-        LicenseLevel _level,
-        string memory _applicantName,
-        string memory _aadhaarNumber,
-        string memory _businessName,
-        string memory _businessAddress,
-        string memory _district,
-        string memory _division
-    ) public virtual onlyAdmins {
+    function submitLicenseApplication(LicenseApplicationInput memory input) public virtual onlyAdmins {
         _incrementLicenseCounter();
         uint256 newLicenseId = licenseIdCounter();
 
         License storage newLicense = licenses[newLicenseId];
         newLicense.licenseId = newLicenseId;
-        newLicense.category = _category;
-        newLicense.level = _level;
+        newLicense.category = input.category;
+        newLicense.level = input.level;
         newLicense.status = LicenseStatus.SUBMITTED;
-        newLicense.applicantName = _applicantName;
-        newLicense.aadhaarNumber = _hashAadhaar(_aadhaarNumber); // hashed
-        newLicense.businessName = _businessName;
-        newLicense.businessAddress = _businessAddress;
-        newLicense.state = "RAJASTHAN";
-        newLicense.district = _district;
-        newLicense.division = _division;
+        newLicense.registeringAuthority = input.registeringAuthority;
+        newLicense.registeringOfficeName = input.registeringOfficeName;
+        newLicense.applicantName = input.applicantName;
+        newLicense.aadhaarNumber = _hashAadhaar(input.aadhaarNumber); // hashed
+        newLicense.applicantPermanentAddress = input.applicantPermanentAddress;
+        newLicense.firmName = input.firmName;
+        newLicense.firmType = input.firmType;
+        newLicense.firmAddress = input.firmAddress;
+        newLicense.salePointAddress = input.salePointAddress;
+        newLicense.saleStorageAddress = input.saleStorageAddress;
+        newLicense.productionCompany = input.productionCompany;
+        newLicense.cropName = input.cropName;
+        newLicense.cropVariety = input.cropVariety;
+        newLicense.isSeedSelfProduced = input.isSeedSelfProduced;
         newLicense.applicationDate = block.timestamp;
         newLicense.lastModifiedDate = block.timestamp;
         newLicense.isActive = false;
@@ -123,25 +104,23 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             Action({
                 timestamp: block.timestamp,
                 actionType: LicenseStatus.SUBMITTED,
-                actorName: _applicantName,
+                actorName: input.applicantName,
                 actorRole: userRole.CITIZEN,
                 remarks: "License Application Successfully Submitted",
-                dataHash: _toHexString(keccak256(abi.encodePacked(_applicantName, _businessName, block.timestamp)))
+                dataHash: _toHexString(keccak256(abi.encodePacked(input.applicantName, input.firmName, block.timestamp)))
             })
         );
 
-        newLicense.licenseNumber = _generateLicenseNumber(_category, _level, newLicenseId);
+        newLicense.licenseNumber = _generateLicenseNumber(input.category, input.level, newLicenseId);
 
         // Update tracking
         allLicenseIds.push(newLicenseId);
-        applicantLicenses[msg.sender].push(newLicenseId);
         licensesByStatus[LicenseStatus.SUBMITTED].push(newLicenseId);
-        licensesByCategory[_category].push(newLicenseId);
-        licensesByLevel[_level].push(newLicenseId);
-        licensesByDistrict[_district].push(newLicenseId);
+        licensesByCategory[input.category].push(newLicenseId);
+        licensesByLevel[input.level].push(newLicenseId);
         licenseNumberToId[newLicense.licenseNumber] = newLicenseId;
 
-        emit LicenseApplicationSubmitted(newLicenseId, newLicense.licenseNumber, _category, newLicense.applicationDate);
+        emit LicenseApplicationSubmitted(newLicenseId, newLicense.licenseNumber, input.category, newLicense.applicationDate);
     }
 
     // 2. Get License Basic Info - to be performed by citizens/officers
@@ -156,11 +135,16 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                 category: license.category,
                 level: license.level,
                 status: license.status,
-                businessName: license.businessName,
-                businessAddress: license.businessAddress,
-                district: license.district,
-                state: license.state,
-                division: license.division,
+                firmName: license.firmName,
+                firmType: license.firmType,
+                firmAddress: license.firmAddress,
+                salePointAddress: license.salePointAddress,
+                saleStorageAddress: license.saleStorageAddress,
+                productionCompany: license.productionCompany,
+                cropName: license.cropName,
+                cropVariety: license.cropVariety,
+                registeringOfficeName: license.registeringOfficeName,
+                registeringAuthority: license.registeringAuthority,
                 applicationDate: license.applicationDate,
                 approvalDate: license.approvalDate,
                 rejectionDate: license.rejectionDate,
@@ -253,33 +237,18 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
 
     // 6. Verify License Integrity and Validity
     function verifyLicenseWithHash(string memory _licenseNumber, string memory _expectedHash) public {
-        LicenseVerificationData memory verificationData = verifyLicenseByNumber(_licenseNumber);
+        LicenseVerificationData memory data = verifyLicenseByNumber(_licenseNumber);
 
-        if (!verificationData.isValid) {
-            emit LicenseVerified(
-                verificationData.licenseId,
-                _licenseNumber,
-                verificationData.status,
-                verificationData.statusMessage,
-                block.timestamp
-            );
+        if (!data.isValid) {
+            emit LicenseVerified(data.licenseId, _licenseNumber, data.statusMessage, block.timestamp);
+            return;
         }
 
-        // Check for tampering by comparing hashes
-        bool isTampered = !_compareStrings(verificationData.verificationHash, _expectedHash);
-
-        if (isTampered) {
-            verificationData.statusMessage = "WARNING: Potential tampering detected!";
-            emit TamperAttemptDetected(verificationData.licenseId, _licenseNumber, verificationData.statusMessage, block.timestamp);
-        } else {
-            emit LicenseVerified(
-                verificationData.licenseId,
-                _licenseNumber,
-                verificationData.status,
-                verificationData.statusMessage,
-                block.timestamp
-            );
+        if (!_compareStrings(data.verificationHash, _expectedHash)) {
+            data.statusMessage = "WARNING: Potential tampering detected!";
+            emit TamperAttemptDetected(data.licenseId, _licenseNumber, data.statusMessage, block.timestamp);
         }
+        emit LicenseVerified(data.licenseId, _licenseNumber, data.statusMessage, block.timestamp);
     }
 
     // 7. Verify License by Number - Private function to be used internally
@@ -295,12 +264,6 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                     isRevoked: false,
                     licenseNumber: _licenseNumber,
                     licenseId: 0,
-                    applicantName: "",
-                    businessName: "",
-                    businessAddress: "",
-                    category: LicenseCategory.SEED,
-                    level: LicenseLevel.STATE,
-                    status: LicenseStatus.SUBMITTED,
                     approvalDate: 0,
                     expiryDate: 0,
                     revokedDate: 0,
@@ -335,18 +298,57 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                 isRevoked: isRevoked,
                 licenseNumber: license.licenseNumber,
                 licenseId: license.licenseId,
-                applicantName: license.applicantName,
-                businessName: license.businessName,
-                businessAddress: license.businessAddress,
-                category: license.category,
-                level: license.level,
-                status: license.status,
                 approvalDate: license.approvalDate,
                 expiryDate: license.expiryDate,
                 revokedDate: license.revokedDate,
                 verificationHash: verificationHash,
                 statusMessage: statusMessage
             });
+    }
+
+    // 8. Update License Details - to be performed by admins
+    function updateLicenseDetails(
+        uint256 _licenseId,
+        string memory _firmName,
+        string memory _firmType,
+        string memory _firmAddress,
+        string memory _salePointAddress,
+        string memory _saleStorageAddress,
+        string memory _productionCompany,
+        string memory _cropName,
+        string memory _cropVariety,
+        bool _isSeedSelfProduced,
+        userRole _role
+    ) public virtual onlyAdmins {
+        License storage license = licenses[_licenseId];
+        require(license.licenseId != 0, "License does not exist");
+        require(license.status == LicenseStatus.APPROVED, "Only approved licenses can be edited");
+
+        // Update license fields
+        license.firmName = _firmName;
+        license.firmType = _firmType;
+        license.firmAddress = _firmAddress;
+        license.salePointAddress = _salePointAddress;
+        license.saleStorageAddress = _saleStorageAddress;
+        license.productionCompany = _productionCompany;
+        license.cropName = _cropName;
+        license.cropVariety = _cropVariety;
+        license.isSeedSelfProduced = _isSeedSelfProduced;
+        license.lastModifiedDate = block.timestamp;
+
+        // Add to action history
+        license.actionHistory.push(
+            Action({
+                timestamp: block.timestamp,
+                actionType: LicenseStatus.APPROVED,
+                actorName: license.registeringAuthority,
+                actorRole: _role,
+                remarks: "License details updated",
+                dataHash: _toHexString(keccak256(abi.encodePacked(_licenseId, block.timestamp)))
+            })
+        );
+
+        emit LicenseDetailsUpdated(_licenseId, block.timestamp);
     }
 
     // Helper functions
@@ -512,17 +514,11 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             _toHexString(
                 keccak256(
                     abi.encodePacked(
-                        license.licenseNumber,
                         license.applicantName,
-                        license.businessName,
-                        license.businessAddress,
-                        uint256(license.category),
-                        uint256(license.level),
-                        uint256(license.status),
-                        license.approvalDate,
-                        license.expiryDate,
-                        license.revokedDate,
-                        license.isActive
+                        license.firmName,
+                        license.firmAddress,
+                        license.salePointAddress,
+                        license.saleStorageAddress
                     )
                 )
             );
