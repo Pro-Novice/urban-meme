@@ -5,7 +5,7 @@ app_name = 'seed_license'
 
 urlpatterns = [
      # Blockchain Utilities
-     path('blockchain/initialize/', views.initialize_blockchain_contract, name='initialize-contract'),
+     # path('blockchain/initialize/', views.initialize_blockchain_contract, name='initialize-contract'),
      path('blockchain/owner/', views.check_owner_blockchain, name='check-owner'),
      path('blockchain/estimate-gas/', views.estimate_gas_view, name='estimate-gas'),
      path('blockchain/transaction/<str:tx_hash>/', views.transaction_status_view, name='transaction-status'),

@@ -42,9 +42,7 @@ def initialize_blockchain_contract(request):
         result = write_to_contract(
             contract_name="LicenseSystemV1",
             method_name="initialize",
-            params=[],
-            # address=address,
-            # private_key=private_key
+            params=[]
         )
         if not result.get("status", "") == "confirmed":
             return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
@@ -63,7 +61,9 @@ def check_owner_blockchain(request):
         result = read_from_contract(
             contract_name="LicenseSystemV1",
             method_name="owner",
-            params=[]
+            params=[],
+            # address=address,
+            # private_key=private_key
         )
         return ApiResponse(data=result, status=HTTP_200_OK)
     except ValueError as e:

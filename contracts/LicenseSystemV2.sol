@@ -9,41 +9,52 @@ import "./LicenseSystemV1.sol";
  */
 contract LicenseSystemV2 is LicenseSystemV1 {
     // New events for V2
-    event FeedbackAdded(uint256 indexed licenseId, address indexed inspector, string remarks, uint256 timestamp);
+    event LicenseDetailsUpdated(uint256 indexed licenseId, uint256 lastModifiedDate);
 
     // New function in V2
-    
+    function updateLicenseDetails(
+        uint256 _licenseId,
+        string memory _firmName,
+        string memory _firmType,
+        string memory _firmAddress,
+        string memory _salePointAddress,
+        string memory _saleStorageAddress,
+        string memory _productionCompany,
+        string memory _cropName,
+        string memory _cropVariety,
+        userRole _role
+    ) public virtual onlyAuthorizedCallers {
+        License storage license = licenses[_licenseId];
+        require(license.licenseId != 0, "License does not exist");
+        require(license.status == LicenseStatus.APPROVED, "Only approved licenses can be edited");
+
+        // Update license fields
+        license.firmName = _firmName;
+        license.firmType = _firmType;
+        license.firmAddress = _firmAddress;
+        license.salePointAddress = _salePointAddress;
+        license.saleStorageAddress = _saleStorageAddress;
+        license.productionCompany = _productionCompany;
+        license.cropName = _cropName;
+        license.cropVariety = _cropVariety;
+        license.lastModifiedDate = block.timestamp;
+
+        // Add to action history
+        license.actionHistory.push(
+            Action({
+                timestamp: block.timestamp,
+                actionType: LicenseStatus.APPROVED,
+                actorName: license.registeringAuthority,
+                actorRole: _role,
+                remarks: "License details updated",
+                dataHash: _toHexString(keccak256(abi.encodePacked(_licenseId, block.timestamp)))
+            })
+        );
+
+        emit LicenseDetailsUpdated(_licenseId, block.timestamp);
+    }
 
     // Override existing function with new logic
-    // function submitLicenseApplication(
-    //     LicenseCategory _category,
-    //     LicenseLevel _level,
-    //     string memory _applicantName,
-    //     string memory _aadhaarNumber,
-    //     string memory _businessName,
-    //     string memory _businessAddress,
-    //     string memory _district,
-    //     string memory _division
-    // ) public override {
-    //     // Call parent function
-    //     super.submitLicenseApplication(_category, _level, _applicantName, _aadhaarNumber, _businessName, _businessAddress, _district, _division);
-
-    //     // New V2 logic: Auto-assign to district officer
-    //     // address districtOfficer = _getDistrictOfficer(_district);
-    //     // if (districtOfficer != address(0)) {
-    //     //     _autoAssignOfficer(licenseId, districtOfficer);
-    //     // }
-    // }
 
     // New internal function for V2
-    // function _getDistrictOfficer(string memory _district) internal view returns (address) {
-    // Logic to find district officer
-    // This is just an example
-    // for (uint i = 0; i < allOfficers.length; i++) {
-    //    if (keccak256(bytes(officers[allOfficers[i]].level)) == keccak256(bytes(_district))) {
-    //       return allOfficers[i];
-    //   }
-    // }
-    //   return address(0);
-    //  }
 }

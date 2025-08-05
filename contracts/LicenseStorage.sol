@@ -174,7 +174,6 @@ contract LicenseStorage {
     mapping(LicenseStatus => uint256[]) internal licensesByStatus;
     mapping(LicenseCategory => uint256[]) internal licensesByCategory;
     mapping(LicenseLevel => uint256[]) internal licensesByLevel;
-    mapping(address => bool) internal admins;
 
     // Gap for future storage variables
     uint256[50] private __gap;

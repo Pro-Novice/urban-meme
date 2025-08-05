@@ -28,13 +28,12 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     );
     event LicenseVerified(uint256 indexed licenseId, string licenseNumber, string statusMessage, uint256 verifiedDate);
     event TamperAttemptDetected(uint256 indexed licenseId, string licenseNumber, string statusMessage, uint256 detectedDate);
-    event LicenseDetailsUpdated(uint256 indexed licenseId, uint256 lastModifiedDate);
     event ApiCallerAuthorized(address indexed caller);
     event ApiCallerRevoked(address indexed caller);
 
     // Modifiers
-    modifier onlyAdmins() {
-        require(msg.sender == owner() || admins[msg.sender], "Only authorized addresses can perform this action");
+    modifier onlyAuthorizedCallers() {
+        require(msg.sender == owner() || authorizedApiCallers[msg.sender], "Only authorized addresses can perform this action");
         _;
     }
 
@@ -52,28 +51,25 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     function initialize() public initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
-        admins[msg.sender] = true; // Add to admin mapping
+        authorizedApiCallers[msg.sender] = true; // Add to admin mapping
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    function addAdmin(address newAdmin) public {
-        require(msg.sender == owner(), "Only owner can add admins");
-        require(newAdmin != address(0), "Invalid address");
-        admins[newAdmin] = true;
-        emit ApiCallerAuthorized(newAdmin);
-    }
-
-    function removeAdmin(address adminToRemove) public {
-        require(msg.sender == owner(), "Only owner can remove admins");
-        require(adminToRemove != address(0), "Invalid address");
-        require(adminToRemove != owner(), "Cannot remove owner");
-        admins[adminToRemove] = false;
-        emit ApiCallerRevoked(adminToRemove);
+    function manageAuthorizedApiCallers(address admin, bool add) public onlyOwner {
+        require(admin != address(0), "Invalid address");
+        if (add) {
+            authorizedApiCallers[admin] = true;
+            emit ApiCallerAuthorized(admin);
+        } else {
+            require(admin != owner(), "Cannot remove owner");
+            authorizedApiCallers[admin] = false;
+            emit ApiCallerRevoked(admin);
+        }   
     }
 
     // 1. Submit License Application - To be used by citizens
-    function submitLicenseApplication(LicenseApplicationInput memory input) public virtual onlyAdmins {
+    function submitLicenseApplication(LicenseApplicationInput memory input) public virtual onlyAuthorizedCallers {
         _incrementLicenseCounter();
         uint256 newLicenseId = licenseIdCounter();
 
@@ -170,7 +166,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         userRole _role,
         string memory _remarks,
         uint256 _renewalPeriodDays // Optional parameter for renewals and approvals
-    ) public onlyAdmins licenseExists(_licenseId) {
+    ) public onlyAuthorizedCallers licenseExists(_licenseId) {
         License storage license = licenses[_licenseId];
         LicenseStatus oldStatus = license.status;
 
@@ -303,50 +299,6 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                 verificationHash: verificationHash,
                 statusMessage: statusMessage
             });
-    }
-
-    // 8. Update License Details - to be performed by admins
-    function updateLicenseDetails(
-        uint256 _licenseId,
-        string memory _firmName,
-        string memory _firmType,
-        string memory _firmAddress,
-        string memory _salePointAddress,
-        string memory _saleStorageAddress,
-        string memory _productionCompany,
-        string memory _cropName,
-        string memory _cropVariety,
-        userRole _role
-    ) public virtual onlyAdmins {
-        License storage license = licenses[_licenseId];
-        require(license.licenseId != 0, "License does not exist");
-        require(license.status == LicenseStatus.APPROVED, "Only approved licenses can be edited");
-
-        // Only update if non-empty
-        if (bytes(_firmName).length > 0) license.firmName = _firmName;
-        if (bytes(_firmType).length > 0) license.firmType = _firmType;
-        if (bytes(_firmAddress).length > 0) license.firmAddress = _firmAddress;
-        if (bytes(_salePointAddress).length > 0) license.salePointAddress = _salePointAddress;
-        if (bytes(_saleStorageAddress).length > 0) license.saleStorageAddress = _saleStorageAddress;
-        if (bytes(_productionCompany).length > 0) license.productionCompany = _productionCompany;
-        if (bytes(_cropName).length > 0) license.cropName = _cropName;
-        if (bytes(_cropVariety).length > 0) license.cropVariety = _cropVariety;
-
-        license.lastModifiedDate = block.timestamp;
-
-        // Add to action history
-        license.actionHistory.push(
-            Action({
-                timestamp: block.timestamp,
-                actionType: LicenseStatus.APPROVED,
-                actorName: license.registeringAuthority,
-                actorRole: _role,
-                remarks: "License details updated",
-                dataHash: _toHexString(keccak256(abi.encodePacked(_licenseId, block.timestamp)))
-            })
-        );
-
-        emit LicenseDetailsUpdated(_licenseId, block.timestamp);
     }
 
     // Helper functions

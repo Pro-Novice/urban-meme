@@ -485,36 +485,6 @@ def get_transaction_status(tx_hash: str):
         return {"tx_hash": tx_hash, "status": "PENDING", "error": str(exc)}
 
 
-def _get_network_info():
-    """Helper function to get network information for error responses"""
-    try:
-        network_names = {
-            1: "Ethereum Mainnet",
-            56: "BSC Mainnet",
-            97: "BSC Testnet", 
-            137: "Polygon Mainnet",
-            80001: "Polygon Mumbai",
-            1337: "Ganache",
-            31337: "Hardhat Network",
-            11155111: "Sepolia",
-            5: "Goerli"
-        }
-        
-        return {
-            "rpc_url": str(w3.provider.endpoint_uri) if hasattr(w3.provider, 'endpoint_uri') else "unknown",
-            "chain_id": w3.eth.chain_id if w3.is_connected() else "unknown",
-            "network_name": network_names.get(w3.eth.chain_id, f"Unknown (ID: {w3.eth.chain_id})") if w3.is_connected() else "unknown",
-            "connected": w3.is_connected()
-        }
-    except Exception:
-        return {
-            "rpc_url": "error",
-            "chain_id": "error", 
-            "network_name": "error",
-            "connected": False
-        }
-
-
 # Universal function to write to any smart contract method
 def write_to_contract(contract_name: str, method_name: str, params: List[Any], address: Optional[str] = None, private_key: Optional[str] = None) -> Dict[str, Any]:
     try:
@@ -641,6 +611,8 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any], a
         # Sign and send
         signed_tx = w3.eth.account.sign_transaction(transaction, sender_private_key)
         tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+
+        print(f"Transaction sent: {tx_hash.hex()}")
         
         # Wait for confirmation
         receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
@@ -771,7 +743,6 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any], a
                 "error": "Transaction failed",
                 "details": error_msg
             }
-
 
 
 # Universal function to read from any smart contract method
