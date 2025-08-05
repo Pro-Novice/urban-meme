@@ -7,7 +7,7 @@ from web3.exceptions import ContractLogicError
 from datetime import datetime, timezone
 from .models import BlockchainEvent
 from seed_license.enums import REVERSE_OFFICER_ROLE, LICENSE_STATUS_REVERSE, REVERSE_LICENSE_CATEGORY, \
-LICENSE_CATEGORIES, LICENSE_LEVELS, LICENSE_STATUSES, FEEDBACK_TYPES, USER_ROLE
+LICENSE_CATEGORIES, LICENSE_LEVELS, LICENSE_STATUSES, USER_ROLE
 
 
 logger = logging.getLogger(__name__)
@@ -140,13 +140,6 @@ GENERIC_TRANSFORM_MAP = {
         "fields": [
             "verificationHash", "licenseNumber",
         ],
-    },
-    "getAllInspectionFeedback": {
-        "fields": [
-            "inspector", "inspectorName", "remarks", "completedDate", "feedbackType"
-        ],
-        "enum_mappings": {"feedbackType": FEEDBACK_TYPES},
-        "timestamp_fields": ["completedDate"]
     }
 
     # add more methods as needed
@@ -221,28 +214,26 @@ def get_contract(contract_name: str):
         abi = None
         abi_found = False
 
-        # Priority 1: If ABI is already embedded in deployment_info.json
-        if "implementationABI" in deployment_info and deployment_info["implementationABI"]:
-            abi = deployment_info["implementationABI"]
-            abi_found = True
-            logger.info("✅ Using embedded implementation ABI from deployment_info.json")
-
-        # Priority 2: Fallback locations if ABI wasn't found in JSON
-        if not abi_found:
-            abi_locations = [
-                os.path.join(BASE_DIR, "blockchainDeploymentScripts", "implementationABI", f"{contract_name}.json"),
-                os.path.join(BASE_DIR, "blockchainDeploymentScripts", f"{contract_name}ImplementationABI.json"),
-                os.path.join(CONTRACTS_DIR, "abi", f"{contract_name}.json"),
-                os.path.join(CONTRACTS_DIR, "abi", "seedLicenseContract.json"),  # for legacy support
-            ]
-            for path in abi_locations:
-                if os.path.exists(path):
-                    with open(path, "r") as f:
-                        abi = json.load(f)
+        if "implementations" in deployment_info:
+            # Get current implementation version (default to V1 if missing)
+            current_version = deployment_info.get("currentImplementation", "V1")
+            
+            # Get ABI for current implementation
+            if current_version in deployment_info["implementations"]:
+                impl_info = deployment_info["implementations"][current_version]
+                if "abi" in impl_info and impl_info["abi"]:
+                    abi = impl_info["abi"]
                     abi_found = True
-                    logger.info(f"✅ Loaded ABI from: {path}")
-                    break
-
+                    logger.info(f"Using {current_version} ABI from deployment_info.json")
+            
+            # Fallback to V1 if current version not found
+            if not abi_found and "V1" in deployment_info["implementations"]:
+                impl_info = deployment_info["implementations"]["V1"]
+                if "abi" in impl_info and impl_info["abi"]:
+                    abi = impl_info["abi"]
+                    abi_found = True
+                    logger.info(f"Using V1 ABI as fallback from deployment_info.json")
+        
         if not abi or not abi_found:
             raise FileNotFoundError(f"ABI for {contract_name} not found in any known location")
 
@@ -252,7 +243,7 @@ def get_contract(contract_name: str):
             abi=abi
         )
 
-        # Cache and return
+        # Cache the contract instance
         _contract_cache[contract_name] = contract
         logger.info(f"✅ Contract {contract_name} loaded successfully with proxy: {proxy_address}")
         return contract
@@ -263,199 +254,6 @@ def get_contract(contract_name: str):
     except Exception as exc:
         logger.error(f"Contract loading error for {contract_name}: {exc}")
         raise
-
-
-# Sign and send a transaction
-# This function signs a transaction with the provided private key and sends it to the blockchain.
-def _sign_and_send(tx: dict, private_key: str) -> str:
-    signed = w3.eth.account.sign_transaction(tx, private_key)
-    return w3.eth.send_raw_transaction(signed.raw_transaction)
-
-# Call a contract function
-# This function builds, signs, and sends a transaction to the blockchain.
-def call_function(function, *args, address=None, private_key=None) -> Tuple[Any, Any]:
-    sender = address or DEFAULT_ADDRESS
-    key = private_key or DEFAULT_PRIVATE_KEY
-    
-    logger.info(f"🔍 TRANSACTION DEBUG - Starting call_function")
-    logger.info(f"From address: {sender}")
-    logger.info(f"Function: {function}")
-    logger.info(f"Args: {args}")
-    
-    # Check account balance first
-    try:
-        balance_wei = w3.eth.get_balance(sender)
-        balance_eth = w3.from_wei(balance_wei, 'ether')
-        logger.info(f"💰 Account balance: {balance_eth} ETH")
-        
-        if balance_eth < 0.01:  # Less than 0.01 ETH
-            raise ValueError(f"Insufficient balance: {balance_eth} ETH. Need at least 0.01 ETH for transactions.")
-    except Exception as e:
-        logger.error(f"Failed to check balance: {e}")
-    
-    # ===== CAPTURE RETURN VALUE BEFORE TRANSACTION =====
-    return_value = None
-    try:
-        # For functions that return values, we need to simulate the call first
-        # This gives us the return value that would be returned
-        return_value = function(*args).call({"from": sender})
-        logger.info(f"✅ Function call simulation successful, return value: {return_value}")
-    except Exception as e:
-        logger.error(f"❌ Function call simulation failed: {e}")
-        # Extract revert reason if available
-        error_str = str(e)
-        if "execution reverted" in error_str:
-            # Try to extract the reason
-            if ":" in error_str:
-                reason = error_str.split(":", 1)[1].strip()
-                raise ContractLogicError(f"Contract reverted: {reason}")
-            else:
-                raise ContractLogicError(f"Contract reverted: {error_str}")
-        # Continue anyway for some edge cases
-    
-    # Get current network info for gas optimization
-    chain_id = w3.eth.chain_id
-    logger.info(f"🌐 Chain ID: {chain_id}")
-    
-    # Build initial transaction
-    try:
-        nonce = w3.eth.get_transaction_count(sender, 'pending')
-        logger.info(f"📋 Using nonce: {nonce}")
-        
-        # Get base gas price
-        base_gas_price = w3.eth.gas_price
-        logger.info(f"⛽ Base gas price: {w3.from_wei(base_gas_price, 'gwei')} gwei")
-        
-        # Optimize gas price based on network
-        if chain_id == 31337:  # Hardhat Network
-            # Use minimal gas price for local development
-            gas_price = max(base_gas_price, 1000000000)  # At least 1 gwei
-            logger.info(f"🔧 Hardhat detected - using minimal gas price: {w3.from_wei(gas_price, 'gwei')} gwei")
-        elif chain_id == 1337:  # Ganache
-            gas_price = base_gas_price
-            logger.info(f"🔧 Ganache detected - using base gas price: {w3.from_wei(gas_price, 'gwei')} gwei")
-        else:
-            # Real networks need premium for faster confirmation
-            gas_price = int(base_gas_price * 1.2)  # 20% premium
-            logger.info(f"🌐 Real network - using premium gas price: {w3.from_wei(gas_price, 'gwei')} gwei")
-        
-        tx = function(*args).build_transaction({
-            "from": sender,
-            "nonce": nonce,
-            "gasPrice": gas_price,
-        })
-        
-        logger.info(f"📝 Initial transaction built successfully")
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to build transaction: {e}")
-        raise ValueError(f"Transaction building failed: {e}")
-    
-    # Estimate gas with safety buffer
-    try:
-        logger.info(f"🔍 Estimating gas...")
-        estimated_gas = w3.eth.estimate_gas(tx)
-        logger.info(f"📊 Gas estimate: {estimated_gas:,}")
-        
-        # Apply appropriate buffer based on network
-        if chain_id in [31337, 1337]:  # Local networks
-            buffer_multiplier = 1.5  # 50% buffer for local testing
-        else:
-            buffer_multiplier = 1.2  # 20% buffer for real networks
-            
-        gas_limit = int(estimated_gas * buffer_multiplier)
-        
-        # Cap gas limit to prevent excessive costs
-        max_gas_limit = 1000000  # 1M gas max
-        if gas_limit > max_gas_limit:
-            logger.warning(f"⚠️ Gas limit {gas_limit:,} exceeds max {max_gas_limit:,}, capping")
-            gas_limit = max_gas_limit
-            
-        tx["gas"] = gas_limit
-        logger.info(f"⛽ Using gas limit: {gas_limit:,} (estimate: {estimated_gas:,}, buffer: {buffer_multiplier}x)")
-        
-    except Exception as e:
-        logger.error(f"❌ Gas estimation failed: {e}")
-        # Use conservative default based on network
-        if chain_id in [31337, 1337]:
-            default_gas = 500000  # 500k for local networks
-        else:
-            default_gas = 300000  # 300k for real networks
-            
-        tx["gas"] = default_gas
-        logger.warning(f"🔄 Using fallback gas limit: {default_gas:,}")
-    
-    # Calculate and validate transaction cost
-    try:
-        total_gas_cost_wei = tx["gas"] * tx["gasPrice"]
-        total_gas_cost_eth = w3.from_wei(total_gas_cost_wei, 'ether')
-        
-        logger.info(f"💸 Transaction cost breakdown:")
-        logger.info(f"   Gas limit: {tx['gas']:,}")
-        logger.info(f"   Gas price: {w3.from_wei(tx['gasPrice'], 'gwei')} gwei")
-        logger.info(f"   Max cost: {total_gas_cost_eth:.6f} ETH")
-        
-        # Check if account can afford the transaction
-        balance_wei = w3.eth.get_balance(sender)
-        if total_gas_cost_wei >= balance_wei:
-            balance_eth = w3.from_wei(balance_wei, 'ether')
-            raise ValueError(
-                f"Insufficient funds for transaction. "
-                f"Need: {total_gas_cost_eth:.6f} ETH, "
-                f"Have: {balance_eth:.6f} ETH"
-            )
-            
-        # Warn if transaction cost is high relative to balance
-        if total_gas_cost_wei > balance_wei * 0.1:  # More than 10% of balance
-            balance_eth = w3.from_wei(balance_wei, 'ether')
-            logger.warning(f"⚠️ High transaction cost: {total_gas_cost_eth:.6f} ETH ({total_gas_cost_wei/balance_wei*100:.1f}% of balance)")
-            
-    except Exception as e:
-        logger.error(f"❌ Failed to calculate transaction cost: {e}")
-        # Continue anyway - might be a calculation error
-    
-    # Sign and send transaction
-    try:
-        logger.info(f"🔍 Signing and sending transaction...")
-        tx_hash = _sign_and_send(tx, key)
-        logger.info(f"📡 Transaction sent: {tx_hash.hex()}")
-        
-        # Wait for confirmation with timeout
-        logger.info(f"⏳ Waiting for confirmation...")
-        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
-       
-       
-        print(f"   Status ==>>>>: {receipt}")
-       
-        if receipt.status == 1:
-            logger.info(f"✅ Transaction confirmed in block {receipt.blockNumber}")
-            logger.info(f"⛽ Gas used: {receipt.gasUsed:,} / {tx['gas']:,} ({receipt.gasUsed/tx['gas']*100:.1f}%)")
-        else:
-            logger.error(f"❌ Transaction failed in block {receipt.blockNumber}")
-        
-        # ===== RETURN BOTH RECEIPT AND RETURN VALUE =====
-        logger.info(f"📤 Returning receipt and return value: {return_value}")
-        return receipt, return_value
-        
-    except Exception as e:
-        logger.error(f"❌ Transaction failed: {e}")
-        
-        # Handle specific Web3 errors
-        error_msg = str(e).lower()
-        
-        if "insufficient funds" in error_msg:
-            raise ValueError(f"Insufficient funds for transaction: {e}")
-        elif "nonce too low" in error_msg:
-            raise ValueError(f"Nonce too low - transaction ordering issue: {e}")
-        elif "already known" in error_msg:
-            raise ValueError(f"Transaction already in mempool: {e}")
-        elif "underpriced" in error_msg:
-            raise ValueError(f"Gas price too low: {e}")
-        elif "intrinsic gas too low" in error_msg:
-            raise ValueError(f"Gas limit too low: {e}")
-        else:
-            raise ValueError(f"Transaction failed: {e}")
-
 
 def call_view_function(function, *args):
     """Read‑only contract call."""
@@ -487,37 +285,25 @@ def get_transaction_status(tx_hash: str):
 
 # Universal function to write to any smart contract method
 def write_to_contract(contract_name: str, method_name: str, params: List[Any], address: Optional[str] = None, private_key: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Function to write to smart contract
+    - Validates method and parameters against ABI from deployment_info.json
+    - Executes transaction with minimal overhead
+    - Returns clean response
+    Args:
+        contract_name (str): Name of the contract to interact with. 
+        method_name (str): Name of the method to call.
+        params (List[Any]): List of parameters to pass to the method.
+        address (Optional[str]): Address to send the transaction from. Defaults to DEFAULT_ADDRESS.
+        private_key (Optional[str]): Private key to sign the transaction. Defaults to DEFAULT_PRIVATE_KEY.
+    Returns:
+        Dict[str, Any]: Response dictionary with success status, data or error message.
+    """
     try:
-        # Load contract instance from cache or deployment info
-        deployment_info_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", "deployment_info.json")
-        
-        if not os.path.exists(deployment_info_path):
-            return {
-                "success": False,
-                "error": "Deployment info not found",
-                "details": f"File not found: {deployment_info_path}"
-            }
-        
-        with open(deployment_info_path, "r") as fh:
-            deployment_info = json.load(fh)
-        
-        # Get contract address (always use proxy for upgradeable contracts)
-        contract_address = deployment_info.get("proxy")
-        if not contract_address:
-            return {
-                "success": False,
-                "error": "Contract address not found",
-                "details": "No proxy address in deployment_info.json"
-            }
-        
-        # Get ABI
-        abi = deployment_info.get("implementationABI")
-        if not abi:
-            return {
-                "success": False,
-                "error": "Contract ABI not found",
-                "details": "No implementationABI in deployment_info.json"
-            }
+        # Get contract instance and ABI in one call
+        contract = get_contract(contract_name)
+        abi = contract.abi
+        contract_address = contract.address
         
         # =============== VALIDATE METHOD EXISTS IN ABI ===============
         method_abi = None
@@ -557,12 +343,6 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any], a
                 "error": "Cannot write to view/pure function",
                 "details": f"Method '{method_name}' is read-only. Use read_from_contract instead."
             }
-        
-        # =============== CREATE CONTRACT INSTANCE ===============
-        contract = w3.eth.contract(
-            address=Web3.to_checksum_address(contract_address),
-            abi=abi
-        )
 
         # Get the function
         contract_function = getattr(contract.functions, method_name)
@@ -951,7 +731,6 @@ def get_contract_abi(contract_name: str) -> List[Dict]:
 # Get all deployed contract addresses
 def get_all_contract_addresses() -> dict:
     """
-    Get all deployed contract addresses
     Returns a dictionary with contract names and their addresses
     """
     deployment_info_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", "deployment_info.json")
@@ -962,36 +741,25 @@ def get_all_contract_addresses() -> dict:
         
         addresses = {}
         
-        # Add proxy address (recommended for interactions)
+        # Add proxy address 
         if "proxy" in deployment_info and deployment_info["proxy"]:
             addresses["proxy"] = deployment_info["proxy"]
-            addresses["LicenseSystemV1"] = deployment_info["proxy"]  # V1 uses proxy
-            addresses["seedLicenseContract"] = deployment_info["proxy"]  # Legacy alias
         
         # Add implementation addresses
-        if "implementationV1" in deployment_info:
-            addresses["implementationV1"] = deployment_info["implementationV1"]
-            addresses["LicenseSystemV1Implementation"] = deployment_info["implementationV1"]
-        
-        if "implementationV2" in deployment_info:
-            addresses["implementationV2"] = deployment_info["implementationV2"]
-            addresses["LicenseSystemV2Implementation"] = deployment_info["implementationV2"]
-            addresses["LicenseSystemV2"] = deployment_info["implementationV2"]
-        
-        # Add any other contract addresses found in deployment_info
-        excluded_keys = {"network", "networkName", "deploymentTime", "deploymentTimeFormatted", "deployer", "implementationABI", "gasUsed", "verification"}
-        
-        for key, value in deployment_info.items():
-            if key not in excluded_keys and isinstance(value, str) and value.startswith("0x"):
-                if key not in addresses:
-                    addresses[key] = value
+        if "implementations" in deployment_info:
+            for version, details in deployment_info["implementations"].items():
+                if "address" in details:
+                    addresses[f"implementation{version}"] = details["address"]
+                    addresses[f"LicenseSystem{version}"] = details["address"]
+                    addresses[f"LicenseSystem{version}Implementation"] = details["address"]
         
         return {
             "addresses": addresses,
             "total_contracts": len(addresses),
             "recommended_address": deployment_info.get("proxy"),
             "network": deployment_info.get("network"),
-            "deployer": deployment_info.get("deployer")
+            "deployer": deployment_info.get("deployer"),
+            "current_implementation": deployment_info.get("currentImplementation", "V1")
         }
         
     except Exception as e:
@@ -1001,54 +769,6 @@ def get_all_contract_addresses() -> dict:
             "addresses": {}
         }
 
-# Get the address of a specific contract by name
-def get_contract_address(contract_name: str) -> str:
-    """
-    Get the address for a specific contract
-    For upgradeable contracts, this returns the PROXY address (the main interaction point)
-    """
-    deployment_info_path = os.path.join(BASE_DIR, "blockchainDeploymentScripts", "deployment_info.json")
-    
-    try:
-        with open(deployment_info_path, "r") as fh:
-            deployment_info = json.load(fh)
-        
-        # Contract name to deployment key mapping
-        contract_mapping = {
-            # Proxy addresses (recommended for interaction)
-            "LicenseSystemV1": "proxy",
-            "LicenseSystemV2": "proxy", 
-            "seedLicenseContract": "proxy",
-            "proxy": "proxy",
-            "ERC1967Proxy": "proxy",
-            
-            # Implementation addresses (for direct access)
-            "LicenseSystemV1Implementation": "implementationV1",
-            "LicenseSystemV2Implementation": "implementationV2",
-            "implementationV1": "implementationV1",
-            "implementationV2": "implementationV2",
-        }
-        
-        # Get deployment key for the contract name
-        deployment_key = contract_mapping.get(contract_name, contract_name)
-        
-        # Get address from deployment info
-        contract_address = deployment_info.get(deployment_key)
-        w3.eth.get_code(contract_address)
-        
-        if contract_address:
-            return contract_address
-        else:
-            raise ValueError(f"Contract address not found for {contract_name}")
-            
-    except Exception as e:
-        logger.error(f"Error getting contract address for {contract_name}: {e}")
-        # Fallback to getting from contract instance
-        try:
-            contract = get_contract(contract_name)
-            return contract.address
-        except:
-            raise ValueError(f"Contract address not found for {contract_name}: {str(e)}")
 
 # Get all available methods for a contract
 def get_available_methods(contract_name: str) -> Dict[str, List[Dict]]:
@@ -1083,8 +803,7 @@ def get_available_methods(contract_name: str) -> Dict[str, List[Dict]]:
     }
 
 # Estimate gas for a contract method call
-def estimate_gas_for_method(contract_name: str, method_name: str, 
-                           params: List[Any], from_address: Optional[str] = None) -> Dict[str, Any]:
+def estimate_gas_for_method(contract_name: str, method_name: str, params: List[Any], from_address: Optional[str] = None) -> Dict[str, Any]:
     """Estimate gas for a contract method call"""
     try:
         contract = get_contract(contract_name)

@@ -11,10 +11,8 @@ from .blockchain_services import (
     get_transaction_status,
     get_available_methods,
     get_contract_abi,
-    get_contract_address,
     estimate_gas_for_method,
     get_all_contract_addresses, 
-    FEEDBACK_TYPES
 )
 
 from .enums import LicenseStatusEnum, LICENSE_STATUS_REVERSE, REVERSE_OFFICER_ROLE

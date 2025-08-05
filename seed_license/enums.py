@@ -109,4 +109,3 @@ LICENSE_STATUSES = [
     "INSPECTION_COMPLETED", "APPROVED", "REJECTED", "REVOKED",
     "EXPIRED", "RENEWED"
 ]
-FEEDBACK_TYPES = ["None", "Satisfactory", "Unsatisfactory", "Needs Reinspection"]
