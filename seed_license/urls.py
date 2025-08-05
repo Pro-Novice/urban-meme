@@ -7,8 +7,6 @@ urlpatterns = [
      # Blockchain Utilities
      path('blockchain/initialize/', views.initialize_blockchain_contract, name='initialize-contract'),
      path('blockchain/owner/', views.check_owner_blockchain, name='check-owner'),
-     path('blockchain/estimate-gas/', views.estimate_gas_view, name='estimate-gas'),
-     path('blockchain/transaction/<str:tx_hash>/', views.transaction_status_view, name='transaction-status'),
 
      # License Management
      path('blockchain/license/create/', views.submit_license_application, name='submit-license-application'),
@@ -21,6 +19,8 @@ urlpatterns = [
      path('blockchain/license/update-status/', views.update_license_status_view, name='update-license-status'),
 
      # Smart Contract Metadata
+     path('blockchain/estimate-gas/', views.estimate_gas_view, name='estimate-gas'),
+     path('blockchain/transaction/<str:tx_hash>/', views.transaction_status_view, name='transaction-status'),
      path('blockchain/contract/<str:contract_name>/methods/', views.contract_methods_view, name='contract-methods'),
      path('blockchain/contract/<str:contract_name>/abi/', views.contract_abi_view, name='contract-abi'),
      path('blockchain/contract/<str:contract_name>/address/', views.contract_address_view, name='contract-address'),

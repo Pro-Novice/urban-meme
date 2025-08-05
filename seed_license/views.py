@@ -10,9 +10,10 @@ from .blockchain_services import (
     read_from_contract,
     get_transaction_status,
     get_available_methods,
-    get_contract_abi,
+    get_contract,
     estimate_gas_for_method,
     get_all_contract_addresses, 
+    get_contract_address
 )
 
 from .enums import LicenseStatusEnum, LICENSE_STATUS_REVERSE, REVERSE_OFFICER_ROLE
@@ -432,7 +433,7 @@ def contract_methods_view(request, contract_name):
 def contract_abi_view(request, contract_name):
     """Get contract ABI"""
     try:
-        abi = get_contract_abi(contract_name)
+        abi = get_contract(contract_name).abi
         return ApiResponse(data={"abi": abi}, status=200)
     except Exception as e:
         logger.exception("Contract ABI error")
@@ -449,7 +450,7 @@ def contract_address_view(request, contract_name):
             return ApiResponse(data=all_addresses, status=200)
 
         # Return specific contract address
-        address = get_all_contract_addresses(contract_name)
+        address = get_contract_address(contract_name)
         return ApiResponse(data={"address": address}, status=200)
     except Exception as e:
         logger.exception("Contract address error")
