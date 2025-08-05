@@ -405,7 +405,7 @@ def update_license_details(request):
         return ApiResponse(err=f"Update license details failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# Transaction Management
+# Contract Information & Utilities
 @api_view(["GET"])
 def transaction_status_view(request, tx_hash):
     """Get transaction status and details by hash"""
@@ -417,7 +417,23 @@ def transaction_status_view(request, tx_hash):
         return ApiResponse(err=f"Failed to get transaction status: {str(e)}", status=500)
 
 
-# Contract Information & Utilities
+@api_view(["GET"])
+def contract_address_view(request, contract_name):
+    """Get contract address(es) - supports 'all' to return all addresses"""
+    try:
+        # Special case: return all contract addresses
+        if contract_name.lower() == 'all':
+            all_addresses = get_all_contract_addresses()
+            return ApiResponse(data=all_addresses, status=200)
+
+        # Return specific contract address
+        address = get_contract_address(contract_name)
+        return ApiResponse(data={"address": address}, status=200)
+    except Exception as e:
+        logger.exception("Contract address error")
+        return ApiResponse(err=f"Failed to get contract address: {str(e)}", status=500)
+
+
 @api_view(["GET"])
 def contract_methods_view(request, contract_name):
     """Get all available methods for a contract"""
@@ -439,53 +455,3 @@ def contract_abi_view(request, contract_name):
         logger.exception("Contract ABI error")
         return ApiResponse(err=f"Failed to get contract ABI: {str(e)}", status=500)
 
-
-@api_view(["GET"])
-def contract_address_view(request, contract_name):
-    """Get contract address(es) - supports 'all' to return all addresses"""
-    try:
-        # Special case: return all contract addresses
-        if contract_name.lower() == 'all':
-            all_addresses = get_all_contract_addresses()
-            return ApiResponse(data=all_addresses, status=200)
-
-        # Return specific contract address
-        address = get_contract_address(contract_name)
-        return ApiResponse(data={"address": address}, status=200)
-    except Exception as e:
-        logger.exception("Contract address error")
-        return ApiResponse(err=f"Failed to get contract address: {str(e)}", status=500)
-
-
-@api_view(["POST"])
-def estimate_gas_view(request):
-    """
-    Estimate gas for a method call
-
-    Expected payload:
-    {
-        "contract_name": "seedLicenseContract",
-        "method_name": "applyForLicense",
-        "params": [...],
-        "from_address": "0x..." (optional)
-    }
-    """
-    contract_name = request.data.get("contract_name")
-    method_name = request.data.get("method_name")
-    params = request.data.get("params", [])
-    from_address = request.data.get("from_address")
-
-    if not contract_name or not method_name:
-        return ApiResponse(err="Missing required fields: contract_name, method_name", status=400)
-
-    try:
-        gas_info = estimate_gas_for_method(
-            contract_name=contract_name,
-            method_name=method_name,
-            params=params,
-            from_address=from_address
-        )
-        return ApiResponse(data=gas_info, status=200)
-    except Exception as e:
-        logger.exception("Gas estimation error")
-        return ApiResponse(err=f"Failed to estimate gas: {str(e)}", status=500)
