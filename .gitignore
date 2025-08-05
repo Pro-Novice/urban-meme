@@ -14,3 +14,11 @@ env/
 # log files
 agri_auth.log
 
+test_config
+venv/
+
+**/.claude/settings.local.json
+node_modules/
+
+
+artifacts/
