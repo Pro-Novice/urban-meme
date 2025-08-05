@@ -7,15 +7,33 @@ pragma solidity ^0.8.0;
  */
 contract LicenseStorage {
     // Storage slot positions as constants to avoid collisions
-    bytes32 private constant ADMIN_SLOT = keccak256("license.storage.admin");
     bytes32 private constant LICENSE_COUNTER_SLOT = keccak256("license.storage.licenseCounter");
-    
-    // Enums (these don't use storage slots)
-    enum LicenseCategory { SEED, FERTILIZER, INSECTICIDE }
-    enum AdminLevel { STATE, DIVISION, DISTRICT }
-    enum LicenseStatus { DRAFT, SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED, INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWAL_PENDING }
-    enum ActionType { CREATED, SUBMITTED, DOCUMENT_UPLOADED, DOCUMENT_VERIFIED, DOCUMENT_REJECTED, PAYMENT_RECORDED, INSPECTION_SCHEDULED, INSPECTION_COMPLETED, STATUS_UPDATED, APPROVED, REJECTED, REVOKED, RENEWED, COMMENT_ADDED, OFFICER_ASSIGNED }
-    enum OfficerRole {
+
+    // Enums
+    enum LicenseCategory {
+        SEED,
+        FERTILIZER,
+        INSECTICIDE
+    }
+    enum LicenseLevel {
+        STATE,
+        DIVISION,
+        DISTRICT
+    }
+    enum LicenseStatus {
+        SUBMITTED,
+        UNDER_REVIEW,
+        DOCUMENTS_VERIFIED,
+        INSPECTION_SCHEDULED,
+        INSPECTION_COMPLETED,
+        APPROVED,
+        REJECTED,
+        REVOKED,
+        EXPIRED,
+        RENEWED
+    }
+    enum userRole {
+        CITIZEN,
         AGRICULTURE_OFFICER,
         ASSISTANT_AGRICULTURE_OFFICER,
         ASSISTANT_DIRECTOR,
@@ -24,55 +42,36 @@ contract LicenseStorage {
         JOINT_DIRECTOR_INPUT,
         FIELD_INSPECTOR
     }
-    enum Division {
-    AJMER_DIVISION,       // 0
-    BHARATPUR_DIVISION,   // 1
-    BIKANER_DIVISION,     // 2
-    JAIPUR_DIVISION,      // 3
-    JODHPUR_DIVISION,     // 4
-    KOTA_DIVISION,        // 5
-    UDAIPUR_DIVISION      // 6
-}
-    enum StandardDocumentType {
-    AFFIDAVIT_SEED_QUALITY,
-    ID_PROOF,
-    SHOP_MAP,
-    REGISTRATION_CERTIFICATE,
-    MEMORANDUM_ARTICLES,
-    PASSPORT_PHOTO,
-    AUTHORIZATION_LETTER
-}
-    enum InspectionFeedbackType {    NONE,  SATISFACTORY, UNSATISFACTORY, NEEDS_REINSPECTION }
 
-    // Structs
+    // Core License Structure
     struct License {
+        // Unique identifier
         uint256 licenseId;
         string licenseNumber;
         LicenseCategory category;
-        AdminLevel level;
         LicenseStatus status;
-        address applicant;
+        LicenseLevel level;
+        // Registering authority details---
+        string registeringAuthority;
+        string registeringOfficeName;
+        // Applicant details
         string applicantName;
         string aadhaarNumber;
-        string panNumber;
-        string gstNumber;
-        string mobileNumber;
-        string email;
-        string businessName;
-        string businessType;
-        string businessAddress;
-        string state;
-        string division;
-        string district;
-        string tehsil;
-        string village;
-        string pincode;
+        string applicantPermanentAddress;
+        // Firm details
+        string firmName;
+        string firmType; // Private Ltd, Public Ltd, Partnership Firm, Proprietor Firm, etc.
+        string firmAddress;
+        string salePointAddress;
+        string saleStorageAddress;
+        // Crop details
+        bool isSeedSelfProduced;
+        string productionCompany;
+        string cropName;
+        string cropVariety;
         mapping(string => string) customFields;
         string[] customFieldKeys;
-        mapping(StandardDocumentType => Document) documents;
-        StandardDocumentType[]  documentTypes;
-        Payment paymentDetails;
-        Inspection[] inspections;
+        // Payment paymentDetails;
         uint256 applicationDate;
         uint256 lastModifiedDate;
         uint256 approvalDate;
@@ -81,106 +80,46 @@ contract LicenseStorage {
         uint256 revokedDate;
         uint256 renewalDate;
         Action[] actionHistory;
-        address[] assignedOfficers;
-        mapping(address => OfficerAssignment) officerAssignments;
         bool isActive;
         bool isPaid;
         bool documentsVerified;
         bool inspectionPassed;
     }
 
-    struct Document {
-    StandardDocumentType documentType;
-    string documentName;        // Optional name from backend
-    string documentHash;        // SHA256 hash from backend
-    bool isVerified;
-    address verifiedBy;
-    uint256 verificationDate;
-    string remarks;
-}
-
     struct Payment {
         uint256 amount;
         string transactionId;
         string paymentMode;
         uint256 paymentDate;
-        address recordedBy;
-        bool isVerified;
-        string receiptNumber;
-    }
-
-    struct Inspection {
-        uint256 inspectionId;
-        uint256 scheduledDate;
-        uint256 completedDate;
-        address inspector;
-        string inspectorName;
-        string gpsLocation;
-        bytes32[] photoHashes;
-        mapping(string => string) findings;
-        string[] findingKeys;
-        bool passed;
-        InspectionFeedbackType feedbackType;
-        string remarks;
-        string reportHash;
     }
 
     struct Action {
         uint256 timestamp;
-        ActionType actionType;
-        address actor;
+        LicenseStatus actionType;
         string actorName;
-        OfficerRole actorRole; // ✅ Not string
-        string department;
+        userRole actorRole;
         string remarks;
-        bytes32 dataHash;
+        string dataHash;
     }
 
-    struct OfficerAssignment {
-        address officer;
-        OfficerRole role;
-        string department;
-        uint256 assignedDate;
-        address assignedBy;
-        bool isActive;
-        string remarks;
-    }
-
-    struct Officer {
-        address officerAddress;
-        string name;
-        string employeeId;
-        OfficerRole role;
-        string department;
-        AdminLevel level;
-        string state;
-        string division;
-        string district;
-        bool isActive;
-        uint256 addedDate;
-    }
-        struct FormattedAction {
-        uint256 timestamp;
-        uint8 actionType;
-        string actor;      // Address as hex string
-        string actorName;
-        OfficerRole actorRole;
-        string department;
-        string remarks;
-        string dataHash;   // bytes32 as hex string
-    }
-
+    // Simplified structs for API responses
     struct LicenseBasicInfo {
         uint256 licenseId;
+        string licenseNumber;
         string applicantName;
         LicenseCategory category;
-        AdminLevel level;
+        LicenseLevel level;
         LicenseStatus status;
-        address applicant;
-        string businessName;
-        string district;
-        string state;
-        string division;
+        string firmName;
+        string firmType;
+        string firmAddress;
+        string salePointAddress;
+        string saleStorageAddress;
+        string productionCompany;
+        string cropName;
+        string cropVariety;
+        string registeringOfficeName;
+        string registeringAuthority;
         uint256 applicationDate;
         uint256 approvalDate;
         uint256 rejectionDate;
@@ -188,53 +127,57 @@ contract LicenseStorage {
         uint256 revokedDate;
         uint256 renewalDate;
         bool isActive;
+        bool isPaid;
+        bool documentsVerified;
+        bool inspectionPassed;
     }
 
-
-    struct getAllFeedback {
-        address inspector;
-        string inspectorName;
-        string remarks;
-        uint256 completedDate;
-        InspectionFeedbackType feedbackType;
+    struct LicenseVerificationData {
+        bool isValid;
+        bool isActive;
+        bool isExpired;
+        bool isRevoked;
+        string licenseNumber;
+        uint256 licenseId;
+        uint256 approvalDate;
+        uint256 expiryDate;
+        uint256 revokedDate;
+        string verificationHash;
+        string statusMessage;
     }
-    // Main storage mappings - using specific slots
+
+    struct LicenseApplicationInput {
+        LicenseCategory category;
+        LicenseLevel level;
+        string registeringAuthority;
+        string registeringOfficeName;
+        string applicantName;
+        string aadhaarNumber;
+        string applicantPermanentAddress;
+        string firmName;
+        string firmType;
+        string firmAddress;
+        string salePointAddress;
+        string saleStorageAddress;
+        string productionCompany;
+        string cropName;
+        string cropVariety;
+    }
+
+    // Main storage mappings
     mapping(uint256 => License) internal licenses;
     mapping(string => uint256) internal licenseNumberToId;
-    mapping(address => Officer) internal officers;
-    mapping(address => bool) internal isOfficer;
-    
+    mapping(address => bool) internal authorizedApiCallers;
+
     // Tracking arrays
     uint256[] internal allLicenseIds;
-    address[] internal allOfficers;
-
-    mapping(address => uint256[]) internal applicantLicenses;
-    mapping(address => uint256[]) internal officerAssignedLicenses;
     mapping(LicenseStatus => uint256[]) internal licensesByStatus;
     mapping(LicenseCategory => uint256[]) internal licensesByCategory;
-    mapping(AdminLevel => uint256[]) internal licensesByLevel;
-    mapping(string => uint256[]) internal licensesByDistrict;
-    StandardDocumentType[] public documentTypes;
-    mapping(StandardDocumentType => Document) documents;
+    mapping(LicenseLevel => uint256[]) internal licensesByLevel;
 
     // Gap for future storage variables
     uint256[50] private __gap;
-    
-    // Admin getter/setter using assembly for specific slot
-    function admin() public view returns (address _admin) {
-        bytes32 slot = ADMIN_SLOT;
-        assembly {
-            _admin := sload(slot)
-        }
-    }
-    
-    function _setAdmin(address _admin) internal {
-        bytes32 slot = ADMIN_SLOT;
-        assembly {
-            sstore(slot, _admin)
-        }
-    }
-    
+
     // License counter getter/setter
     function licenseIdCounter() public view returns (uint256 _counter) {
         bytes32 slot = LICENSE_COUNTER_SLOT;
@@ -242,7 +185,7 @@ contract LicenseStorage {
             _counter := sload(slot)
         }
     }
-    
+
     function _incrementLicenseCounter() internal returns (uint256 _newValue) {
         bytes32 slot = LICENSE_COUNTER_SLOT;
         assembly {

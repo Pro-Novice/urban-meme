@@ -10,61 +10,40 @@ from .blockchain_services import (
     read_from_contract,
     get_transaction_status,
     get_available_methods,
-    get_contract_abi,
-    get_contract_address,
+    get_contract,
     estimate_gas_for_method,
-    get_all_contract_addresses, FEEDBACK_TYPES
-
+    get_all_contract_addresses, 
+    get_contract_address
 )
-from .enums import LicenseStatusEnum, DoctypeEnum
-from .serialzers import AddOfficerSerializer, CreateLicenseSerializer, UpdateLicenseStatusSerializer, \
-    VerifyDocumentSerializer, AddInspectionFeedbackSerializer, REVERSE_OFFICER_ROLE_MAP
+
+from .enums import LicenseStatusEnum, LICENSE_STATUS_REVERSE, REVERSE_OFFICER_ROLE
+
+from .serialzers import SubmitLicenseApplicationSerializer, UpdateLicenseStatusSerializer, VerifyLicenseSerializer, UpdateLicenseDetailsSerializer
 
 logger = logging.getLogger(__name__)
 
 # Valid transitions for status progression
 VALID_STATUS_TRANSITIONS = {
-    LicenseStatusEnum.DRAFT.value: [LicenseStatusEnum.SUBMITTED.value],
     LicenseStatusEnum.SUBMITTED.value: [LicenseStatusEnum.UNDER_REVIEW.value],
-    LicenseStatusEnum.UNDER_REVIEW.value: [
-        LicenseStatusEnum.DOCUMENTS_VERIFIED.value,
-        LicenseStatusEnum.REJECTED.value,
-    ],
+    LicenseStatusEnum.UNDER_REVIEW.value: [LicenseStatusEnum.DOCUMENTS_VERIFIED.value, LicenseStatusEnum.REJECTED.value],
     LicenseStatusEnum.DOCUMENTS_VERIFIED.value: [LicenseStatusEnum.INSPECTION_SCHEDULED.value],
-    LicenseStatusEnum.INSPECTION_SCHEDULED.value: [
-        LicenseStatusEnum.INSPECTION_COMPLETED.value,
-        LicenseStatusEnum.REJECTED.value,
-    ],
-    LicenseStatusEnum.INSPECTION_COMPLETED.value: [
-        LicenseStatusEnum.APPROVED.value,
-        LicenseStatusEnum.REJECTED.value,
-    ],
-
+    LicenseStatusEnum.INSPECTION_SCHEDULED.value: [LicenseStatusEnum.INSPECTION_COMPLETED.value],
+    LicenseStatusEnum.INSPECTION_COMPLETED.value: [LicenseStatusEnum.APPROVED.value, LicenseStatusEnum.REJECTED.value],
+    LicenseStatusEnum.APPROVED.value: [LicenseStatusEnum.REVOKED.value, LicenseStatusEnum.EXPIRED.value],
+    LicenseStatusEnum.EXPIRED.value: [LicenseStatusEnum.RENEWED.value], 
 }
 
-# ══════════════════════════════════════════════════════════════════
-# Backend Interaction Endpoints
-# ══════════════════════════════════════════════════════════════════
-
-# 1. Initialize Blockchain contract apis
-
-# 1. Initialize Blockchain contract apis
+# 1. Initialize Blockchain contract
 @api_view(["GET"])
 def initialize_blockchain_contract(request):
-    """
-    Universal endpoint for writing to any smart contract method
-
-    """
-
+    # Endpoint for intializing the blockchain contract
     try:
         result = write_to_contract(
             contract_name="LicenseSystemV1",
             method_name="initialize",
-            params=[],
-            # address=address,
-            # private_key=private_key
+            params=[]
         )
-        if not result.get("success"):
+        if not result.get("status", "") == "confirmed":
             return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
         return ApiResponse(data=result, status=HTTP_200_OK)
     except ValueError as e:
@@ -73,16 +52,11 @@ def initialize_blockchain_contract(request):
         logger.exception("Blockchain write error")
         return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
 
-#2. Check owner of the blockchain
+# 2. Check owner of the blockchain
 @api_view(["GET"])
 def check_owner_blockchain(request):
-    """
-    Universal endpoint for writing to any smart contract method
-
-    """
-
+    # Endpoint to check the owner of the blockchain contract
     try:
-
         result = read_from_contract(
             contract_name="LicenseSystemV1",
             method_name="owner",
@@ -98,43 +72,17 @@ def check_owner_blockchain(request):
         return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-#3. check admin of the blockchain
-@api_view(["GET"])
-def check_admin_blockchain(request):
-    """
-    Universal endpoint for writing to any smart contract method
-    """
-
-    try:
-        result = read_from_contract(
-            contract_name="LicenseSystemV1",
-            method_name="admin",
-            params=[],
-            # address=address,
-            # private_key=private_key
-        )
-        return ApiResponse(data=result, status=HTTP_200_OK)
-    except ValueError as e:
-        return ApiResponse(err=str(e), status=HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        logger.exception("Blockchain write error")
-        return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
-
-#4. check total License count
+# 3. check total License count
 @api_view(["GET"])
 def check_total_license_count(request):
+    """ Endpoint to get the total number of licenses created in the blockchain.
+    This is useful for tracking the number of licenses issued.
     """
-    Universal endpoint for writing to any smart contract method
-
-    """
-
     try:
         result = read_from_contract(
             contract_name="LicenseSystemV1",
             method_name="licenseIdCounter",
-            params=[],
-            # address=address,
-            # private_key=private_key
+            params=[]
         )
         return ApiResponse(data=result, status=HTTP_200_OK)
     except ValueError as e:
@@ -143,115 +91,10 @@ def check_total_license_count(request):
         logger.exception("Blockchain write error")
         return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
 
-#5. Add Officer according to level
+
+# 4. Submit License Application for all the levels
 @api_view(["POST"])
-def add_officer_view(request):
-    """ Add a new officer to the blockchain.
-    Expected payload:
-    {
-        "officer_address": "0xabc123...",
-        "officer_name": "John Doe",
-        "officer_id": 12345,
-        "officer_role": "JOINT_DIRECTOR",
-        "department": "Agriculture",
-        "officer_level": "DISTRICT",
-        "state": "Rajasthan",
-        "district": "Jaipur",
-        "division": "North"
-    }
-
-    """
-    # print("DEBUG: request.data =", request.data)
-    serializer = AddOfficerSerializer(data=request.data)
-    if not serializer.is_valid():
-        return ApiResponse(err=serializer.errors, status=400)
-
-    validated = serializer.validated_data
-
-    # Prepare parameters for smart contract
-    level = validated["officer_level"]
-
-    params = [
-        validated["officer_address"],
-        validated["officer_name"],
-        validated["officer_id"],
-        validated["officer_role"],  # already converted to enum
-        validated["department"],
-        level,  # already converted to enum
-        validated.get("state", ""),
-        validated.get("district", ""),
-        validated.get("division", "")  ]
-    print("params %s", params)
-
-    try:
-        result = write_to_contract(
-            contract_name="LicenseSystemV1",
-            method_name="addOfficer",
-            params=params,
-
-        )
-        if not result.get("success"):
-            return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
-
-        return ApiResponse(data=result, status=HTTP_200_OK)
-    except ValueError as e:
-        return ApiResponse(err=str(e), status=HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        logger.exception("Blockchain write error")
-        return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
-
-@api_view(["GET"])
-def get_officer_role(request, address):
-    """
-    Get officer role by their blockchain address.
-
-    """
-    if not address:
-        return ApiResponse(err="Missing officer address in URL", status=HTTP_400_BAD_REQUEST)
-
-    try:
-        result = read_from_contract(
-            contract_name="LicenseSystemV1",
-            method_name="getOfficerRole",
-            params=[address],
-        )
-        role_id = result.get("role")
-        role_name = REVERSE_OFFICER_ROLE_MAP.get(role_id, "UNKNOWN_ROLE")
-        return ApiResponse(data={"role_id": role_id, "role_name": role_name}, status=HTTP_200_OK)
-
-    except ValueError as e:
-        return ApiResponse(err=str(e), status=HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        logger.exception("Blockchain read error")
-        return ApiResponse(err=f"Blockchain read failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["GET"])
-def get_officer_details(request, address):
-    """
-    Get officer details by blockchain address.
-
-    """
-    if not address:
-        return ApiResponse(err="Missing officer address in URL", status=HTTP_400_BAD_REQUEST)
-
-    try:
-        result = read_from_contract(
-            contract_name="LicenseSystemV1",
-            method_name="getOfficerDetails",
-            params=[address],
-        )
-        return ApiResponse(data=result, status=HTTP_200_OK)
-
-    except ValueError as e:
-        return ApiResponse(err=str(e), status=HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        logger.exception("Blockchain read error")
-        return ApiResponse(err=f"Blockchain read failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
-# 8. create License for all the levels
-
-@api_view(["POST"])
-def create_license_view(request):
+def submit_license_application(request):
     """
     Create a new license by interacting with the smart contract.
     Expected payload:
@@ -261,45 +104,108 @@ def create_license_view(request):
         "applicant_name": "John Doe",
         "aadhaar_number": "123456789012",
         "business_name": "John's Farm",
-        "state": "Rajasthan",
+        "business_address": "123 Farm Lane, Jaipur",
+        "state": "RAJASTHAN",  # Hardcoded in contract
         "district": "Jaipur",
         "division": "North"
     }
     """
-    serializer = CreateLicenseSerializer(data=request.data)
+    serializer = SubmitLicenseApplicationSerializer(data=request.data)
     if not serializer.is_valid():
         return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
 
     validated = serializer.validated_data
-    params = [
-        validated["license_category"],
-        validated["admin_level"],
-        validated["applicant_name"],
-        validated["aadhaar_number"],
-        validated["business_name"],
-        validated.get("state", ""),
-        validated.get("district", ""),
-        validated.get("division", "")
-    ]
+    struct_input = {
+        "category": validated["license_category"],
+        "level": validated["license_level"],
+        "registeringAuthority": validated["registering_authority"],
+        "registeringOfficeName": validated["registering_office_name"],
+        "applicantName": validated["applicant_name"],
+        "aadhaarNumber": validated["aadhaar_number"],
+        "applicantPermanentAddress": validated["applicant_permanent_address"],
+        "firmName": validated["firm_name"],
+        "firmType": validated["firm_type"],
+        "firmAddress": validated["firm_address"],
+        "salePointAddress": validated["sale_point_address"],
+        "saleStorageAddress": validated["sale_storage_address"],
+        "productionCompany": validated["production_company"],
+        "cropName": validated["crop_name"],
+        "cropVariety": validated["crop_variety"],
+    }
 
     try:
         result = write_to_contract(
             contract_name="LicenseSystemV1",
-            method_name="createLicense",
-            params=params,
-            # address=request.data.get("address"),
-            # private_key=request.data.get("private_key")
+            method_name="submitLicenseApplication",
+            params=[struct_input]
         )
-        if not result.get("success"):
+       
+        if not result.get("status", "") == "confirmed":
             return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
-
-
         return ApiResponse(data=result, status=HTTP_200_OK)
 
     except Exception as e:
         logger.exception("Create license failed")
         return ApiResponse(err=f"Create license failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
 
+# 5. get_license_basic_info
+@api_view(["GET"])
+def get_license_basic_info(request, license_id):
+    """ Fetch basic license information by ID. """
+    try:
+        license_id = int(license_id)
+        if license_id <= 0:
+            return ApiResponse(err="License ID must be positive integer", status=HTTP_400_BAD_REQUEST)
+            
+    except ValueError:
+        return ApiResponse(err="License ID must be a valid integer", status=HTTP_400_BAD_REQUEST)
+
+    try:
+        result = read_from_contract(
+            contract_name="LicenseSystemV1",
+            method_name="getLicenseBasicInfo",
+            params=[license_id]
+        )
+
+        return ApiResponse(data=result, status=HTTP_200_OK)
+
+    except Exception as e:
+        logger.exception(f"License fetch failed for ID {license_id}")
+        return ApiResponse(
+            err=f"License information unavailable: {str(e)}",
+            status=HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# 6. Get License Action History
+@api_view(["GET"])
+def get_license_action_history(request, license_id):
+    """ Fetch license action history by ID. """
+    try:
+        license_id = int(license_id)
+        if license_id <= 0:
+            return ApiResponse(err="License ID must be positive integer", status=HTTP_400_BAD_REQUEST)
+    except ValueError:
+        return ApiResponse(err="License ID must be a valid integer", status=HTTP_400_BAD_REQUEST)
+   
+    try:
+        result = read_from_contract(
+            contract_name="LicenseSystemV1",
+            method_name="getLicenseActionHistory",
+            params=[
+                license_id,
+            ]
+        )
+
+        return ApiResponse(data=result, status=HTTP_200_OK)
+    except ValueError as e:
+        return ApiResponse(err=str(e), status=HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.exception("Blockchain write error")
+        return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# 7. Update License Status
 @api_view(["POST"])
 def update_license_status_view(request):
     """ Update the status of an existing license.
@@ -307,7 +213,10 @@ def update_license_status_view(request):
     {
         "license_id": 123,
         "status": "APPROVED",
-        "remarks": "License approved after review"
+        "remarks": "License approved after review",
+        "officer_name": "John Doe",
+        "role": "JOINT_DIRECTOR",
+        "renewal_period_days": 365  # only needed if status is APPROVED
     }
     """
 
@@ -317,8 +226,11 @@ def update_license_status_view(request):
 
     validated = serializer.validated_data
     license_id = validated["license_id"]
-    new_status = validated["status"]
+    new_status = validated["status"]            
     remarks = validated["remarks"]
+    officer_name = validated["officer_name"]
+    role = validated["role"]                    
+    renewal_period_days = validated.get("renewal_period_days", 0)
 
     try:
         # 1. Fetch current license info
@@ -327,435 +239,173 @@ def update_license_status_view(request):
             method_name="getLicenseBasicInfo",
             params=[license_id]
         )
+        current_status_str = current_data["status"]
+        current_status = LicenseStatusEnum.from_string(current_status_str)
 
-        current_status = LicenseStatusEnum.from_string(current_data["status"])
-        if new_status not in VALID_STATUS_TRANSITIONS.get(current_status, []):
+        # 2. Validate allowed status transition
+        allowed_next = VALID_STATUS_TRANSITIONS.get(current_status, [])
+        if new_status not in allowed_next:
             return ApiResponse(
-                err=f"Invalid status transition from {LicenseStatusEnum(current_status).name} to {LicenseStatusEnum(new_status).name}",
+                err=f"Invalid status transition from {LICENSE_STATUS_REVERSE[current_status]} to {LICENSE_STATUS_REVERSE[new_status]}",
                 status=HTTP_400_BAD_REQUEST
             )
-        # 3. Proceed with update
+
+        # 3. Call contract method
         result = write_to_contract(
             contract_name="LicenseSystemV1",
-            method_name="updateStatus",
-            params=[license_id, new_status, remarks],
+            method_name="updateLicenseStatus",
+            params=[
+                license_id,
+                new_status,
+                officer_name,
+                role,
+                remarks,
+                renewal_period_days  
+            ],
         )
-        if not result.get("success"):
+
+        if not result.get("status", "") == "confirmed":
             return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
+
         return ApiResponse(data=result, status=HTTP_200_OK)
 
     except Exception as e:
         logger.exception("Update license status failed")
         return ApiResponse(err=f"Update license status failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
-# 10. Update License Action History
-@api_view(["GET"])
-def get_license_action_history(request,license_id):
-    """
-    Universal endpoint for writing to any smart contract method
 
+
+# 8. GET QR Code Data for License Verification
+@api_view(["GET"])
+def get_license_qr_data(request, license_id):
+    """ Fetch QR code data for a license by ID.
+    This data can be used to generate a QR code for easy verification.
     """
-    license_id = int(license_id)
-    if not license_id:
-        return ApiResponse(err="Missing license_id in URL", status=HTTP_400_BAD_REQUEST)
+    try:
+        license_id = int(license_id)
+        if license_id <= 0:
+            return ApiResponse(err="License ID must be positive integer", status=HTTP_400_BAD_REQUEST)
+    except ValueError:
+        return ApiResponse(err="License ID must be a valid integer", status=HTTP_400_BAD_REQUEST)
+
     try:
         result = read_from_contract(
             contract_name="LicenseSystemV1",
-            method_name="getLicenseActionHistory",
+            method_name="getLicenseQRData",
+            params=[license_id]
+        )
+
+        return ApiResponse(data=result, status=HTTP_200_OK)
+
+    except Exception as e:
+        logger.exception(f"QR data fetch failed for license ID {license_id}")
+        return ApiResponse(
+            err=f"QR data fetch failed: {str(e)}",
+            status=HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+
+# 9. Verify Integrity and Validity of License Document
+@api_view(["POST"])
+def verify_license_document(request):
+    """ Verify a license document using its hash.
+    Expected payload:
+    {
+        "license_number": "123",
+        "expected_hash": "abc123897834377",
+    }
+    """
+    serializer = VerifyLicenseSerializer(data=request.data)
+    if not serializer.is_valid():
+        return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
+
+    validated = serializer.validated_data
+    license_number = validated["license_number"]
+    expected_hash = validated["expected_hash"]
+
+    try:
+        result = write_to_contract(
+            contract_name="LicenseSystemV1",
+            method_name="verifyLicenseWithHash",
+            params=[
+                license_number,
+                expected_hash
+            ],
+        )
+
+        if not result.get("status", "") == "confirmed":
+            return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
+
+        return ApiResponse(data=result, status=HTTP_200_OK)
+
+    except Exception as e:
+        logger.exception("Verify document failed")
+        return ApiResponse(err=f"Verify document failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# 10. Update License Details
+@api_view(["POST"])
+def update_license_details(request):
+    """ Update details of an existing license.
+    Expected payload:
+    {
+        "license_id": 123,
+        "firm_name": "New Firm Name",
+        "firm_type": "New Firm Type",
+        "firm_address": "New Firm Address",
+        "sale_point_address": "New Sale Point Address",
+        "sale_storage_address": "New Sale Storage Address",
+        "production_company": "New Production Company",
+        "crop_name": "New Crop Name",
+        "crop_variety": "New Crop Variety",
+        "role": "JOINT_DIRECTOR"
+    }
+    """
+    serializer = UpdateLicenseDetailsSerializer(data=request.data)
+    if not serializer.is_valid():
+        return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
+
+    validated = serializer.validated_data
+    license_id = validated["license_id"]
+    firm_name = validated.get("firm_name", "")
+    firm_type = validated.get("firm_type", "")
+    firm_address = validated.get("firm_address", "")
+    sale_point_address = validated.get("sale_point_address", "")
+    sale_storage_address = validated.get("sale_storage_address", "")
+    production_company = validated.get("production_company", "")
+    crop_name = validated.get("crop_name", "")
+    crop_variety = validated.get("crop_variety", "")
+    role = validated["role"]
+
+    try:
+        # Call contract method to update license details
+        result = write_to_contract(
+            contract_name="LicenseSystemV1",
+            method_name="updateLicenseDetails",
             params=[
                 license_id,
+                firm_name,
+                firm_type,
+                firm_address,
+                sale_point_address,
+                sale_storage_address,
+                production_company,
+                crop_name,
+                crop_variety,
+                role
             ],
-            # address=address,
-            # private_key=private_key
         )
 
-        return ApiResponse(data=result, status=HTTP_200_OK)
-    except ValueError as e:
-        return ApiResponse(err=str(e), status=HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        logger.exception("Blockchain write error")
-        return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
-#11. get_license_basic_info
-@api_view(["GET"])
-def get_license_basic_info(request, license_id):
-    """ Fetch basic license information by ID.
-    Expected URL: /api/license/basic-info/<license_id>/
-    """
-    try:
-        license_id = int(license_id)
-    except ValueError:
-        return ApiResponse(err="License id should be an integer", status=HTTP_400_BAD_REQUEST)
-
-    if license_id <= 0:
-        return ApiResponse(err="Invalid license_id in URL", status=HTTP_400_BAD_REQUEST)
-
-    try:
-        result = read_from_contract(
-            contract_name="LicenseSystemV1",
-            method_name="getLicenseBasicInfo",
-            params=[license_id]
-        )
-
-        # Check for dummy values
-        if (
-            not result or
-            result.get("licenseId") == 0 or
-            result.get("applicant") == "0x0000000000000000000000000000000000000000" or
-            not result.get("isActive", False)
-        ):
-            return ApiResponse(err="License not found", status=HTTP_404_NOT_FOUND)
-
-        return ApiResponse(data=result, status=HTTP_200_OK)
-
-    except Exception as e:
-        logger.exception("Fetch license basic info failed")
-        return ApiResponse(
-            err=f"License basic info fetch failed: {str(e)}",
-            status=HTTP_500_INTERNAL_SERVER_ERROR
-        )
-# 12.Verify Document Hash
-@api_view(["POST"])
-@parser_classes([MultiPartParser])
-def generate_document_hash(request):
-    """ Generate a SHA-256 hash for a document file.
-    Expected payload:
-    {
-        "file": <file>
-    }
-    """
-    file = request.FILES.get("file")
-    if not file:
-        return ApiResponse(err="File is required", status=HTTP_400_BAD_REQUEST)
-
-    try:
-        hash_func = hashlib.sha256()
-        for chunk in file.chunks():
-            hash_func.update(chunk)
-        file_hash = hash_func.hexdigest()
-        return ApiResponse(data={"hash": file_hash},status=HTTP_200_OK)
-    except Exception as e:
-        logger.exception("Hash generation failed")
-        return ApiResponse(err=f"Document hash generation failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
-
-#13. verify_document
-@api_view(["POST"])
-def verify_document(request):
-    """ Verify a document's hash and update its status in the blockchain.
-    Expected payload:
-    {
-        "license_id": 123,
-        "document_type": 0,
-    }
-    """
-    serializer = VerifyDocumentSerializer(data=request.data)
-    if not serializer.is_valid():
-        return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
-
-    validated_data = serializer.validated_data
-    try:
-        result = write_to_contract(
-            contract_name="LicenseSystemV1",
-            method_name="verifyDocument",
-            params=[
-                validated_data["license_id"],
-                validated_data["document_type"],
-                validated_data["document_hash"],
-                validated_data["is_verified"],
-                validated_data["remarks"]
-            ],
-            # address=validated_data.get("address"),
-            # private_key=validated_data.get("private_key")
-        )
-        if (
-                isinstance(result, dict) and
-                result.get("success") is False and
-                "Gas estimation failed" in result.get("error", "") and
-                "License not found" in result.get("details", "")
-        ):
-            return ApiResponse(err="License not found. Please check the license ID.", status=HTTP_400_BAD_REQUEST)
-        if not result.get("success"):
+        if not result.get("status", "") == "confirmed":
             return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
-        return ApiResponse(data=result, status=HTTP_200_OK)
-    except Exception as e:
-        logger.exception("Document verification failed")
-        return ApiResponse(err=f"Document verification failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
-#13. Get All Document Statuses with type and license_id
-@api_view(["GET"])
-def get_document_status(request, license_id, document_type):
-    """ Fetch the status of a specific document for a given license.
-    """
-    try:
-        license_id = int(license_id)
-        document_type = int(document_type)
-
-        # Validate that the int value is in DoctypeEnum
-        try:
-            doc_enum = DoctypeEnum(document_type)
-        except ValueError:
-            return ApiResponse(
-                err=f"Invalid document_type: {document_type}. Must be between 0 and {len(DoctypeEnum) - 1}.",
-                status=HTTP_400_BAD_REQUEST
-            )
-
-        # Call contract
-        result = read_from_contract(
-            contract_name="LicenseSystemV1",
-            method_name="getDocumentStatus",
-            params=[license_id, document_type]
-        )
-
-        if not result.get("isVerified", False):
-            return ApiResponse(
-                err=f"{doc_enum.name} not verified yet.",
-                status=HTTP_404_NOT_FOUND
-            )
-
-        return ApiResponse(data=result, status=HTTP_200_OK)
-
-    except ValueError:
-        return ApiResponse(
-            err="Invalid license_id or document_type. Must be integers.",
-            status=HTTP_400_BAD_REQUEST
-        )
-    except Exception as e:
-        logger.exception("Fetch document status failed")
-        return ApiResponse(
-            err=f"Document status fetch failed: {str(e)}",
-            status=HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-#14. Get All Document Statuses for a License_id
-@api_view(["GET"])
-def get_all_document_status(request, license_id):
-    """ Fetch the status of all documents for a given license.
-    """
-    try:
-        license_id = int(license_id)
-    except ValueError:
-        return ApiResponse(err="Invalid license_id in URL", status=HTTP_400_BAD_REQUEST)
-
-    try:
-        result = read_from_contract(
-            contract_name="LicenseSystemV1",
-            method_name="getAllDocumentStatuses",
-            params=[license_id]
-        )
-
-        document_types = result.get("documentTypes", [])
-        statuses = result.get("verificationStatuses", [])
-        remarks = result.get("remarks", [])
-
-        # Check if all returned lists are empty
-        if not document_types and not statuses and not remarks:
-            return ApiResponse(
-                err="No documents verified yet for this license.",
-                status=HTTP_404_NOT_FOUND
-            )
 
         return ApiResponse(data=result, status=HTTP_200_OK)
 
     except Exception as e:
-        logger.exception("Fetch all document statuses failed")
-        return ApiResponse(
-            err=f"All document statuses fetch failed: {str(e)}",
-            status=HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-#15. add_inspection_feedback
-@api_view(["POST"])
-def add_inspection_feedback(request):
-    """ Add feedback from an inspection for a license.
-    Expected payload:
-    {
-        "license_id": 123,
-        "inspector": "John Doe",
-        "feedback_type": 0,
-        "remarks": "Inspection passed"
-    }
-    """
-    serializer = AddInspectionFeedbackSerializer(data=request.data)
-    if not serializer.is_valid():
-        return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
-
-    data = serializer.validated_data
-
-    try:
-        result = write_to_contract(
-            contract_name="LicenseSystemV1",
-            method_name="addInspectionFeedback",
-            params=[
-                data["license_id"],
-                data["inspector"],
-                data["feedback_type"],
-                data["remarks"]
-            ],
-            # address=data.get("address"),
-            # private_key=data.get("private_key")
-        )
-        if (
-                isinstance(result, dict) and
-                result.get("success") is False and
-                "Gas estimation failed" in result.get("error", "") and
-                "License not found" in result.get("details", "")
-        ):
-            return ApiResponse(err=f"License not found. Please check the license ID: ", status=HTTP_400_BAD_REQUEST)
-        if not result.get("success"):
-            return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
-        return ApiResponse(data=result, status=HTTP_200_OK)
-    except Exception as e:
-        logger.exception("Add inspection feedback failed")
-        return ApiResponse(
-            err=f"Inspection feedback submission failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
-#16. Get All Inspection Feedback
-@api_view(["GET"])
-def get_all_inspection_feedback(request, license_id):
-    """ Fetch all inspection feedback for a given license.
-    """
-    try:
-        license_id = int(license_id)
-    except ValueError:
-        return ApiResponse(err="Invalid license_id in URL", status=HTTP_400_BAD_REQUEST)
-
-    try:
-        result = read_from_contract(
-            contract_name="LicenseSystemV1",
-            method_name="getAllInspectionFeedback",
-            params=[license_id]
-        )
-
-        # ✅ Check if result is empty or count is zero
-        if not result:
-            return ApiResponse(
-                err="Physical verification not yet done for this license.",
-                status=HTTP_404_NOT_FOUND
-            )
-
-        return ApiResponse(data=result, status=HTTP_200_OK)
-
-    except Exception as e:
-        logger.exception("Fetch inspection feedback failed")
-        return ApiResponse(
-            err=f"Inspection feedback fetch failed: {str(e)}",
-            status=HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        logger.exception("Update license details failed")
+        return ApiResponse(err=f"Update license details failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-#17. Count Feedback by Type
-@api_view(["GET"])
-def count_feedback_by_type(request, license_id, feedback_type):
-    """ Count the number of feedback entries for a specific type on a license.
-    """
-    try:
-        license_id = int(license_id)
-        feedback_type = int(feedback_type)
-    except (ValueError, TypeError):
-        return ApiResponse(
-            err="Invalid license_id or feedback_type (must be integers).",
-            status=HTTP_400_BAD_REQUEST
-        )
-
-    try:
-        result = read_from_contract(
-            contract_name="LicenseSystemV1",
-            method_name="countFeedbackByType",
-            params=[license_id, feedback_type]
-        )
-
-        # Assume 0 count means no feedback submitted for that type
-        if result == 0:
-            return ApiResponse(
-                err=f"No feedback of type: {FEEDBACK_TYPES[feedback_type]} submitted for license ID {license_id}.",
-                status=HTTP_404_NOT_FOUND
-            )
-
-        return ApiResponse(data={"count": result}, status=HTTP_200_OK)
-
-    except Exception as e:
-        logger.exception("Count feedback by type failed")
-        return ApiResponse(
-            err=f"Count feedback fetch failed: {str(e)}",
-            status=HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-# ══════════════════════════════════════════════════════════════════
-# Core Blockchain Interaction Endpoints
-# ══════════════════════════════════════════════════════════════════
-
-@api_view(["POST"])
-def blockchain_write_view(request):
-    """
-    Universal endpoint for writing to any smart contract method
-
-    Expected payload:
-    {
-        "contract_name": "seedLicenseContract",
-        "method_name": "applyForLicense",
-        "params": [...],
-        "address": "0x..." (optional),
-        "private_key": "..." (optional)
-    }
-    """
-    contract_name = request.data.get("contract_name")
-    method_name = request.data.get("method_name")
-    params = request.data.get("params", [])
-    address = request.data.get("address")
-    private_key = request.data.get("private_key")
-
-    if not contract_name or not method_name:
-        return ApiResponse(err="Missing required fields: contract_name, method_name", status=400)
-
-    try:
-        result = write_to_contract(
-            contract_name=contract_name,
-            method_name=method_name,
-            params=params,
-            address=address,
-            private_key=private_key
-        )
-        return ApiResponse(data=result, status=200)
-    except ValueError as e:
-        return ApiResponse(err=str(e), status=400)
-    except Exception as e:
-        logger.exception("Blockchain write error")
-        return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=500)
-
-
-@api_view(["GET"])
-def blockchain_read_view(request):
-    """
-    Universal endpoint for reading from any smart contract method
-
-    Expected payload:
-    {
-        "contract_name": "seedLicenseContract",
-        "method_name": "getLicenseDetails",
-        "params": [123]
-    }
-    """
-    contract_name = request.data.get("contract_name")
-    method_name = request.data.get("method_name")
-    params = request.data.get("params", [])
-
-    if not contract_name or not method_name:
-        return ApiResponse(err="Missing required fields: contract_name, method_name", status=400)
-
-    try:
-        result = read_from_contract(
-            contract_name=contract_name,
-            method_name=method_name,
-            params=params
-        )
-        return ApiResponse(data=result, status=200)
-    except ValueError as e:
-        return ApiResponse(err=str(e), status=500)
-    except Exception as e:
-        logger.exception("Blockchain read error")
-        return ApiResponse(err=f"Blockchain read failed: {str(e)}", status=500)
-
-
-# ══════════════════════════════════════════════════════════════════════
-# Transaction Management
-# ══════════════════════════════════════════════════════════════════════
-
+# Contract Information & Utilities
 @api_view(["GET"])
 def transaction_status_view(request, tx_hash):
     """Get transaction status and details by hash"""
@@ -767,9 +417,22 @@ def transaction_status_view(request, tx_hash):
         return ApiResponse(err=f"Failed to get transaction status: {str(e)}", status=500)
 
 
-# ══════════════════════════════════════════════════════════════════════
-# Contract Information & Utilities
-# ══════════════════════════════════════════════════════════════════════
+@api_view(["GET"])
+def contract_address_view(request, contract_name):
+    """Get contract address(es) - supports 'all' to return all addresses"""
+    try:
+        # Special case: return all contract addresses
+        if contract_name.lower() == 'all':
+            all_addresses = get_all_contract_addresses()
+            return ApiResponse(data=all_addresses, status=200)
+
+        # Return specific contract address
+        address = get_contract_address(contract_name)
+        return ApiResponse(data={"address": address}, status=200)
+    except Exception as e:
+        logger.exception("Contract address error")
+        return ApiResponse(err=f"Failed to get contract address: {str(e)}", status=500)
+
 
 @api_view(["GET"])
 def contract_methods_view(request, contract_name):
@@ -786,59 +449,9 @@ def contract_methods_view(request, contract_name):
 def contract_abi_view(request, contract_name):
     """Get contract ABI"""
     try:
-        abi = get_contract_abi(contract_name)
+        abi = get_contract(contract_name).abi
         return ApiResponse(data={"abi": abi}, status=200)
     except Exception as e:
         logger.exception("Contract ABI error")
         return ApiResponse(err=f"Failed to get contract ABI: {str(e)}", status=500)
 
-
-@api_view(["GET"])
-def contract_address_view(request, contract_name):
-    """Get contract address(es) - supports 'all' to return all addresses"""
-    try:
-        # Special case: return all contract addresses
-        if contract_name.lower() == 'all':
-            all_addresses = get_all_contract_addresses()
-            return ApiResponse(data=all_addresses, status=200)
-
-        # Return specific contract address
-        address = get_all_contract_addresses(contract_name)
-        return ApiResponse(data={"address": address}, status=200)
-    except Exception as e:
-        logger.exception("Contract address error")
-        return ApiResponse(err=f"Failed to get contract address: {str(e)}", status=500)
-
-
-@api_view(["POST"])
-def estimate_gas_view(request):
-    """
-    Estimate gas for a method call
-
-    Expected payload:
-    {
-        "contract_name": "seedLicenseContract",
-        "method_name": "applyForLicense",
-        "params": [...],
-        "from_address": "0x..." (optional)
-    }
-    """
-    contract_name = request.data.get("contract_name")
-    method_name = request.data.get("method_name")
-    params = request.data.get("params", [])
-    from_address = request.data.get("from_address")
-
-    if not contract_name or not method_name:
-        return ApiResponse(err="Missing required fields: contract_name, method_name", status=400)
-
-    try:
-        gas_info = estimate_gas_for_method(
-            contract_name=contract_name,
-            method_name=method_name,
-            params=params,
-            from_address=from_address
-        )
-        return ApiResponse(data=gas_info, status=200)
-    except Exception as e:
-        logger.exception("Gas estimation error")
-        return ApiResponse(err=f"Failed to estimate gas: {str(e)}", status=500)

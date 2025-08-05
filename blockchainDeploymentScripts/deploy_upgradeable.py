@@ -724,7 +724,7 @@ class SmartContractDeployer:
             
             # Test 1: Check admin
             try:
-                admin = proxy_contract.functions.admin().call()
+                admin = proxy_contract.functions.owner().call()
                 print(f"✅ Admin check: {admin}")
                 
                 if admin.lower() == self.address.lower():
@@ -761,30 +761,103 @@ class SmartContractDeployer:
             print(f"❌ Verification failed: {e}")
             return False
     
+    # def deploy_upgradeable_system(self):
+    #     """Deploy the complete upgradeable system with enhanced error handling"""
+    #     print(f"\n{'='*80}")
+    #     print(f"🚀 DEPLOYING UPGRADEABLE LICENSE SYSTEM")
+    #     print(f"{'='*80}")
+        
+    #     try:
+    #         # Step 1: Deploy Implementation V1
+    #         print(f"\n📋 Step 1: Deploying Implementation V1...")
+    #         impl_v1_address, impl_v1_abi = self.deploy_contract('LicenseSystemV1')
+            
+    #         # Step 2: Deploy Proxy
+    #         print(f"\n📋 Step 2: Deploying Proxy...")
+    #         proxy_address = self.deploy_proxy(impl_v1_address, self.address)
+            
+    #         # Step 3: Verify deployment
+    #         print(f"\n📋 Step 3: Verifying deployment...")
+    #         verification_success = self.verify_deployment(proxy_address, impl_v1_address)
+            
+    #         if not verification_success:
+    #             print("⚠️  Verification failed, but deployment might still be usable")
+            
+    #         # Step 4: Save deployment info
+    #         print(f"\n📋 Step 4: Saving deployment information...")
+    #         deployment_info = {
+    #             'network': self.chain_id,
+    #             'networkName': self._get_network_name(self.chain_id),
+    #             'deploymentTime': int(time.time()),
+    #             'deploymentTimeFormatted': time.strftime("%Y-%m-%d %H:%M:%S"),
+    #             'deployer': self.address,
+    #             'proxy': proxy_address,
+    #             'implementationV1': impl_v1_address,
+    #             'implementationABI': self.full_abis['LicenseSystemV1'],
+    #             'gasUsed': {
+    #                 'implementation': 'See transaction details',
+    #                 'proxy': 'See transaction details'
+    #             },
+    #             'verification': {
+    #                 'success': verification_success,
+    #                 'timestamp': int(time.time())
+    #             }
+    #         }
+            
+    #         deployment_path = Path(__file__).parent / 'deployment_info.json'
+    #         with open(deployment_path, 'w') as f:
+    #             json.dump(deployment_info, f, indent=2)
+            
+    #         print(f"✅ Deployment info saved to: {deployment_path}")
+            
+    #         # Success summary
+    #         print(f"\n{'='*80}")
+    #         print(f"🎉 DEPLOYMENT SUCCESSFUL!")
+    #         print(f"{'='*80}")
+    #         print(f"📍 Proxy Address: {proxy_address}")
+    #         print(f"📍 Implementation V1: {impl_v1_address}")
+    #         print(f"👤 Admin/Owner: {self.address}")
+    #         print(f"🔗 Chain ID: {self.chain_id}")
+    #         print(f"📄 Deployment info: {deployment_path}")
+    #         print(f"{'='*80}")
+            
+    #         return proxy_address, impl_v1_address
+            
+    #     except Exception as e:
+    #         print(f"\n{'='*80}")
+    #         print(f"❌ DEPLOYMENT FAILED")
+    #         print(f"{'='*80}")
+    #         print(f"Error: {e}")
+    #         print(f"{'='*80}")
+    #         raise
+
     def deploy_upgradeable_system(self):
-        """Deploy the complete upgradeable system with enhanced error handling"""
+        """Deploy the complete upgradeable system with V1, V2 implementations and proxy"""
         print(f"\n{'='*80}")
-        print(f"🚀 DEPLOYING UPGRADEABLE LICENSE SYSTEM")
+        print(f"🚀 DEPLOYING UPGRADEABLE LICENSE SYSTEM (V1 & V2)")
         print(f"{'='*80}")
         
         try:
-            # Step 1: Deploy Implementation V1
+            # Step 1: Deploy Implementations (V1 and V2)
             print(f"\n📋 Step 1: Deploying Implementation V1...")
-            impl_v1_address, impl_v1_abi = self.deploy_contract('LicenseSystemV1')
+            impl_v1_address, _ = self.deploy_contract('LicenseSystemV1')
             
-            # Step 2: Deploy Proxy
-            print(f"\n📋 Step 2: Deploying Proxy...")
-            proxy_address = self.deploy_proxy(impl_v1_address, self.address)
+            print(f"\n📋 Step 2: Deploying Implementation V2...")
+            impl_v2_address, _ = self.deploy_contract('LicenseSystemV2')
             
-            # Step 3: Verify deployment
-            print(f"\n📋 Step 3: Verifying deployment...")
-            verification_success = self.verify_deployment(proxy_address, impl_v1_address)
+            # Step 3: Deploy Proxy (pointing to V1 initially)
+            print(f"\n📋 Step 3: Deploying Proxy...")
+            proxy_address = self.deploy_proxy(impl_v2_address, self.address)
+            
+            # Step 4: Verify deployment (V1 implementation)
+            print(f"\n📋 Step 4: Verifying deployment...")
+            verification_success = self.verify_deployment(proxy_address, impl_v2_address)
             
             if not verification_success:
                 print("⚠️  Verification failed, but deployment might still be usable")
             
-            # Step 4: Save deployment info
-            print(f"\n📋 Step 4: Saving deployment information...")
+            # Step 5: Save deployment info
+            print(f"\n📋 Step 5: Saving deployment information...")
             deployment_info = {
                 'network': self.chain_id,
                 'networkName': self._get_network_name(self.chain_id),
@@ -792,15 +865,21 @@ class SmartContractDeployer:
                 'deploymentTimeFormatted': time.strftime("%Y-%m-%d %H:%M:%S"),
                 'deployer': self.address,
                 'proxy': proxy_address,
-                'implementationV1': impl_v1_address,
-                'implementationABI': self.full_abis['LicenseSystemV1'],
-                'gasUsed': {
-                    'implementation': 'See transaction details',
-                    'proxy': 'See transaction details'
-                },
+                'currentImplementation': 'V2',  # Proxy currently points to V1
+                'admin': self.address,
                 'verification': {
                     'success': verification_success,
                     'timestamp': int(time.time())
+                },
+                'implementations': {
+                    'V1': {
+                        'address': impl_v1_address,
+                        'abi': self.full_abis['LicenseSystemV1']
+                    },
+                    'V2': {
+                        'address': impl_v2_address,
+                        'abi': self.full_abis['LicenseSystemV2']
+                    }
                 }
             }
             
@@ -816,12 +895,13 @@ class SmartContractDeployer:
             print(f"{'='*80}")
             print(f"📍 Proxy Address: {proxy_address}")
             print(f"📍 Implementation V1: {impl_v1_address}")
+            print(f"📍 Implementation V2: {impl_v2_address}")
             print(f"👤 Admin/Owner: {self.address}")
             print(f"🔗 Chain ID: {self.chain_id}")
             print(f"📄 Deployment info: {deployment_path}")
             print(f"{'='*80}")
             
-            return proxy_address, impl_v1_address
+            return proxy_address, impl_v1_address, impl_v2_address
             
         except Exception as e:
             print(f"\n{'='*80}")
