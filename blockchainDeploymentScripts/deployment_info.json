@@ -1,19 +1,19 @@
 {
   "network": 1337,
   "networkName": "Ganache",
-  "deploymentTime": 1754422572,
-  "deploymentTimeFormatted": "2025-08-06 01:06:12",
+  "deploymentTime": 1754470437,
+  "deploymentTimeFormatted": "2025-08-06 14:23:57",
   "deployer": "0xFE3B557E8Fb62b89F4916B721be55cEb828dBd73",
-  "proxy": "0x5eD7Ae021239d7823f441Bbb72fd678B8D100DcF",
+  "proxy": "0xd6A7c915066E17ba18024c799258C8A286fFBc00",
   "currentImplementation": "V2",
   "admin": "0xFE3B557E8Fb62b89F4916B721be55cEb828dBd73",
   "verification": {
     "success": true,
-    "timestamp": 1754422572
+    "timestamp": 1754470437
   },
   "implementations": {
     "V1": {
-      "address": "0x18F74B80E8F3a1D46AE7f411e7a12e7c088dEcd9",
+      "address": "0x5EB5888938e3fE7b334b1838B19C1e828c5148aA",
       "abi": [
         {
           "inputs": [],
@@ -945,7 +945,7 @@
       ]
     },
     "V2": {
-      "address": "0x80Dc4fAb3d9D8BDb99b3e12f61cD04A6Ca528D64",
+      "address": "0x4261D524bc701dA4AC49339e5F8b299977045eA5",
       "abi": [
         {
           "inputs": [
