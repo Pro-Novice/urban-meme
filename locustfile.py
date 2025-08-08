@@ -15,33 +15,50 @@ class BlockchainUser(HttpUser):
 
     # Dummy request bodies — replace with your actual payloads
     create_payload = {
-    "licenseCategory": "SEED",
-    "adminLevel": "DIVISION",
-    "applicantName": "Ravi Kumar",
-    "aadhaarNumber": "123456789012",
-    "businessName": "Kumar Seeds & Agriculture",
-    "division": "udaipur"
+        "licenseCategory": "SEED",
+        "licenseLevel": "DISTRICT",
+        "registeringAuthority": "Department of Agriculture",
+        "registeringOfficeName": "District Agri Office, Jaipur",
+        "applicantName": "Ravi Kumar",
+        "aadhaarNumber": "123456789012",
+        "applicantPermanentAddress": "H.No 45, Green Colony, Jaipur",
+        "firmName": "Ravi Agro Traders",
+        "firmType": "Partnership",
+        "firmAddress": "Plot No 22, Mandi Road, Jaipur",
+        "salePointAddress": "Shop No 5, Krishi Market, Jaipur",
+        "saleStorageAddress": "Warehouse No 3, Outer Ring Road, Jaipur",
+        "cropName": "Wheat",
+        "cropVariety": "HD2967",
+        "isSeedSelfProduced": False,
+        "productionCompany": "Agro Seeds Pvt Ltd"
     }
 
-    update_status_payload = {        
-    "licenseId":2,
-    "status":"submitted",//DRAFT, SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, PAYMENT_PENDING, PAYMENT_COMPLETED, INSPECTION_SCHEDULED
-    "remarks":"License is submitted"
-}
+    # Status update payload (for officers)
+    update_status_payload = {
+        "licenseId": 2,
+        "status": "UNDER_REVIEW",
+        "officerName": "Shrawan",
+        "role": "AGRICULTURE_OFFICER",
+        "renewalPeriodDays": 34,
+        "remarks": "License is UNDER_REVIEW"
+    }
 
+    # Verify license payload
+    verify_payload = {
+        "licenseNumber": "RJSDST1",
+        "expectedHash": "212d02520d33be03153a2c34cb4d50b63f570e6d6881589ebbec2ec6b3da51b0"
+    }
+
+    # Update license details
     update_payload = {
-    // license_id and role are required fields, rest ae optional but atleast there should be 1 field to update
-    "license_id": 1,
-    "firm_name": "New Firm Name",
-    "firm_type": "New Firm Type",
-    "firm_address": "New Firm Address",
-    "sale_point_address": "New Sale Point Address",
-    // "sale_storage_address": "New Sale Storage Address",
-    // "production_company": "New Production Company",
-    // "crop_name": "New Crop Name",
-    "crop_variety": "New Crop Variety",
-    "role": "JOINT_DIRECTOR"
-}
+        "license_id": 1,
+        "firm_name": "New Firm Name",
+        "firm_type": "New Firm Type",
+        "firm_address": "New Firm Address",
+        "sale_point_address": "New Sale Point Address",
+        "crop_variety": "New Crop Variety",
+        "role": "JOINT_DIRECTOR"
+    }
 
     def request(self, method, path, **kwargs):
         base_url = random.choice(self.validator_nodes)
@@ -70,6 +87,12 @@ class BlockchainUser(HttpUser):
     def license_update_status(self):
         self.request("POST", "/api/blockchain/license/update-status/", 
                      data=json.dumps(self.update_status_payload),
+                     headers={"Content-Type": "application/json"})
+
+    @task
+    def license_verify(self):
+        self.request("POST", "/api/blockchain/verify-document/",
+                     data=json.dumps(self.verify_payload),
                      headers={"Content-Type": "application/json"})
 
     @task
