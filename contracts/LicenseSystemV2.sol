@@ -28,15 +28,16 @@ contract LicenseSystemV2 is LicenseSystemV1 {
         require(license.licenseId != 0, "License does not exist");
         require(license.status == LicenseStatus.APPROVED, "Only approved licenses can be edited");
 
-        // Update license fields
-        license.firmName = _firmName;
-        license.firmType = _firmType;
-        license.firmAddress = _firmAddress;
-        license.salePointAddress = _salePointAddress;
-        license.saleStorageAddress = _saleStorageAddress;
-        license.productionCompany = _productionCompany;
-        license.cropName = _cropName;
-        license.cropVariety = _cropVariety;
+        // Only update if non-empty
+        if (bytes(_firmName).length > 0) license.firmName = _firmName;
+        if (bytes(_firmType).length > 0) license.firmType = _firmType;
+        if (bytes(_firmAddress).length > 0) license.firmAddress = _firmAddress;
+        if (bytes(_salePointAddress).length > 0) license.salePointAddress = _salePointAddress;
+        if (bytes(_saleStorageAddress).length > 0) license.saleStorageAddress = _saleStorageAddress;
+        if (bytes(_productionCompany).length > 0) license.productionCompany = _productionCompany;
+        if (bytes(_cropName).length > 0) license.cropName = _cropName;
+        if (bytes(_cropVariety).length > 0) license.cropVariety = _cropVariety;
+
         license.lastModifiedDate = block.timestamp;
 
         // Add to action history
