@@ -1,4 +1,4 @@
-import json, logging, os
+import json, logging, os, threading, requests
 from typing import Any, List, Dict, Optional, Tuple
 from django.conf import settings
 from web3 import Web3
@@ -12,8 +12,25 @@ from seed_license.enums import REVERSE_OFFICER_ROLE, LICENSE_STATUS_REVERSE, USE
 
 logger = logging.getLogger(__name__)
 
+# ================== CONCURRENCY & PERFORMANCE SETUP ================== #
+
+# A lock to prevent nonce collisions when sending transactions from the same account concurrently.
+# This ensures that only one thread can fetch the nonce and send a transaction at a time.
+NONCE_LOCK = threading.Lock()
+
+# A lock to ensure thread-safe access to the contract cache.
+CACHE_LOCK = threading.Lock()
+
+# Use a requests.Session for HTTP connection pooling, which is more performant in a concurrent environment.
+session = requests.Session()
+adapter = requests.adapters.HTTPAdapter(pool_connections=20, pool_maxsize=20)
+session.mount('http://', adapter)
+session.mount('https://', adapter)
+
+# ================== WEB3 CONNECTION SETUP ================== #
+
 # Connect to blockchain node
-w3 = Web3(Web3.HTTPProvider(settings.BLOCKCHAIN_URL))
+w3 = Web3(Web3.HTTPProvider(settings.BLOCKCHAIN_URL, session=session))
 if not w3.is_connected():
     raise ConnectionError("Cannot connect to blockchain node")
 
@@ -68,7 +85,8 @@ def format_unix_timestamp(ts: int) -> str:
 def clear_contract_cache():
     """Clear the contract cache to force reload"""
     global _contract_cache
-    _contract_cache = {}
+    with CACHE_LOCK:
+        _contract_cache = {}
     logger.info("Contract cache cleared")
 
 def load_deployment_info() -> Dict:
@@ -105,9 +123,10 @@ def get_current_implementation_abi(deployment_info: Dict) -> Tuple[str, Dict]:
 
 # ================== CORE FUNCTIONS ================== #
 def get_contract(contract_name: str):
-    """Get contract instance by name using deployment info"""
-    if contract_name in _contract_cache:
-        return _contract_cache[contract_name]
+    """Get contract instance by name using deployment info in a thread-safe way"""
+    with CACHE_LOCK:
+        if contract_name in _contract_cache:
+            return _contract_cache[contract_name]
     
     try:
         deployment_info = load_deployment_info()
@@ -126,7 +145,8 @@ def get_contract(contract_name: str):
             address=Web3.to_checksum_address(proxy_address),
             abi=abi
         )
-        _contract_cache[contract_name] = contract
+        with CACHE_LOCK:
+            _contract_cache[contract_name] = contract
         logger.info(f"Contract {contract_name} loaded with proxy: {proxy_address}")
         return contract
         
@@ -155,8 +175,8 @@ def get_transaction_status(tx_hash: str):
 
 # ================== CONTRACT INTERACTION ================== #
 def write_to_contract(contract_name: str, method_name: str, params: List[Any], 
-                     address: Optional[str] = None, private_key: Optional[str] = None) -> Dict[str, Any]:
-    """Execute state-changing contract method"""
+                      address: Optional[str] = None, private_key: Optional[str] = None) -> Dict[str, Any]:
+    """Execute state-changing contract method with concurrency protection"""
     try:
         contract = get_contract(contract_name)
         abi = contract.abi
@@ -164,7 +184,7 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
         
         # Validate method exists
         method_abi = next((item for item in abi 
-                          if item.get('type') == 'function' and item.get('name') == method_name), None)
+                           if item.get('type') == 'function' and item.get('name') == method_name), None)
         if not method_abi:
             available_methods = [item['name'] for item in abi if item.get('type') == 'function']
             return {
@@ -194,44 +214,52 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
                 "details": f"Use read_from_contract instead"
             }
 
-        # Prepare transaction
+        # Prepare transaction components
         contract_function = getattr(contract.functions, method_name)
         processed_params = process_params_for_abi(params, contract_function, contract)
         sender_address = address or DEFAULT_ADDRESS
         sender_private_key = private_key or DEFAULT_PRIVATE_KEY
-        nonce = w3.eth.get_transaction_count(sender_address, 'pending')
         
-        # Estimate gas
-        try:
-            test_tx = contract_function(*processed_params).build_transaction({
+        # Acquire lock to ensure atomic nonce fetching and transaction sending
+        with NONCE_LOCK:
+            # Get the nonce for the next transaction
+            nonce = w3.eth.get_transaction_count(sender_address, 'pending')
+            
+            # Estimate gas
+            try:
+                test_tx = contract_function(*processed_params).build_transaction({
+                    'from': sender_address,
+                    'nonce': nonce,
+                    'gasPrice': w3.eth.gas_price,
+                })
+                gas_estimate = w3.eth.estimate_gas(test_tx)
+                gas_limit = int(gas_estimate * 1.2)  # 20% buffer
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": "Gas estimation failed",
+                    "details": str(e),
+                    "possible_causes": [
+                        "Invalid parameters", "Contract state prevents operation", 
+                        "Insufficient permissions", "Contract not initialized"
+                    ]
+                }
+            
+            # Build, sign, and send transaction
+            transaction = contract_function(*processed_params).build_transaction({
                 'from': sender_address,
-                'nonce': nonce,
+                'gas': gas_limit,
                 'gasPrice': w3.eth.gas_price,
+                'nonce': nonce,
+                'chainId': w3.eth.chain_id
             })
-            gas_estimate = w3.eth.estimate_gas(test_tx)
-            gas_limit = int(gas_estimate * 1.2)  # 20% buffer
-        except Exception as e:
-            return {
-                "success": False,
-                "error": "Gas estimation failed",
-                "details": str(e),
-                "possible_causes": [
-                    "Invalid parameters", "Contract state prevents operation", 
-                    "Insufficient permissions", "Contract not initialized"
-                ]
-            }
-        
-        # Build, sign, and send transaction
-        transaction = contract_function(*processed_params).build_transaction({
-            'from': sender_address,
-            'gas': gas_limit,
-            'gasPrice': w3.eth.gas_price,
-            'nonce': nonce,
-            'chainId': w3.eth.chain_id
-        })
-        signed_tx = w3.eth.account.sign_transaction(transaction, sender_private_key)
-        tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
-        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
+            signed_tx = w3.eth.account.sign_transaction(transaction, sender_private_key)
+            tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+
+        # NOTE: wait_for_transaction_receipt is a blocking call. For high-throughput applications,
+        # it's better to return the tx_hash immediately and have a separate service
+        # or client-side polling to check for the receipt.
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)
         
         # Parse events
         license_id, events = parse_events(receipt, abi, contract_address)
@@ -487,7 +515,7 @@ def parse_events(receipt, abi, contract_address):
     license_id = None
     events = []
     timestamp_fields = ["approvalDate", "expiryDate", "renewalDate", "rejectionDate", 
-                       "revokedDate", "applicationDate", "verifiedDate", "detectedDate", "lastModifiedDate"]
+                        "revokedDate", "applicationDate", "verifiedDate", "detectedDate", "lastModifiedDate"]
 
     try:
         for log in receipt.logs:
@@ -617,7 +645,7 @@ def get_available_methods(contract_name: str) -> Dict[str, List[Dict]]:
     }
 
 def estimate_gas_for_method(contract_name: str, method_name: str, params: List[Any], 
-                           from_address: Optional[str] = None) -> Dict[str, Any]:
+                            from_address: Optional[str] = None) -> Dict[str, Any]:
     """Estimate gas for a contract method call"""
     try:
         contract = get_contract(contract_name)
