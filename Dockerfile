@@ -1,4 +1,3 @@
-# Use official Python base image
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -16,20 +15,22 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user
 RUN useradd -m appuser
 
 WORKDIR /app
 
-# Copy requirements and install as root
 COPY --chown=appuser:appuser requirements.txt .
 RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the project as appuser
 COPY --chown=appuser:appuser . .
 
-# Copy entrypoint script explicitly (in case it is .dockerignored, make sure it is NOT!)
+# ✅ Ensure log directory exists and is writable
+RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs
+
+# ✅ Ensure .env is included if needed
+COPY --chown=appuser:appuser .env .env
+
 COPY --chown=appuser:appuser entrypoint.sh /app/entrypoint.sh
 
 ENV DJANGO_SETTINGS_MODULE=agri_backend.settings
