@@ -1,3 +1,7 @@
+# removed: set_solc_binary()
+
+# removed: set_solc_binary()
+
 # compile_contracts.py
 import json
 import os
@@ -7,7 +11,7 @@ from shutil import copyfile
 import platform
 
 # Install Solidity 0.8.22 to match OpenZeppelin requirements
-install_solc('0.8.22')
+#install_solc('0.8.22')
 
 def fix_windows_paths(path):
     """Convert paths to forward slashes for Solidity compiler"""

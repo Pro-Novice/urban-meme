@@ -1,0 +1,6 @@
+Method,Name,Error,Occurrences
+GET,GET /license/:id/qr,"CatchResponseError('qr failed: 500 {""success"": false, ""data"": {}, ""error"": ""QR data fetch failed: {\'code\': -32000, \'message\': \'Execution reverted (License must be active to generate QR data)\', \'data\': \'0x08c379a000000000000000000000000')",55
+POST,POST /license/verify,"CatchResponseError('Verify failed: 400 {""success"": false, ""data"": {""success"": false, ""error"": ""Transaction failed"", ""details"": ""{\'code\': -32000, \'message\': \'Known transaction\'}""}}')",38
+POST,POST /license/update-status,"CatchResponseError('Status update failed: 400 {""success"": false, ""data"": {}, ""error"": ""Invalid status transition from SUBMITTED to APPROVED""}')",50
+POST,POST /license/update,"CatchResponseError('Update failed: 400 {""success"": false, ""data"": {""success"": false, ""error"": ""Gas estimation failed"", ""details"": ""{\'code\': -32000, \'message\': \'Execution reverted (Only approved licenses can be edited)\', \'data\': \'0x08c379a0')",58
+POST,POST /license/create,"CatchResponseError('Create failed: 400 {""success"": false, ""data"": {}, ""error"": {""license_category"": [""Invalid license category""]}}')",100

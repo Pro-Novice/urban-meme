@@ -231,7 +231,7 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
         })
         signed_tx = w3.eth.account.sign_transaction(transaction, sender_private_key)
         tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
-        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
         
         # Parse events
         license_id, events = parse_events(receipt, abi, contract_address)
@@ -252,17 +252,6 @@ def write_to_contract(contract_name: str, method_name: str, params: List[Any],
         # Add success message
         if receipt.status == 1:
             response["message"] =  (f"Method '{method_name}' executed successfully")
-        
-        # Save events to database
-        for event in events:
-            BlockchainEvent.objects.create(
-                event_name=event.get("event"),
-                license_id=event.get("license_id") or license_id,
-                block_number=event.get("block_number") or receipt.blockNumber,
-                tx_hash=event.get("transaction_hash") or receipt.transactionHash.hex(),
-                address=event.get("address") or contract_address,
-                payload=event
-            )
 
         return response
 
