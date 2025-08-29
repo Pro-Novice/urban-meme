@@ -1,0 +1,14 @@
+# Hardhat files
+/cache
+/artifacts
+/typechain-types
+
+# solidity-coverage files
+/coverage
+/coverage.json
+
+node_modules
+package-lock.json
+.env
+.openzeppelin
+deployment_info.json
