@@ -70,16 +70,16 @@ npm install
   GAS_REPORT=true npx hardhat test
   ```
 
-* **Start a local Hardhat node:**
-
-  ```bash
-  npx hardhat node
-  ```
-
 * **Deploy to Besu network:**
 
   ```bash
   npx hardhat run scripts/deploy.ts --network besu
+  ```
+
+* **Start a local Hardhat node:**
+
+  ```bash
+  npx hardhat node
   ```
 
 * **Get Hardhat help:**
