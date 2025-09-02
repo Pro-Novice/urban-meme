@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 from decouple import config
 from web3 import Web3
+from django.core.exceptions import ImproperlyConfigured 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -184,13 +185,6 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Blockchain Configuration
-# BLOCKCHAIN_CONFIG = {
-#     'RPC_URL': config('RPC_URL', default='http://localhost:8545'),
-#     'PRIVATE_KEY': config('PRIVATE_KEY'),
-#     'CONTRACT_ADDRESS': config('CONTRACT_ADDRESS', default='0x5A9FA05739B99e2D948cee47D79307B18FF97ee2'),
-#     'CHAIN_ID': config('CHAIN_ID', default=1337, cast=int),
-#     # 'WALLET_ADDRESS': Web3().eth.account.from_key(PRIVATE_KEY).address
-# }
 BLOCKCHAIN_URL = config('RPC_URL', default='http://127.0.0.1:8545/')
 PRIVATE_KEY = config("PRIVATE_KEY")
 WALLET_ADDRESS = Web3().eth.account.from_key(PRIVATE_KEY).address
@@ -202,3 +196,20 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
+
+
+# Cryptography Keys for In-Transit Encryption
+try:
+    # Construct paths relative to the project root (BASE_DIR)
+    PRIVATE_KEY_PATH = BASE_DIR / 'private_key.pem'
+    PUBLIC_KEY_PATH = BASE_DIR / 'public_key.pem'
+
+    # Read the file contents
+    GENERATED_PRIVATE_KEY = PRIVATE_KEY_PATH.read_text()
+    GENERATED_PUBLIC_KEY = PUBLIC_KEY_PATH.read_text()
+
+except FileNotFoundError:
+    raise ImproperlyConfigured(
+        "Key files (private_key.pem or public_key.pem) not found. "
+        "Ensure they are available in project root directory."
+    )

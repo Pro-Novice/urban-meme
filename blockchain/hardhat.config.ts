@@ -16,15 +16,14 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
-    amoy: {
-      url: process.env.AMOY_RPC_URL,
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      chainId: 80002, 
-    },
+    // amoy: {
+    //   url: process.env.AMOY_RPC_URL,
+    //   accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+    //   chainId: 80002, 
+    // },
     besu: {
       url: process.env.BESU_RPC_URL || "http://127.0.0.1:8545",
       accounts: process.env.BESU_PRIVATE_KEY ? [process.env.BESU_PRIVATE_KEY] : [],
-      // accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: parseInt(process.env.BESU_CHAIN_ID || "1337"), 
       gasPrice: "auto",  // Besu supports EIP-1559, can leave auto
     },

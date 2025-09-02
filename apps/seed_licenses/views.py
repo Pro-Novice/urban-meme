@@ -1,6 +1,9 @@
 from rest_framework.decorators import api_view
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_200_OK, HTTP_500_INTERNAL_SERVER_ERROR, HTTP_404_NOT_FOUND, HTTP_202_ACCEPTED
 import logging
+from django.conf import settings
+from cryptography.hazmat.primitives import serialization
+
 
 from .enums import LicenseStatusEnum, LICENSE_STATUS_REVERSE, REVERSE_OFFICER_ROLE
 from .serializers import SubmitLicenseApplicationSerializer, UpdateLicenseStatusSerializer, VerifyLicenseSerializer, UpdateLicenseDetailsSerializer
@@ -27,6 +30,27 @@ VALID_STATUS_TRANSITIONS = {
     LicenseStatusEnum.EXPIRED.value: [LicenseStatusEnum.RENEWED.value], 
 }
 
+# def load_private_key():
+#     # Load from settings or environment variable
+#     pem_private_key = settings.GENERATED_PRIVATE_KEY 
+#     private_key = serialization.load_pem_private_key(
+#         pem_private_key.encode('utf-8'),
+#         password=None, 
+#     )
+#     return private_key
+
+# GENERATED_PRIVATE_KEY = load_private_key()
+
+# 0. Get Public Key
+@api_view(["GET"])
+def get_public_key(request):
+    """
+    Provides the public key for client-side encryption.
+    """
+    public_key = settings.GENERATED_PUBLIC_KEY 
+    return ApiResponse(data=public_key, status=HTTP_200_OK)
+
+
 # 1. Get Owner Address
 @api_view(["GET"])
 def check_owner_blockchain(request):
@@ -42,7 +66,6 @@ def check_owner_blockchain(request):
     except Exception as e:
         logger.exception("Blockchain write error")
         return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 
 # 2. check total License count

@@ -2,6 +2,9 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+     # Get Public Key
+     path('security/public-key/', views.get_public_key, name='get-public-key'),
+
      # Blockchain Utilities
      path('owner/', views.check_owner_blockchain, name='check-owner'),
 

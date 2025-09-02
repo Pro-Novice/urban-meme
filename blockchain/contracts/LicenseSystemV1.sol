@@ -81,7 +81,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         newLicense.registeringAuthority = input.registeringAuthority;
         newLicense.registeringOfficeName = input.registeringOfficeName;
         newLicense.applicantName = input.applicantName;
-        newLicense.aadhaarNumber = _hashAadhaar(input.aadhaarNumber); // hashed
+        newLicense.aadhaarNumber = input.aadhaarNumber; // Aadhar is already encrypted 
         newLicense.applicantPermanentAddress = input.applicantPermanentAddress;
         newLicense.firmName = input.firmName;
         newLicense.firmType = input.firmType;
@@ -302,10 +302,6 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     }
 
     // Helper functions
-    function _hashAadhaar(string memory _aadhaarNumber) internal pure returns (string memory) {
-        return _toHexString(keccak256(abi.encodePacked(_aadhaarNumber)));
-    }
-
     function _licenseIdExists(uint256 _licenseId) internal view returns (bool) {
         return bytes(licenses[_licenseId].licenseNumber).length > 0;
     }

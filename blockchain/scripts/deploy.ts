@@ -99,7 +99,7 @@ async function main() {
     };
 
     // Save deployment info
-    const filename = path.join(__dirname, "..", `deployment_info.json`);
+    const filename = path.resolve(process.cwd(), "deployment_info.json");
     fs.writeFileSync(filename, JSON.stringify(deploymentInfo, null, 2));
     console.log(`Deployment information saved to ${filename}`);
 
