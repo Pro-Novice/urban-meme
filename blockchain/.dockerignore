@@ -1,0 +1,19 @@
+# Git and Docker
+.git
+.gitignore
+Dockerfile
+.dockerignore
+
+# Node.js
+node_modules
+
+# Hardhat build artifacts
+artifacts
+cache
+.openzeppelin
+
+# Environment variables
+.env
+
+# Other
+README.md
