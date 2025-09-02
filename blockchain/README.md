@@ -76,7 +76,7 @@ npm install
   npx hardhat run scripts/deploy.ts --network besu
   ```
 
-* **Start a local Hardhat node:**
+* **Start a local Hardhat node:** (Optional – only needed if you don’t have an external RPC_URL)
 
   ```bash
   npx hardhat node
