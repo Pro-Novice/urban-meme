@@ -3,13 +3,20 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-echo "🚀 Starting deployment process..."
+echo "Starting deployment process..."
 
 # 1. Check for the .env file
 if [ ! -f .env ]; then
-    echo "❌ Error: .env file not found."
+    echo "Error: .env file not found."
     echo "Please create it by copying .env.example and adding your BESU_PRIVATE_KEY and BESU_RPC_URL."
     exit 1
+fi
+
+# --- Cross-platform volume mount setup ---
+HOST_PATH="$(pwd)"
+if [[ "$(uname -s)" == *"MINGW64_NT"* ]]; then
+    echo "Windows (Git Bash) detected. Adjusting path for Docker volume mount."
+    HOST_PATH="/$(pwd)"
 fi
 
 # 2. Build the Docker image -> image will be tagged as 'hardhat-deployer'
@@ -21,14 +28,15 @@ echo "Docker image built successfully."
 # Task argument (default = deploy)
 TASK=${1:-deploy}
 # 3. Run the deployment script inside the container
-echo "🚀 Running Hardhat task: $TASK ..."
+echo "Running Hardhat task: $TASK ..."
 
+# We now use the ${HOST_PATH} variable in all 'docker run' commands
 case "$TASK" in
     deploy)
         docker run --rm \
         --env-file .env \
         --add-host=host.docker.internal:host-gateway \
-        -v "$(pwd)":/app \
+        -v "${HOST_PATH}":/app \
         hardhat-deployer \
         npx hardhat run scripts/deploy.ts --network besu
     ;;
@@ -36,7 +44,7 @@ case "$TASK" in
     test)
         docker run --rm \
         --env-file .env \
-        -v "$(pwd)":/app \
+        -v "${HOST_PATH}":/app \
         hardhat-deployer npx hardhat test
     ;;
 
@@ -44,25 +52,25 @@ case "$TASK" in
         docker run --rm \
         --env-file .env \
         -e REPORT_GAS=true \
-        -v "$(pwd)":/app \
+        -v "${HOST_PATH}":/app \
         hardhat-deployer npx hardhat test
     ;;
 
     help)
         docker run --rm \
-        -v "$(pwd)":/app \
+        -v "${HOST_PATH}":/app \
         hardhat-deployer npx hardhat help
     ;;
 
     node)
         docker run --rm -it \
         -p 8545:8545 \
-        -v "$(pwd)":/app \
+        -v "${HOST_PATH}":/app \
         hardhat-deployer npx hardhat node
     ;;
 
     *)
-        echo "❌ Unknown task: $TASK"
+        echo "Unknown task: $TASK"
         echo "Usage: $0 [deploy|test|gas-test|help|node]"
         exit 1
     ;;
