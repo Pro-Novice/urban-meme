@@ -205,7 +205,7 @@ try:
     PUBLIC_KEY_PATH = BASE_DIR / 'public_key.pem'
 
     # Read the file contents
-    GENERATED_PRIVATE_KEY = PRIVATE_KEY_PATH.read_text()
+    GENERATED_PRIVATE_KEY_BYTES = PRIVATE_KEY_PATH.read_bytes()
     GENERATED_PUBLIC_KEY = PUBLIC_KEY_PATH.read_text()
 
 except FileNotFoundError:

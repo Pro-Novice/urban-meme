@@ -1,6 +1,9 @@
-import re
+import re, base64
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import padding
 
 from .enums import LicenseStatusEnum, OfficerRole, LICENSE_CATEGORY_MAP, LEVEL_MAP
 
@@ -32,6 +35,44 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
         if enum_value is None:
             raise serializers.ValidationError("Invalid license level")
         return enum_value
+    
+    def validate_aadhaar_number(self, value):
+        """
+        Decrypts and validates the Aadhaar number.
+        """
+        try:
+            # 1. Load the private key from settings bytes
+            private_key = serialization.load_pem_private_key(
+                settings.GENERATED_PRIVATE_KEY_BYTES,
+                password=None,
+            )
+
+            # 2. The incoming 'value' is a Base64 string from the frontend. Decode it.
+            encrypted_aadhaar_bytes = base64.b64decode(value)
+
+            # 3. Decrypt the data using the private key
+            # The padding scheme MUST match what the frontend library (e.g. JSEncrypt) uses.
+            # JSEncrypt uses OAEP with SHA-1 by default, but SHA-256 is more secure, Assuming JSEncrypt is configured for SHA-256. 
+            decrypted_aadhaar_bytes = private_key.decrypt(
+                encrypted_aadhaar_bytes,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None
+                )
+            )
+
+            # 4. Decode the decrypted bytes into a string
+            decrypted_aadhaar_str = decrypted_aadhaar_bytes.decode('utf-8')
+
+            # 5. Now, validate the plaintext Aadhaar number
+            if not re.match(r"^[2-9]{1}[0-9]{11}$", decrypted_aadhaar_str):
+                 raise serializers.ValidationError("Invalid Aadhaar number format after decryption.")
+
+            return decrypted_aadhaar_str
+        except Exception as e:
+            # Catch-all for any other unexpected errors
+            raise serializers.ValidationError
 
     # def validate_aadhaar_number(self, value):
     #     if not re.match(r"^[1-9]{1}[0-9]{11}$", value):

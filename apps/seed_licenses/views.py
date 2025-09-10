@@ -4,8 +4,7 @@ import logging
 from django.conf import settings
 from cryptography.hazmat.primitives import serialization
 
-
-from .enums import LicenseStatusEnum, LICENSE_STATUS_REVERSE, REVERSE_OFFICER_ROLE
+from .enums import LicenseStatusEnum, LICENSE_STATUS_REVERSE
 from .serializers import SubmitLicenseApplicationSerializer, UpdateLicenseStatusSerializer, VerifyLicenseSerializer, UpdateLicenseDetailsSerializer
 
 from utils.api_response import ApiResponse
@@ -29,17 +28,6 @@ VALID_STATUS_TRANSITIONS = {
     LicenseStatusEnum.APPROVED.value: [LicenseStatusEnum.REVOKED.value, LicenseStatusEnum.EXPIRED.value],
     LicenseStatusEnum.EXPIRED.value: [LicenseStatusEnum.RENEWED.value], 
 }
-
-# def load_private_key():
-#     # Load from settings or environment variable
-#     pem_private_key = settings.GENERATED_PRIVATE_KEY 
-#     private_key = serialization.load_pem_private_key(
-#         pem_private_key.encode('utf-8'),
-#         password=None, 
-#     )
-#     return private_key
-
-# GENERATED_PRIVATE_KEY = load_private_key()
 
 # 0. Get Public Key
 @api_view(["GET"])
