@@ -8,6 +8,13 @@
     "Hardhat"
   ],
   "author": "shrawank22",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "deploy": "npx hardhat run scripts/deploy.ts --network",
+    "test": "npx hardhat test",
+    "node": "npx hardhat node",
+    "help": "npx hardhat help"
+  },
   "devDependencies": {
     "@openzeppelin/hardhat-upgrades": "^3.9.1",
     "ethers": "^6.15.0",

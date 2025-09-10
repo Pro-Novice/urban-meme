@@ -19,7 +19,7 @@ The project uses **Hardhat** for development, testing, and deployment in a **loc
 
 ### Prerequisites
 
-* [Node.js](https://nodejs.org/) (v18 or later)
+* [Node.js](https://nodejs.org/) (v20 or later)
 * npm
 * A running Besu node (or other EVM-compatible RPC endpoint)
 
@@ -37,7 +37,7 @@ Edit `.env` with your deployment details:
 
 ```env
 BESU_PRIVATE_KEY=your_private_key
-BESU_RPC_URL=http://127.0.0.1:8545
+BESU_RPC_URL=http://127.0.0.1:8545/
 ```
 
 ---
@@ -55,37 +55,45 @@ npm install
 * **Compile contracts:**
 
   ```bash
-  npx hardhat compile
+  npm run compile
   ```
 
 * **Run tests:**
 
   ```bash
-  npx hardhat test
+  npm test
   ```
 
 * **Run tests with gas report:**
 
   ```bash
-  GAS_REPORT=true npx hardhat test
+  GAS_REPORT=true npm test
   ```
 
-* **Deploy to Besu network:**
+* **Deploy to a network:**
 
   ```bash
-  npx hardhat run scripts/deploy.ts --network besu
+  npm run deploy -- <network>
   ```
+  Examples:
+
+  ```bash
+  npm run deploy -- besu
+  npm run deploy -- amoy
+  npm run deploy -- sepolia
+  ```
+  > ℹ️ The network names must be defined inside `hardhat.config.ts`.
 
 * **Start a local Hardhat node:** (Optional – only needed if you don’t have an external RPC_URL)
 
   ```bash
-  npx hardhat node
+  npm run node
   ```
 
 * **Get Hardhat help:**
 
   ```bash
-  npx hardhat help
+  npm run help
   ```
 
 ---
@@ -93,12 +101,15 @@ npm install
 ## 📂 Project Structure
 
 ```
-.
+blockchain
 ├── contracts/            # Solidity smart contracts
 ├── scripts/              # Deployment and upgrade scripts
 ├── test/                 # Unit and integration tests
 ├── hardhat.config.ts     # Hardhat configuration
 ├── .env.example          # Environment variables template
+├── README.md             # Project documentation and usage instructions
+├── tsconfig.json         # Typescript config file
+├── package.json          # Project dependencies and npm scripts
 └── deployment_info.json  # Deployment artifacts (auto-generated)
 ```
 
