@@ -1,0 +1,82 @@
+services:
+  web:
+    build: .
+    image: rajasthan-seed-backend-web:latest
+    container_name: rajasthan-seed-backend
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+      - ./logs:/app/logs
+      - static_volume:/app/static
+      - media_volume:/app/media
+    depends_on:
+      - redis
+      - postgres           # Added postgres as a dependency
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=postgres       # Point to the postgres service hostname
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - REDIS_URL=${REDIS_URL}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - agri-network
+
+  redis:
+    image: redis:alpine
+    container_name: rajasthan-seed-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - agri-network
+
+  celery:
+    build: .
+    container_name: rajasthan-seed-celery
+    command: celery -A config worker -l info
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - web
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - agri-network
+
+  postgres:
+    image: postgres:15-alpine       # Using a lightweight official postgres image
+    container_name: rajasthan-seed-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - agri-network
+
+volumes:
+  redis_data:
+  static_volume:
+  media_volume:
+  postgres_data:
+
+networks:
+  agri-network:
+    driver: bridge
