@@ -26,7 +26,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         userRole changedByRole,
         uint256 lastModifiedDate
     );
-    event LicenseVerified(uint256 indexed licenseId, string licenseNumber, string statusMessage, uint256 verifiedDate);
+    event LicenseVerificationStatus(uint256 indexed licenseId, string licenseNumber, string statusMessage, uint256 verifiedDate);
     event TamperAttemptDetected(uint256 indexed licenseId, string licenseNumber, string statusMessage, uint256 detectedDate);
     event ApiCallerAuthorized(address indexed caller);
     event ApiCallerRevoked(address indexed caller);
@@ -234,16 +234,14 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     function verifyLicenseWithHash(string memory _licenseNumber, string memory _expectedHash) public {
         LicenseVerificationData memory data = verifyLicenseByNumber(_licenseNumber);
 
-        if (!data.isValid) {
-            emit LicenseVerified(data.licenseId, _licenseNumber, data.statusMessage, block.timestamp);
-            return;
-        }
+        require(data.isValid, data.statusMessage);
 
-        if (!_compareStrings(data.verificationHash, _expectedHash)) {
-            data.statusMessage = "WARNING: Potential tampering detected!";
-            emit TamperAttemptDetected(data.licenseId, _licenseNumber, data.statusMessage, block.timestamp);
-        }
-        emit LicenseVerified(data.licenseId, _licenseNumber, data.statusMessage, block.timestamp);
+        require(
+            _compareStrings(data.verificationHash, _expectedHash),
+            "WARNING: Potential tampering detected!"
+        );
+
+        emit LicenseVerificationStatus(data.licenseId, _licenseNumber, data.statusMessage, block.timestamp);
     }
 
     // 7. Verify License by Number - Private function to be used internally
@@ -485,16 +483,8 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             return "License application is under review";
         } else if (status == LicenseStatus.REJECTED) {
             return "License application has been rejected";
-        } else if (status == LicenseStatus.SUBMITTED) {
-            return "License application has been submitted";
-        } else if (status == LicenseStatus.DOCUMENTS_VERIFIED) {
-            return "License documents have been verified";
-        } else if (status == LicenseStatus.INSPECTION_SCHEDULED) {
-            return "License inspection has been scheduled";
-        } else if (status == LicenseStatus.INSPECTION_COMPLETED) {
-            return "License inspection has been completed";
-        }
+        } 
 
-        return "License status unknown";
+        return "License application is not active";
     }
 }

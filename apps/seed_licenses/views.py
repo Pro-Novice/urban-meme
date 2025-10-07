@@ -131,7 +131,7 @@ def submit_license_application(request):
         return ApiResponse(
             data={
                 "transaction_hash": result.get("transaction_hash"),
-                "status": "pending",
+                "status": "accepted",
                 "message": "Transaction submitted successfully. Processing will continue in the background."
             }, 
             status=HTTP_202_ACCEPTED
@@ -260,7 +260,7 @@ def update_license_status_view(request):
         return ApiResponse(
             data={
                 "transaction_hash": result.get("transaction_hash"),
-                "status": "pending",
+                "status": "accepted",
                 "message": "Transaction submitted successfully. Processing will continue in the background."
             }, 
             status=HTTP_202_ACCEPTED
@@ -327,6 +327,8 @@ def verify_license_document(request):
             ],
         )
 
+        print("saghsadg", result)
+
         if not result.get("success", False):
             return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
         
@@ -334,7 +336,7 @@ def verify_license_document(request):
         return ApiResponse(
             data={
                 "transaction_hash": result.get("transaction_hash"),
-                "status": "pending",
+                "status": "accepted",
                 "message": "Transaction submitted successfully. Processing will continue in the background."
             }, 
             status=HTTP_202_ACCEPTED
@@ -404,7 +406,7 @@ def update_license_details(request):
         return ApiResponse(
             data={
                 "transaction_hash": result.get("transaction_hash"),
-                "status": "pending",
+                "status": "accepted",
                 "message": "Transaction submitted successfully. Processing will continue in the background."
             }, 
             status=HTTP_202_ACCEPTED

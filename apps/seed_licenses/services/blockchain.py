@@ -1,4 +1,5 @@
 import json, logging, os, threading, requests
+import ast
 from typing import Any, List, Dict, Optional, Tuple
 from django.conf import settings
 from web3 import Web3
@@ -231,15 +232,18 @@ def write_to_contract(method_name: str, params: List[Any],
         }
 
     except Exception as e:
-        error_msg = str(e)
-        if "insufficient funds" in error_msg.lower():
-            return {"success": False, "error": "Insufficient funds", "details": "Not enough ETH for gas fees"}
-        elif "nonce too low" in error_msg.lower():
-            return {"success": False, "error": "Nonce error", "details": "Transaction ordering issue"}
-        elif "execution reverted" in error_msg.lower():
-            return {"success": False, "error": "Transaction reverted", "details": "Contract rejected the transaction"}
-        
-        return {"success": False, "error": "Transaction failed", "details": error_msg}
+        try:
+            error_details_str = str(e.args[0])
+
+            error_dict = ast.literal_eval(error_details_str)
+
+            revert_reason = error_dict.get('message', 'Execution reverted with no reason')
+
+            return {"success": False, "error": "Transaction failed", "details": revert_reason}
+
+        except (ValueError, SyntaxError, IndexError, KeyError):
+            # If parsing fails for any reason, fall back to a generic message
+            return {"success": False, "error": "Transaction failed", "details": str(e)}
 
 
 def read_from_contract(method_name: str, params: List[Any]) -> Any:
@@ -263,7 +267,15 @@ def read_from_contract(method_name: str, params: List[Any]) -> Any:
         raise
     except Exception as e:
         logger.error(f"Error reading from contract: {e}")
-        raise
+        try:
+            error_details_str = str(e.args[0])
+            error_dict = ast.literal_eval(error_details_str)
+            revert_reason = error_dict.get('message', 'Execution reverted with no reason')
+            raise Exception(revert_reason)
+        except (ValueError, SyntaxError, IndexError, KeyError):
+            # If parsing fails for any reason, fall back to a generic message
+            raise e
+
 
 # ================== DATA PROCESSING ================== #
 def format_and_transform_response(result: Any, method_name: str, contract: Any) -> Any:
