@@ -23,28 +23,38 @@ if [[ -z "$REDIS_USER" || -z "$REDIS_PASSWORD" ]]; then
     exit 1
 fi
 
-# Stop containers if requested
-if [[ $1 == "stop" ]]; then
-    log "Stopping and Removing Containers"
-    docker compose down -v
+# Ask user for environment to run
+echo "Select environment to deploy:"
+echo "1) Local (no Postgres)"
+echo "2) Server (with Postgres)"
+read -rp "Enter your choice [1 or 2]: " ENV_CHOICE
+
+if [[ "$ENV_CHOICE" == "1" ]]; then
+    COMPOSE_FILE="docker-compose.local.yml"
+    ENV_NAME="Local"
+elif [[ "$ENV_CHOICE" == "2" ]]; then
+    COMPOSE_FILE="docker-compose.yaml"
+    ENV_NAME="Server"
+else
+    echo -e "${RED}Invalid choice! Please run the script again and enter 1 or 2.${NC}"
+    exit 1
+fi
+
+# Ask user if they want to stop containers only
+read -rp "Do you want to stop existing containers only? (y/N): " STOP_ONLY
+STOP_ONLY=${STOP_ONLY,,}  # lowercase
+
+if [[ "$STOP_ONLY" == "y" || "$STOP_ONLY" == "yes" ]]; then
+    log "Stopping and Removing Containers for $ENV_NAME Environment"
+    docker compose -f "$COMPOSE_FILE" down -v
     exit 0
 fi
 
-# Set environment (dev or staging)
-if [[ $1 == "production" ]]; then
-    log "Connecting to prod Server"
-    export AUTH_PORT=8080
-else
-    log "Connecting to Staging or Dev Server"
-    export AUTH_PORT=8080
-fi
+log "Stopping Existing Containers for $ENV_NAME Environment"
+docker compose -f "$COMPOSE_FILE" down -v
 
-# Restart containers
-log "Stopping Existing Containers"
-docker compose down -v
-
-log "Building and Starting Containers"
-docker compose up -d --build
+log "Building and Starting Containers for $ENV_NAME Environment"
+docker compose -f "$COMPOSE_FILE" up -d --build
 
 # Configure Redis ACL
 log "Configuring Redis ACL"
