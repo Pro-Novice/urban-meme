@@ -145,7 +145,7 @@ export default function () {
       if (total === 0) return;
 
       const licenseId = randomInt(1, total);
-      const detailsRes = http.get(`${BASE_URL}/license/${licenseId}/info/`);
+      const detailsRes = http.get(`${BASE_URL}/license/info/${licenseId}/`);
       if (detailsRes.status !== 200) {
         sleep(2);
         return;
@@ -190,7 +190,7 @@ export default function () {
       }
       sleep(3);
       if (payload.status === 'APPROVED' && [200, 202].includes(updateRes?.status)) {
-      const qrRes = http.get(`${BASE_URL}/license/${licenseId}/qr/`);
+      const qrRes = http.get(`${BASE_URL}/license/qr/${licenseId}/`);
       check(qrRes, { 'QR data retrieved': (r) => [200, 202].includes(r.status) });
 
       if ([200, 202].includes(qrRes.status)) {
