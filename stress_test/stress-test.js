@@ -1,6 +1,7 @@
 import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { SharedArray } from 'k6/data';
+import { Trend, Counter } from 'k6/metrics';
 
 // ---------------- CONFIG ----------------
 export const options = {
@@ -20,7 +21,7 @@ export const options = {
 };
 
 // ---------------- CONSTANTS ----------------
-const BASE_URL = 'http://127.0.0.1:8000/api/blockchain';
+const BASE_URL = __ENV.BASE_URL;
 const JSON_HEADERS = { headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' } };
 
 function randomInt(min, max) {
@@ -41,14 +42,27 @@ function safeJson(res) {
   }
 }
 
+const encryptedAadhaars = new SharedArray('encryptedAadhaars', function () {
+    return JSON.parse(open('encrypted_aadhaar.json'));
+});
+
+
+function getEncryptedAadhaar() {
+    return encryptedAadhaars[Math.floor(Math.random() * encryptedAadhaars.length)];
+}
+
+// ---------------- METRICS ----------------
+export let requestCounter = new Counter('http_reqs_total');
+export let createTrend = new Trend('License_Create_Duration');
+export let statusTrend = new Trend('Status_Update_Duration');
+export let verifyTrend = new Trend('Verify_Duration');
+
 // ---------------- TEST DATA ----------------
 const applicantData = new SharedArray('applicants', () => [
   {
     licenseCategory: 'SEED',
     licenseLevel: 'DISTRICT',
     applicantName: 'Ravi Kumar',
-    aadhaarNumber:
-      'IRk4zRfT9iJvf5CRYUQOZwor9ro553k8mWwlfqwLPheTWoz0oLEPlr/+4vPOPOa0nOROMII9ZhLV9r2DR1AnPqsVXUj2g1JiAZWvIE61Zu/qU/RU/B+yxUnbmztYC8kmK0eunlvFyNtmBidbgbatQWnn4JufcuewGFwCIUblTCQ9PpPouh8KK9602n4rPi36MGcGQFVdm8uoxig9/RRLh34UFb8yBamhuY5I/5UMDQUgli5Vu9Fc8AXuu+3sZ3odR8DIeMykmtTyrysTYAu7I8jHHThGcHNiysrESgaPEc5azFdFHdULoLiWA4RRMrgKDFWJV1MeTbI1UZsHtCc/PA==',
     firmName: 'Ravi Agro Traders',
     firmType: 'Partnership',
     cropName: 'Wheat',
@@ -91,6 +105,7 @@ function generateApplication() {
   const base = randomItem(applicantData);
   return {
     ...base,
+    aadhaarNumber: getEncryptedAadhaar(),
     registeringAuthority: 'Department of Agriculture',
     registeringOfficeName: `District Agri Office, ${randomItem(['Jaipur', 'Udaipur', 'Jodhpur', 'Kota'])}`,
     applicantPermanentAddress: `H.No ${randomInt(1, 100)}, ${randomItem(['Green', 'Royal', 'Sunrise'])} Colony`,
@@ -103,12 +118,16 @@ function generateApplication() {
 // ---------------- SETUP ----------------
 export function setup() {
   console.log('🚀 Starting Rajasthan Seed Licensing Stress Test');
-  const res = http.get(`${BASE_URL}/owner/`);
-  console.log(`API connectivity check: ${res.status}`);
-  if (res.status !== 200) {
-    console.error('❌ Backend not reachable — check Django + blockchain nodes.');
-  } else {
-    console.log('✅ Backend reachable. Proceeding...');
+  try {
+    const res = http.get(`${BASE_URL}/owner/`);
+    console.log(`API connectivity check: ${res.status}`);
+    if (res.status !== 200) {
+      console.error('❌ Backend not reachable — check Django + blockchain nodes.');
+    } else {
+      console.log('✅ Backend reachable. Proceeding...');
+    }
+  } catch (error) {
+    console.error('❌ Error occurred while checking API connectivity:', error);
   }
 }
 
@@ -120,19 +139,29 @@ export default function () {
     // Citizen submitting license application
     group('Citizen: License Creation', () => {
       const payload = generateApplication();
+      const start = new Date().getTime();
       const res = http.post(`${BASE_URL}/license/create/`, JSON.stringify(payload), JSON_HEADERS);
       const duration = res.timings.duration;
+      createTrend.add(new Date().getTime() - start);
+      requestCounter.add(1);
       log(`🟢 POST /license/create → ${res.status} (${duration.toFixed(0)} ms)`);
-
+      
       check(res, { 'Application submitted successfully': (r) => [200, 201, 202].includes(r.status) });
       if ([200, 201, 202].includes(res.status)) stats.create_ok++;
-      else stats.create_fail++;
-      sleep(randomInt(1, 3));
+      else {
+        stats.create_fail++;
+        log(`❌ License Creation Failed:
+          • Status: ${res.status}
+          • Response Body: ${res.body ? res.body.substring(0, 400) : '[Empty response]'}`);
+      }
+
+      sleep(randomInt(2, 3));
     });
   } else {
     // Officer performing workflow updates
     group('Officer: License Workflow', () => {
       const countRes = http.get(`${BASE_URL}/license/count/`);
+      requestCounter.add(1);
       if (countRes.status !== 200) {
         sleep(2);
         return;
@@ -146,6 +175,7 @@ export default function () {
 
       const licenseId = randomInt(1, total);
       const detailsRes = http.get(`${BASE_URL}/license/info/${licenseId}/`);
+      requestCounter.add(1);
       if (detailsRes.status !== 200) {
         sleep(2);
         return;
@@ -172,7 +202,10 @@ export default function () {
 
       let updateRes;
       for (let i = 0; i < 3; i++) {
+        const start = new Date().getTime();
         updateRes = http.post(`${BASE_URL}/license/update-status/`, JSON.stringify(payload), JSON_HEADERS);
+        statusTrend.add(new Date().getTime() - start);
+        requestCounter.add(1);
         if ([200, 202].includes(updateRes.status)) {
           log(`✅ POST /update-status success for license ${licenseId}`);
           stats.status_ok++;
@@ -191,6 +224,7 @@ export default function () {
       sleep(3);
       if (payload.status === 'APPROVED' && [200, 202].includes(updateRes?.status)) {
       const qrRes = http.get(`${BASE_URL}/license/qr/${licenseId}/`);
+      requestCounter.add(1);
       check(qrRes, { 'QR data retrieved': (r) => [200, 202].includes(r.status) });
 
       if ([200, 202].includes(qrRes.status)) {
@@ -202,7 +236,10 @@ export default function () {
             licenseNumber: qr.licenseNumber,
             expectedHash: qr.verificationHash,
           };
+          const start = new Date().getTime();
           const verifyRes = http.post(`${BASE_URL}/license/verify/`, JSON.stringify(verifyPayload), JSON_HEADERS);
+          verifyTrend.add(new Date().getTime() - start);
+          requestCounter.add(1);
           log(`🔵 POST /license/verify → ${verifyRes.status}`);
           check(verifyRes, { 'License verified successfully': (r) => [200, 202].includes(r.status) });
         } else {
