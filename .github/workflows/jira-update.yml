@@ -1,0 +1,39 @@
+name: Jira Ticket Update
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited, closed]
+
+jobs:
+  update-jira:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract Jira Issue Key
+        id: extract
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          KEY=$(echo "$TITLE" | grep -oE '[A-Z]+-[0-9]+')
+          echo "JIRA_KEY=$KEY" >> $GITHUB_ENV
+          echo "Detected Jira key: $KEY"
+
+      - name: Add comment to Jira issue
+        if: env.JIRA_KEY != ''
+        run: |
+          COMMENT="🔗 Pull Request [#${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }}) - *${{ github.event.pull_request.title }}* by ${{ github.actor }}"
+          
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
+            --data "{\"body\": \"$COMMENT\"}" \
+            "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/issue/${{ env.JIRA_KEY }}/comment"
+
+      - name: Transition Jira issue to 'In Review'
+        if: env.JIRA_KEY != '' && github.event.action == 'opened'
+        run: |
+          # Replace '31' with your actual transition ID for "In Review"
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
+            --data '{"transition": {"id": "31"}}' \
+            "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/issue/${{ env.JIRA_KEY }}/transitions"
