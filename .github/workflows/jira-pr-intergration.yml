@@ -15,14 +15,19 @@ jobs:
           TITLE="${{ github.event.pull_request.title }}"
           BRANCH="${{ github.head_ref }}"
           KEY=$(echo "$TITLE $BRANCH" | grep -oE 'RAP-[0-9]+')
-          echo "JIRA_KEY=$KEY" >> $GITHUB_ENV
-          echo "Detected Jira key: $KEY"
+          if [ -n "$KEY" ]; then
+            echo "Detected Jira key: $KEY"
+            echo "JIRA_KEY=$KEY" >> $GITHUB_ENV
+          else
+            echo "No Jira key detected — skipping."
+          fi
 
       - name: Add comment on PR open or update
         if: env.JIRA_KEY != '' && github.event.action != 'closed'
         run: |
           COMMENT="🔗 Pull Request [#${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }}) - *${{ github.event.pull_request.title }}* by ${{ github.actor }}"
-          echo "Posting comment to Jira issue ${{ env.JIRA_KEY }}"
+          echo "Posting comment to Jira issue ${{ env.JIRA_KEY }}..."
+          
           curl -X POST \
             -H "Content-Type: application/json" \
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
@@ -32,7 +37,7 @@ jobs:
       - name: Transition Jira issue to 'In Review' (on PR open)
         if: env.JIRA_KEY != '' && github.event.action == 'opened'
         run: |
-          # Replace 31 with your actual transition ID for "In Review"
+          echo "Moving ${{ env.JIRA_KEY }} → In Review"
           curl -X POST \
             -H "Content-Type: application/json" \
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
@@ -42,7 +47,7 @@ jobs:
       - name: Transition Jira issue to 'Done' (on PR merge)
         if: env.JIRA_KEY != '' && github.event.pull_request.merged == true
         run: |
-          # Replace 41 with your actual transition ID for "Done"
+          echo "Moving ${{ env.JIRA_KEY }} → Done"
           curl -X POST \
             -H "Content-Type: application/json" \
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
