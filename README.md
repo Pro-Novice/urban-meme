@@ -116,6 +116,36 @@ docker compose logs -f celery
 ```
 
 ---
+## Testing
+
+---
+
+### ✅ Prerequisites
+
+Ensure you have the following installed in your virtual environment:
+
+* `pytest`
+* `pytest-django`
+
+
+### ⚙️ Configuration
+
+Make sure your `pytest.ini` (or `pyproject.toml`) is configured properly. Example `pytest.ini`:
+
+```ini
+# pytest.ini
+[pytest]
+DJANGO_SETTINGS_MODULE = config.settings
+python_files = tests.py test_*.py *_tests.py
+```
+
+### 🔍 Running Tests by following command
+
+
+```bash
+pytest apps/seed_licenses/tests.py
+```
+
 
 ## 📜 Deployment
 
