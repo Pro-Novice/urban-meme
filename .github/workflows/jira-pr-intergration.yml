@@ -11,19 +11,23 @@ jobs:
     steps:
       - name: Extract Jira Key (RAP project only)
         id: extract
+        shell: bash
         run: |
           TITLE="${{ github.event.pull_request.title }}"
           BRANCH="${{ github.head_ref }}"
-          KEY=$(echo "$TITLE $BRANCH" | grep -oE 'RAP-[0-9]+')
+          KEY=$(echo "$TITLE $BRANCH" | grep -oE 'RAP-[0-9]+' | head -n 1)
+          
           if [ -n "$KEY" ]; then
-            echo "Detected Jira key: $KEY"
-            echo "JIRA_KEY=$KEY" >> $GITHUB_ENV
+            echo "✅ Detected Jira key: $KEY"
+            # Safe write to GITHUB_ENV (no extra blank lines or plain outputs)
+            echo "JIRA_KEY=$KEY" >> "$GITHUB_ENV"
           else
-            echo "No Jira key detected — skipping."
+            echo "⚠️ No Jira key detected — skipping."
           fi
 
       - name: Add comment on PR open or update
         if: env.JIRA_KEY != '' && github.event.action != 'closed'
+        shell: bash
         run: |
           COMMENT="🔗 Pull Request [#${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }}) - *${{ github.event.pull_request.title }}* by ${{ github.actor }}"
           echo "Posting comment to Jira issue ${{ env.JIRA_KEY }}..."
@@ -36,6 +40,7 @@ jobs:
 
       - name: Transition Jira issue to 'In Review' (on PR open)
         if: env.JIRA_KEY != '' && github.event.action == 'opened'
+        shell: bash
         run: |
           echo "Moving ${{ env.JIRA_KEY }} → In Review"
           curl -X POST \
@@ -46,6 +51,7 @@ jobs:
 
       - name: Transition Jira issue to 'Done' (on PR merge)
         if: env.JIRA_KEY != '' && github.event.pull_request.merged == true
+        shell: bash
         run: |
           echo "Moving ${{ env.JIRA_KEY }} → Done"
           curl -X POST \
