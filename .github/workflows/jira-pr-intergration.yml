@@ -30,9 +30,20 @@ jobs:
         shell: bash
         run: |
           echo "Verifying Jira credentials for ${{ secrets.JIRA_EMAIL }}..."
-          curl -s -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
+          RESPONSE=$(curl -s -w "%{http_code}" -o jira_me.json \
+            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
             -H "Accept: application/json" \
-            "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/myself" | jq '.displayName'
+            "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/myself")
+
+          if [ "$RESPONSE" = "200" ]; then
+            echo "✅ Jira authentication successful!"
+            jq '.displayName' jira_me.json
+          else
+            echo "❌ Jira authentication failed (HTTP $RESPONSE)"
+            echo "Response:"
+            cat jira_me.json
+            # Don't fail the job, continue gracefully
+          fi
 
       - name: Add comment on PR open or update
         if: env.JIRA_KEY != '' && github.event.action != 'closed'
