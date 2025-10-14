@@ -25,7 +25,7 @@ session.mount('https://', adapter)
 # ================== WEB3 CONNECTION SETUP ================== #
 w3 = Web3(Web3.HTTPProvider(settings.BLOCKCHAIN_URL, session=session))
 if not w3.is_connected():
-    raise ConnectionError("Cannot connect to blockchain node")
+    raise ConnectionError("Cannot connect to blockchain node",settings.BLOCKCHAIN_URL)
 
 w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
 

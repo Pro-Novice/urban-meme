@@ -72,7 +72,7 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
             return decrypted_aadhaar_str
         except Exception as e:
             # Catch-all for any other unexpected errors
-            raise serializers.ValidationError
+            raise serializers.ValidationError(f"Decryption failed: {str(e)}")
 
     # def validate_aadhaar_number(self, value):
     #     if not re.match(r"^[1-9]{1}[0-9]{11}$", value):
