@@ -82,3 +82,43 @@ jobs:
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
             --data '{"transition": {"id": "41"}}' \
             "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/issue/${{ env.JIRA_KEY }}/transitions"
+      - name: Link PR to Jira issue (Development panel)
+        if: env.JIRA_KEY != '' && github.event.action != 'closed'
+        shell: bash
+        run: |
+          echo "🔗 Linking PR to Jira Development info for ${{ env.JIRA_KEY }}"
+
+          PR_ID="${{ github.event.pull_request.id }}"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_URL="${{ github.event.pull_request.html_url }}"
+          BRANCH="${{ github.head_ref }}"
+          REPO="${{ github.repository }}"
+
+          PAYLOAD=$(jq -nc --arg key "${{ env.JIRA_KEY }}" \
+                          --arg url "$PR_URL" \
+                          --arg name "$PR_TITLE" \
+                          --arg branch "$BRANCH" \
+                          --arg repo "$REPO" \
+            '{
+              repositories: [
+                {
+                  name: $repo,
+                  pullRequests: [
+                    {
+                      id: $branch,
+                      name: $name,
+                      url: $url,
+                      issueKeys: [$key],
+                      status: "OPEN"
+                    }
+                  ]
+                }
+              ]
+            }')
+
+          curl -X POST \
+            -H "Authorization: Basic $(echo -n "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" | base64)" \
+            -H "Content-Type: application/json" \
+            --data "$PAYLOAD" \
+            "https://${{ secrets.JIRA_DOMAIN }}/rest/devinfo/0.10/bulk"
+
