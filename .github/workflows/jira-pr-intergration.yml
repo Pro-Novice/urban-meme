@@ -19,30 +19,42 @@ jobs:
           
           if [ -n "$KEY" ]; then
             echo "✅ Detected Jira key: $KEY"
-            # Safe write to GITHUB_ENV (no extra blank lines or plain outputs)
             echo "JIRA_KEY=$KEY" >> "$GITHUB_ENV"
           else
             echo "⚠️ No Jira key detected — skipping."
           fi
+
+      # (Optional) Verify Jira credentials - helps debugging
+      - name: Verify Jira Authentication
+        if: env.JIRA_KEY != ''
+        shell: bash
+        run: |
+          echo "Verifying Jira credentials for ${{ secrets.JIRA_EMAIL }}..."
+          curl -s -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
+            -H "Accept: application/json" \
+            "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/myself" | jq '.displayName'
 
       - name: Add comment on PR open or update
         if: env.JIRA_KEY != '' && github.event.action != 'closed'
         shell: bash
         run: |
           COMMENT="🔗 Pull Request [#${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }}) - *${{ github.event.pull_request.title }}* by ${{ github.actor }}"
-          echo "Posting comment to Jira issue ${{ env.JIRA_KEY }}..."
-          
+          echo "Posting ADF comment to Jira issue ${{ env.JIRA_KEY }}..."
+
+          ADF_JSON=$(jq -nc --arg text "$COMMENT" \
+            '{body: {type: "doc", version: 1, content: [{type: "paragraph", content: [{type: "text", text: $text}]}]}}')
+
           curl -X POST \
             -H "Content-Type: application/json" \
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
-            --data "{\"body\": \"$COMMENT\"}" \
+            --data "$ADF_JSON" \
             "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/issue/${{ env.JIRA_KEY }}/comment"
 
       - name: Transition Jira issue to 'In Review' (on PR open)
         if: env.JIRA_KEY != '' && github.event.action == 'opened'
         shell: bash
         run: |
-          echo "Moving ${{ env.JIRA_KEY }} → In Review"
+          echo "🚀 Moving ${{ env.JIRA_KEY }} → In Review"
           curl -X POST \
             -H "Content-Type: application/json" \
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
@@ -53,7 +65,7 @@ jobs:
         if: env.JIRA_KEY != '' && github.event.pull_request.merged == true
         shell: bash
         run: |
-          echo "Moving ${{ env.JIRA_KEY }} → Done"
+          echo "✅ Moving ${{ env.JIRA_KEY }} → Done"
           curl -X POST \
             -H "Content-Type: application/json" \
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
