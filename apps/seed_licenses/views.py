@@ -53,7 +53,7 @@ def check_owner_blockchain(request):
         return ApiResponse(err=str(e), status=HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception("Blockchain write error")
-        return ApiResponse(err=f"Blockchain write failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
+        return ApiResponse(err=f"Blockchain read failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # 2. check total License count
