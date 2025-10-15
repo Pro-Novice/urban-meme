@@ -1,4 +1,4 @@
-name: Jira PR Integration (Debug Enabled)
+name: Jira PR Integration (Debug Enabled + Connectivity Test)
 
 on:
   pull_request:
@@ -29,15 +29,39 @@ jobs:
             echo "⚠️ No Jira key found in title or branch — skipping."
           fi
 
+      - name: 🧪 Test Jira connectivity (Early check)
+        shell: bash
+        run: |
+          echo "=== 🌐 Testing Jira Connectivity ==="
+          echo "Domain: ${{ secrets.JIRA_DOMAIN }}"
+          echo "Email: ${{ secrets.JIRA_EMAIL }}"
+          echo "Testing API access to: https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/serverInfo"
+
+          RESPONSE=$(curl -s -w "%{http_code}" -o serverinfo.json \
+            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
+            -H "Accept: application/json" \
+            "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/serverInfo")
+
+          echo "HTTP Status: $RESPONSE"
+          cat serverinfo.json | jq || cat serverinfo.json
+
+          if [ "$RESPONSE" != "200" ]; then
+            echo "❌ Cannot reach Jira Cloud. Please check:"
+            echo "   - JIRA_DOMAIN (must be 'ras-dwivedi.atlassian.net' without https://)"
+            echo "   - JIRA_EMAIL (must be your Jira Cloud email)"
+            echo "   - JIRA_API_TOKEN (must be valid token from Atlassian API tokens page)"
+            exit 1
+          fi
+
+          echo "✅ Jira Cloud connectivity verified successfully."
+          echo "Deployment type:"
+          jq -r '.deploymentType' serverinfo.json || echo "(unknown)"
+
       - name: Verify Jira Authentication
         if: env.JIRA_KEY != ''
         shell: bash
         run: |
           echo "=== 🔐 Verifying Jira Authentication ==="
-          echo "Jira Domain: ${{ secrets.JIRA_DOMAIN }}"
-          echo "Jira Email: ${{ secrets.JIRA_EMAIL }}"
-          echo "Checking credentials..."
-
           RESPONSE=$(curl -s -w "%{http_code}" -o jira_me.json \
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
             -H "Accept: application/json" \
@@ -50,6 +74,7 @@ jobs:
             echo "✅ Jira authentication successful"
           else
             echo "❌ Jira authentication failed (HTTP $RESPONSE)"
+            exit 1
           fi
 
       - name: Add comment on PR open or update
@@ -138,6 +163,11 @@ jobs:
           echo "Payload JSON:"
           echo "$PAYLOAD" | jq
 
+          echo "🔍 Checking if DevInfo API is enabled..."
+          curl -s -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
+            "https://${{ secrets.JIRA_DOMAIN }}/rest/devinfo/0.10/health" | jq || true
+
+          echo "📤 Sending payload to Jira..."
           RESPONSE=$(curl -s -w "%{http_code}" -o link_res.json \
             -X POST \
             -H "Authorization: Basic $(echo -n "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" | base64)" \
@@ -147,3 +177,11 @@ jobs:
 
           echo "HTTP Status: $RESPONSE"
           cat link_res.json | jq || cat link_res.json
+
+          if [ "$RESPONSE" != "202" ]; then
+            echo "❌ DevInfo link failed (HTTP $RESPONSE)."
+            echo "➡️  Make sure the 'GitHub for Jira' app is installed in ras-dwivedi.atlassian.net"
+            exit 1
+          fi
+
+          echo "✅ PR successfully linked to Jira issue in Development panel."
