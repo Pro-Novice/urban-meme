@@ -74,11 +74,7 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
             # Catch-all for any other unexpected errors
             raise serializers.ValidationError(f"Decryption failed: {str(e)}")
 
-    # def validate_aadhaar_number(self, value):
-    #     if not re.match(r"^[1-9]{1}[0-9]{11}$", value):
-    #         raise ValidationError("Invalid Aadhaar number. Must be 12 digits starting with non-zero.")
-    #     return value
-
+  
 
 class UpdateLicenseStatusSerializer(serializers.Serializer):
     license_id = serializers.IntegerField(min_value=1)
