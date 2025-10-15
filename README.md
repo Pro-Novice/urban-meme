@@ -143,7 +143,8 @@ python_files = tests.py test_*.py *_tests.py
 
 
 ```bash
-pytest apps/seed_licenses/tests.py
+python -m pytest apps/seed_licenses/Tests/
+
 ```
 
 
