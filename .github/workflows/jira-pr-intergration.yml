@@ -1,4 +1,4 @@
-name: Jira PR Integration
+name: Jira PR Integration (Debug Enabled)
 
 on:
   pull_request:
@@ -13,70 +13,99 @@ jobs:
         id: extract
         shell: bash
         run: |
+          echo "=== 🧩 Extracting Jira Key ==="
+          echo "PR Title: '${{ github.event.pull_request.title }}'"
+          echo "Branch: '${{ github.head_ref }}'"
           TITLE="${{ github.event.pull_request.title }}"
           BRANCH="${{ github.head_ref }}"
-          KEY=$(echo "$TITLE $BRANCH" | grep -oE 'RAP-[0-9]+' | head -n 1)
-          
+
+          KEY=$(echo "$TITLE $BRANCH" | grep -oE 'RAP-[0-9]+' | head -n 1 || true)
+          echo "Detected Key (raw): '$KEY'"
+
           if [ -n "$KEY" ]; then
-            echo "✅ Detected Jira key: $KEY"
+            echo "✅ Jira key found: $KEY"
             echo "JIRA_KEY=$KEY" >> "$GITHUB_ENV"
           else
-            echo "⚠️ No Jira key detected — skipping."
+            echo "⚠️ No Jira key found in title or branch — skipping."
           fi
 
-      # (Optional) Verify Jira credentials - helps debugging
       - name: Verify Jira Authentication
         if: env.JIRA_KEY != ''
         shell: bash
         run: |
-          echo "Verifying Jira credentials for ${{ secrets.JIRA_EMAIL }}..."
+          echo "=== 🔐 Verifying Jira Authentication ==="
+          echo "Jira Domain: ${{ secrets.JIRA_DOMAIN }}"
+          echo "Jira Email: ${{ secrets.JIRA_EMAIL }}"
+          echo "Checking credentials..."
+
           RESPONSE=$(curl -s -w "%{http_code}" -o jira_me.json \
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
             -H "Accept: application/json" \
             "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/myself")
 
+          echo "HTTP Status: $RESPONSE"
+          cat jira_me.json | jq || cat jira_me.json
+
           if [ "$RESPONSE" = "200" ]; then
-            echo "✅ Jira authentication successful!"
-            jq '.displayName' jira_me.json
+            echo "✅ Jira authentication successful"
           else
             echo "❌ Jira authentication failed (HTTP $RESPONSE)"
-            echo "Response:"
-            cat jira_me.json
-            # Don't fail the job, continue gracefully
           fi
 
       - name: Add comment on PR open or update
         if: env.JIRA_KEY != '' && github.event.action != 'closed'
         shell: bash
         run: |
-          COMMENT="🔗 Pull Request [#${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }}) - *${{ github.event.pull_request.title }}* by ${{ github.actor }}"
-          echo "Posting ADF comment to Jira issue ${{ env.JIRA_KEY }}..."
+          echo "=== 💬 Adding comment on Jira issue ==="
+          echo "PR Number: ${{ github.event.pull_request.number }}"
+          echo "Jira Issue: ${{ env.JIRA_KEY }}"
+          echo "Action: ${{ github.event.action }}"
+
+          COMMENT="🔗 PR [#${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }}) - *${{ github.event.pull_request.title }}* by ${{ github.actor }}"
+          echo "Comment content: $COMMENT"
 
           ADF_JSON=$(jq -nc --arg text "$COMMENT" \
             '{body: {type: "doc", version: 1, content: [{type: "paragraph", content: [{type: "text", text: $text}]}]}}')
 
-          curl -X POST \
-            -H "Content-Type: application/json" \
+          echo "ADF Payload:"
+          echo "$ADF_JSON" | jq
+
+          RESPONSE=$(curl -s -w "%{http_code}" -o comment_res.json \
+            -X POST -H "Content-Type: application/json" \
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
             --data "$ADF_JSON" \
-            "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/issue/${{ env.JIRA_KEY }}/comment"
+            "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/issue/${{ env.JIRA_KEY }}/comment")
+
+          echo "HTTP Status: $RESPONSE"
+          cat comment_res.json | jq || cat comment_res.json
 
       - name: Transition Jira issue to 'In Review' (on PR open)
         if: env.JIRA_KEY != '' && github.event.action == 'opened'
         shell: bash
         run: |
-          echo "🚀 Moving ${{ env.JIRA_KEY }} → In Review"
-          curl -X POST \
+          echo "=== 🔄 Transitioning Jira issue ==="
+          echo "Issue: ${{ env.JIRA_KEY }}"
+          echo "Transition ID: 31 (In Review)"
+          RESPONSE=$(curl -s -w "%{http_code}" -o transition_res.json \
+            -X POST \
             -H "Content-Type: application/json" \
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
             --data '{"transition": {"id": "31"}}' \
-            "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/issue/${{ env.JIRA_KEY }}/transitions"
+            "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/issue/${{ env.JIRA_KEY }}/transitions")
+
+          echo "HTTP Status: $RESPONSE"
+          cat transition_res.json | jq || cat transition_res.json
 
       - name: Link PR to Jira issue (Development panel)
         if: env.JIRA_KEY != '' && github.event.action != 'closed'
         shell: bash
         run: |
-          echo "🔗 Linking PR to Jira Development info for ${{ env.JIRA_KEY }}"
+          echo "=== 🔗 Linking PR to Jira Development Info ==="
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.head_ref }}"
+          echo "PR URL: ${{ github.event.pull_request.html_url }}"
+          echo "Issue: ${{ env.JIRA_KEY }}"
+          echo "Action: ${{ github.event.action }}"
 
           PR_TITLE="${{ github.event.pull_request.title }}"
           PR_URL="${{ github.event.pull_request.html_url }}"
@@ -84,7 +113,6 @@ jobs:
           REPO="${{ github.repository }}"
           ISSUE="${{ env.JIRA_KEY }}"
 
-          # Build compact JSON payload safely
           PAYLOAD=$(jq -nc --arg repo "$REPO" \
                           --arg branch "$BRANCH" \
                           --arg name "$PR_TITLE" \
@@ -107,11 +135,15 @@ jobs:
                 }
               ]}')
 
-          echo "Payload: $PAYLOAD"
+          echo "Payload JSON:"
+          echo "$PAYLOAD" | jq
 
-          # Send the payload to Jira
-          curl -v -X POST \
+          RESPONSE=$(curl -s -w "%{http_code}" -o link_res.json \
+            -X POST \
             -H "Authorization: Basic $(echo -n "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" | base64)" \
             -H "Content-Type: application/json" \
             --data "$PAYLOAD" \
-            "https://${{ secrets.JIRA_DOMAIN }}/rest/devinfo/0.10/bulk"
+            "https://${{ secrets.JIRA_DOMAIN }}/rest/devinfo/0.10/bulk")
+
+          echo "HTTP Status: $RESPONSE"
+          cat link_res.json | jq || cat link_res.json
