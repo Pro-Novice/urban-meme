@@ -131,7 +131,7 @@ jobs:
                     issueKeys: [$issue],
                     status: $status,
                     source: {branch: {name: $branch}},
-                    destination: {branch: {name: "optimization"}},
+                    destination: {branch: {name: "main"}},
                     updateSequenceId: $seq
                   }
                 ]
