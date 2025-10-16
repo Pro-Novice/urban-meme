@@ -1,4 +1,4 @@
-name: Jira PR Integration (Clean + Stable DevInfo Link)
+name: Jira PR Integration (Comments + Transitions)
 
 on:
   pull_request:
@@ -70,87 +70,21 @@ jobs:
 
           echo "HTTP Status: $RESPONSE"
           cat comment_res.json | jq || cat comment_res.json
+          [ "$RESPONSE" != "201" ] && { echo "❌ Failed to add comment (HTTP $RESPONSE)"; exit 1; }
+          echo "✅ Comment successfully added to Jira issue."
 
       - name: 🔄 Transition Jira issue to 'In Review' (on PR open)
         if: env.JIRA_KEY != '' && github.event.action == 'opened'
         shell: bash
         run: |
-          echo "=== 🔄 Transitioning Jira issue ==="
+          echo "=== 🔄 Transitioning Jira issue to 'In Review' ==="
           RESPONSE=$(curl -s -w "%{http_code}" -o transition_res.json \
             -X POST -H "Content-Type: application/json" \
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
             --data '{"transition": {"id": "31"}}' \
             "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/issue/${{ env.JIRA_KEY }}/transitions")
+
           echo "HTTP Status: $RESPONSE"
           cat transition_res.json | jq || cat transition_res.json
-
-      - name: 🔗 Link PR to Jira Development Info
-        if: env.JIRA_KEY != ''
-        shell: bash
-        run: |
-          echo "=== 🔗 Linking PR to Jira Development Info ==="
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          PR_URL="${{ github.event.pull_request.html_url }}"
-          BRANCH="${{ github.head_ref }}"
-          REPO="${{ github.repository }}"
-          ISSUE="${{ env.JIRA_KEY }}"
-          STATUS="OPEN"
-          REPO_URL="https://github.com/$REPO"
-          SEQ=$(date +%s)
-
-          # Mark as MERGED/CLOSED when PR closed
-          if [ "${{ github.event.action }}" = "closed" ]; then
-            if [ "${{ github.event.pull_request.merged }}" = "true" ]; then
-              STATUS="MERGED"
-            else
-              STATUS="DECLINED"
-            fi
-          fi
-
-          PAYLOAD=$(jq -nc \
-            --arg repo "$REPO" \
-            --arg repoId "$REPO" \
-            --arg repoUrl "$REPO_URL" \
-            --arg branch "$BRANCH" \
-            --arg name "$PR_TITLE" \
-            --arg url "$PR_URL" \
-            --arg issue "$ISSUE" \
-            --arg status "$STATUS" \
-            --arg pr_id "${{ github.event.pull_request.number }}" \
-            --argjson seq $SEQ \
-            '{repositories: [
-              {
-                id: $repoId,
-                name: $repo,
-                url: $repoUrl,
-                pullRequests: [
-                  {
-                    id: $pr_id,
-                    name: $name,
-                    url: $url,
-                    issueKeys: [$issue],
-                    status: $status,
-                    source: {branch: {name: $branch}},
-                    destination: {branch: {name: "optimization"}},
-                    updateSequenceId: $seq
-                  }
-                ]
-              }
-            ]}')
-
-          echo "Payload JSON:"
-          echo "$PAYLOAD" | jq
-
-          echo "📤 Sending payload to Jira DevInfo API..."
-          RESPONSE=$(curl -s -w "%{http_code}" -o link_res.json \
-            -X POST \
-            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            --data "$PAYLOAD" \
-            "https://${{ secrets.JIRA_DOMAIN }}/rest/devinfo/0.10/bulk")
-
-          echo "HTTP Status: $RESPONSE"
-          cat link_res.json | jq || cat link_res.json
-          [ "$RESPONSE" != "202" ] && { echo "❌ DevInfo link failed (HTTP $RESPONSE)"; exit 1; }
-
-          echo "✅ PR successfully linked to Jira issue (DevInfo API accepted)."
+          [ "$RESPONSE" != "204" ] && { echo "⚠️ Transition may not have succeeded (HTTP $RESPONSE)"; exit 0; }
+          echo "✅ Jira issue transitioned to 'In Review' successfully."
