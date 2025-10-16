@@ -95,6 +95,8 @@ jobs:
           REPO="${{ github.repository }}"
           ISSUE="${{ env.JIRA_KEY }}"
           STATUS="OPEN"
+          REPO_URL="https://github.com/$REPO"
+          SEQ=$(date +%s)
 
           # Mark as MERGED/CLOSED when PR closed
           if [ "${{ github.event.action }}" = "closed" ]; then
@@ -105,24 +107,32 @@ jobs:
             fi
           fi
 
-          PAYLOAD=$(jq -nc --arg repo "$REPO" \
-                          --arg branch "$BRANCH" \
-                          --arg name "$PR_TITLE" \
-                          --arg url "$PR_URL" \
-                          --arg issue "$ISSUE" \
-                          --arg status "$STATUS" \
+          PAYLOAD=$(jq -nc \
+            --arg repo "$REPO" \
+            --arg repoId "$REPO" \
+            --arg repoUrl "$REPO_URL" \
+            --arg branch "$BRANCH" \
+            --arg name "$PR_TITLE" \
+            --arg url "$PR_URL" \
+            --arg issue "$ISSUE" \
+            --arg status "$STATUS" \
+            --arg pr_id "${{ github.event.pull_request.number }}" \
+            --argjson seq $SEQ \
             '{repositories: [
               {
+                id: $repoId,
                 name: $repo,
+                url: $repoUrl,
                 pullRequests: [
                   {
-                    id: $branch,
+                    id: $pr_id,
                     name: $name,
                     url: $url,
                     issueKeys: [$issue],
                     status: $status,
                     source: {branch: {name: $branch}},
-                    destination: {branch: {name: "main"}}
+                    destination: {branch: {name: "optimization"}},
+                    updateSequenceId: $seq
                   }
                 ]
               }
@@ -143,4 +153,4 @@ jobs:
           cat link_res.json | jq || cat link_res.json
           [ "$RESPONSE" != "202" ] && { echo "❌ DevInfo link failed (HTTP $RESPONSE)"; exit 1; }
 
-          echo "✅ PR successfully linked to Jira issue in Development panel."
+          echo "✅ PR successfully linked to Jira issue (DevInfo API accepted)."
