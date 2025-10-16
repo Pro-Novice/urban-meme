@@ -7,6 +7,5 @@ __pycache__/
 media
 static
 encrypted_aadhaar.json
-node_modules/
 .vscode/
 blockhain/node_modules/
