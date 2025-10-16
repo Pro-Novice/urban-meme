@@ -96,9 +96,9 @@ jobs:
           ISSUE="${{ env.JIRA_KEY }}"
           STATUS="OPEN"
           REPO_URL="https://github.com/$REPO"
+          REPO_ID=$(echo "$REPO" | tr '/.' '_')
           SEQ=$(date +%s)
 
-          # Mark as MERGED/CLOSED when PR closed
           if [ "${{ github.event.action }}" = "closed" ]; then
             if [ "${{ github.event.pull_request.merged }}" = "true" ]; then
               STATUS="MERGED"
@@ -109,14 +109,14 @@ jobs:
 
           PAYLOAD=$(jq -nc \
             --arg repo "$REPO" \
-            --arg repoId "$REPO" \
+            --arg repoId "$REPO_ID" \
             --arg repoUrl "$REPO_URL" \
             --arg branch "$BRANCH" \
             --arg name "$PR_TITLE" \
             --arg url "$PR_URL" \
             --arg issue "$ISSUE" \
             --arg status "$STATUS" \
-            --arg pr_id "${{ github.event.pull_request.number }}" \
+            --argjson pr_id ${{ github.event.pull_request.number }} \
             --argjson seq $SEQ \
             '{repositories: [
               {
