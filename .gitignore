@@ -8,3 +8,4 @@ media
 static
 encrypted_aadhaar.json
 node_modules/
+.vscode/
