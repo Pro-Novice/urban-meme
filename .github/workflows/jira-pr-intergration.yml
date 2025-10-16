@@ -96,7 +96,7 @@ jobs:
           ISSUE="${{ env.JIRA_KEY }}"
           STATUS="OPEN"
           REPO_URL="https://github.com/$REPO"
-          REPO_ID=$(echo "$REPO" | tr '/.' '_')
+          REPO_ID=$(echo "$REPO" | tr '/.' '_' | tr '[:upper:]' '[:lower:]')
           SEQ=$(date +%s)
 
           if [ "${{ github.event.action }}" = "closed" ]; then
@@ -123,6 +123,7 @@ jobs:
                 id: $repoId,
                 name: $repo,
                 url: $repoUrl,
+                updateSequenceId: $seq,
                 pullRequests: [
                   {
                     id: $pr_id,
@@ -131,15 +132,14 @@ jobs:
                     issueKeys: [$issue],
                     status: $status,
                     source: {branch: {name: $branch}},
-                    destination: {branch: {name: "main"}},
+                    destination: {branch: {name: "optimization"}},
                     updateSequenceId: $seq
                   }
                 ]
               }
             ]}')
 
-          echo "Payload JSON:"
-          echo "$PAYLOAD" | jq
+          echo "Payload JSON:"; echo "$PAYLOAD" | jq
 
           echo "📤 Sending payload to Jira DevInfo API..."
           RESPONSE=$(curl -s -w "%{http_code}" -o link_res.json \
@@ -152,5 +152,4 @@ jobs:
           echo "HTTP Status: $RESPONSE"
           cat link_res.json | jq || cat link_res.json
           [ "$RESPONSE" != "202" ] && { echo "❌ DevInfo link failed (HTTP $RESPONSE)"; exit 1; }
-
           echo "✅ PR successfully linked to Jira issue (DevInfo API accepted)."
