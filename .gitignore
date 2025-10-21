@@ -7,4 +7,5 @@ __pycache__/
 media
 static
 encrypted_aadhaar.json
-node_modules/
+stress_report.html
+locust_report.html
