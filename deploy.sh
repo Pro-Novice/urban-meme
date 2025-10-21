@@ -46,12 +46,12 @@ STOP_ONLY=${STOP_ONLY,,}  # lowercase
 
 if [[ "$STOP_ONLY" == "y" || "$STOP_ONLY" == "yes" ]]; then
     log "Stopping and Removing Containers for $ENV_NAME Environment"
-    docker compose -f "$COMPOSE_FILE" down -v
+    docker compose -f "$COMPOSE_FILE" down 
     exit 0
 fi
 
 log "Stopping Existing Containers for $ENV_NAME Environment"
-docker compose -f "$COMPOSE_FILE" down -v
+docker compose -f "$COMPOSE_FILE" down 
 
 log "Building and Starting Containers for $ENV_NAME Environment"
 docker compose -f "$COMPOSE_FILE" up -d --build
