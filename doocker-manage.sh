@@ -1,0 +1,101 @@
+#!/bin/bash
+set -e  # Exit on error
+
+# Colors for logs
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+log() {
+    echo -e "${GREEN}####################################################################"
+    echo -e "   $1"
+    echo -e "####################################################################${NC}"
+}
+
+# Load .env if exists
+if [[ -f .env ]]; then
+    export $(grep -v '^#' .env | xargs)
+fi
+
+# Validate Redis credentials
+if [[ -z "$REDIS_USER" || -z "$REDIS_PASSWORD" ]]; then
+    echo -e "${RED}Error: REDIS_USER and REDIS_PASSWORD must be set in .env${NC}"
+    exit 1
+fi
+
+# Ask user for environment to run
+echo -e "${YELLOW}Select environment:${NC}"
+echo "1) Local (with Postgres)"
+echo "2) Server (no Postgres)"
+read -rp "Enter your choice [1 or 2]: " ENV_CHOICE
+
+if [[ "$ENV_CHOICE" == "1" ]]; then
+    COMPOSE_FILE="docker-compose.local.yml"
+    ENV_NAME="Local"
+elif [[ "$ENV_CHOICE" == "2" ]]; then
+    COMPOSE_FILE="docker-compose.yaml"
+    ENV_NAME="Server"
+else
+    echo -e "${RED}Invalid choice! Please run the script again and enter 1 or 2.${NC}"
+    exit 1
+fi
+
+# Ask user what action to perform
+echo ""
+echo -e "${YELLOW}What do you want to do?${NC}"
+echo "1) Deploy/Restart all services (stops existing, rebuilds, and starts)"
+echo "2) Stop and remove containers of this service only"
+echo "3) Deploy without rebuild (faster restart)"
+read -rp "Enter your choice [1/2/3]: " ACTION_CHOICE
+
+case "$ACTION_CHOICE" in
+    1)
+        # Full deployment with rebuild
+        log "Stopping Existing Containers for $ENV_NAME Environment"
+        docker compose -f "$COMPOSE_FILE" down 
+        
+        log "Building and Starting Containers for $ENV_NAME Environment"
+        docker compose -f "$COMPOSE_FILE" up -d --build
+        
+        # Configure Redis ACL
+        log "Configuring Redis ACL"
+        sleep 2  # Give Redis time to start
+        if docker exec -i rajasthan-seed-redis redis-cli \
+            ACL SETUSER "$REDIS_USER" on ">" password \
+            ">$REDIS_PASSWORD" +@all ~*; then
+            log "Redis ACL Configured Successfully"
+        else
+            echo -e "${RED}Redis ACL Configuration Failed${NC}"
+            exit 1
+        fi
+        
+        log "Deployment Successful ✓"
+        docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+        ;;
+        
+    2)
+        # Stop only
+        log "Stopping and Removing All Containers for $ENV_NAME Environment"
+        docker compose -f "$COMPOSE_FILE" down
+        log "All Containers Stopped Successfully ✓"
+        echo ""
+        echo "Remaining running containers:"
+        docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+        ;;
+        
+    3)
+        # Quick restart without rebuild
+        log "Restarting Containers for $ENV_NAME Environment (No Rebuild)"
+        docker compose -f "$COMPOSE_FILE" down
+        docker compose -f "$COMPOSE_FILE" up -d
+        
+        log "Restart Successful ✓"
+        docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+        ;;
+        
+    *)
+        echo -e "${RED}Invalid choice! Please enter 1, 2, or 3.${NC}"
+        exit 1
+        ;;
+esac
