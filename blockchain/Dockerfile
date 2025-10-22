@@ -13,5 +13,5 @@ RUN npm install --legacy-peer-deps
 # Copy rest of project
 COPY . .
 
-# Default command (overridden by docker-compose/deploy.sh)
+# Default command (overridden by docker-compose/docker-manage.sh)
 CMD ["npx", "hardhat", "help"]
