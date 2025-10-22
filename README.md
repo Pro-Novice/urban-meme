@@ -31,8 +31,7 @@ RAJASTHAN-SEED-BACKEND/
 ├── .env.example          # Example env file for setup
 ├── .gitignore            # Git ignore rules
 │
-├── deploy.sh             # Deployment automation script
-├── stop.sh               # Script to stop containers
+├── docker-manage.sh      # Deployment/Stopping automation script(for managing dockerised container)
 ├── docker-compose.yaml   # Multi-container definition
 ├── Dockerfile            # Web app Docker image
 ├── entrypoint.sh         # Entrypoint for migrations & collectstatic
@@ -150,17 +149,17 @@ python -m pytest apps/seed_licenses/Tests/
 
 ## 📜 Deployment
 
-Use the provided `deploy.sh` script for automated deployment:
+Use the provided `docker-manage.sh` script for automated deployment and removal of containers:
 
 ```bash
 # For staging/dev
-./deploy.sh
+./docker-manage.sh
 
 # For production
-./deploy.sh production
+./docker-manage.sh production
 
 # To stop everything
-./deploy.sh stop
+./docker-manage.sh stop
 ```
 
 The script will:
