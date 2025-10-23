@@ -3,6 +3,10 @@ import { check, sleep, group } from 'k6';
 import { SharedArray } from 'k6/data';
 import { Trend, Counter } from 'k6/metrics';
 
+//HTML report generator 
+import { htmlReport } from 'https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js';
+import { textSummary } from 'https://jslib.k6.io/k6-summary/0.1.0/index.js';
+
 // ---------------- CONFIG ----------------
 export const options = {
   stages: [
@@ -56,6 +60,10 @@ export let requestCounter = new Counter('http_reqs_total');
 export let createTrend = new Trend('License_Create_Duration');
 export let statusTrend = new Trend('Status_Update_Duration');
 export let verifyTrend = new Trend('Verify_Duration');
+export let qrTrend = new Trend('QR_Fetch_Duration');
+export let countTrend = new Trend('License_Count_Duration');
+export let detailsTrend = new Trend('License_Details_Duration');
+export let errorRate = new Counter('errors');
 
 // ---------------- TEST DATA ----------------
 const applicantData = new SharedArray('applicants', () => [
@@ -161,9 +169,11 @@ export default function () {
     // Officer performing workflow updates
     group('Officer: License Workflow', () => {
       const countRes = http.get(`${BASE_URL}/license/count/`);
+      const start = new Date().getTime();
+      countTrend.add(new Date().getTime() - start);
       requestCounter.add(1);
       if (countRes.status !== 200) {
-        sleep(2);
+        sleep(1);
         return;
       }
       const countJson = safeJson(countRes);
@@ -175,9 +185,10 @@ export default function () {
 
       const licenseId = randomInt(1, total);
       const detailsRes = http.get(`${BASE_URL}/license/info/${licenseId}/`);
+      detailsTrend.add(new Date().getTime() - start);
       requestCounter.add(1);
       if (detailsRes.status !== 200) {
-        sleep(2);
+        sleep(0.5);
         return;
       }
       const license = safeJson(detailsRes).data;
@@ -221,9 +232,10 @@ export default function () {
           break;
         }
       }
-      sleep(3);
+      sleep(1);
       if (payload.status === 'APPROVED' && [200, 202].includes(updateRes?.status)) {
       const qrRes = http.get(`${BASE_URL}/license/qr/${licenseId}/`);
+      qrTrend.add(new Date().getTime() - start);
       requestCounter.add(1);
       check(qrRes, { 'QR data retrieved': (r) => [200, 202].includes(r.status) });
 
@@ -247,7 +259,36 @@ export default function () {
         }
       }
     }
-    sleep(randomInt(1, 3));
+    sleep(randomInt(0.5, 2));
   });
   }
+}
+
+// ---------------- HTML REPORT GENERATION ----------------
+export function handleSummary(data) {
+  const totalRequestsCount = data.metrics.http_reqs_total?.values.count || 0;
+  const testDuration = (data.state?.testRunDurationMs || 0) / 1000; 
+  const tps = testDuration > 0 ? totalRequestsCount / testDuration : 0;
+  const avgResTime = data.metrics.http_req_duration?.values.avg
+    ? data.metrics.http_req_duration.values.avg / 1000
+    : 0;
+  const p95ResTime = data.metrics.http_req_duration?.values['p(95)']
+    ? data.metrics.http_req_duration.values['p(95)'] / 1000
+    : 0;
+
+  console.log(`
+    📊 ======= STRESS TEST SUMMARY =======
+    🔹 Total Requests: ${totalRequestsCount}
+    ⚙️  Test Duration: ${testDuration.toFixed(2)}s
+    🚀 Throughput (TPS): ${tps.toFixed(2)} req/s
+    ⏱️  Avg Response Time: ${avgResTime.toFixed(2)}s
+    🔥 P(95) Response Time: ${p95ResTime.toFixed(2)}s
+  `);
+  return {
+    'stress_report.html': htmlReport(data, {
+      title: '🌾 Rajasthan Seed Licensing System - Stress Test Report',
+      theme: 'default', 
+    }),
+    stdout: textSummary(data, { indent: ' ', enableColors: true }),
+  };
 }
