@@ -7,5 +7,7 @@ __pycache__/
 media
 static
 encrypted_aadhaar.json
+.vscode/
+blockhain/node_modules/
 stress_report.html
 locust_report.html
