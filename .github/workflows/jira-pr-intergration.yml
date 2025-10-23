@@ -53,26 +53,45 @@ jobs:
           [ "$RESPONSE" != "200" ] && { echo "❌ Jira authentication failed."; exit 1; }
           echo "✅ Jira authentication successful."
 
-      - name: 💬 Add readable commit comment on Jira issue
+      - name: 💬 Add rich Jira comment (proper ADF formatting)
         if: env.JIRA_KEY != '' && github.event.action != 'closed'
         shell: bash
         run: |
-          echo "=== 💬 Adding formatted commit comment on Jira issue ==="
+          echo "=== 💬 Adding properly formatted Jira comment ==="
 
           COMMIT_MESSAGE="${{ github.event.pull_request.title }}"
           COMMIT_SHA=${{ github.event.pull_request.head.sha }}
           COMMIT_URL="https://github.com/${{ github.repository }}/commit/${COMMIT_SHA}"
           AUTHOR="@${{ github.actor }}"
 
-          COMMENT="🔗 *Commit:* ${COMMIT_MESSAGE}\n➡️ *View Commit:* ${COMMIT_URL}\n👤 *Author:* ${AUTHOR}"
+          # Build ADF JSON for Jira (Atlassian Document Format)
+          ADF_JSON=$(jq -nc \
+            --arg msg "$COMMIT_MESSAGE" \
+            --arg url "$COMMIT_URL" \
+            --arg author "$AUTHOR" \
+            '{
+              body: {
+                type: "doc",
+                version: 1,
+                content: [
+                  { type: "paragraph", content: [
+                      { type: "text", text: "🔗 Commit: ", marks: [{type: "strong"}] },
+                      { type: "text", text: $msg }
+                  ]},
+                  { type: "paragraph", content: [
+                      { type: "text", text: "➡️ View Commit: ", marks: [{type: "strong"}] },
+                      { type: "text", text: $url, marks: [{type: "link", attrs: {href: $url}}] }
+                  ]},
+                  { type: "paragraph", content: [
+                      { type: "text", text: "👤 Author: ", marks: [{type: "strong"}] },
+                      { type: "text", text: $author }
+                  ]}
+                ]
+              }
+            }')
 
-          # Build Jira ADF body
-          ADF_JSON=$(jq -nc --arg text "$COMMENT" \
-            '{body: {type: "doc", version: 1, content: [
-              {type: "paragraph", content: [{type: "text", text: $text}]}
-            ]}}')
+          echo "$ADF_JSON" | jq
 
-          # Post comment to Jira
           RESPONSE=$(curl -s -w "%{http_code}" -o comment_res.json \
             -X POST -H "Content-Type: application/json" \
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
@@ -82,7 +101,7 @@ jobs:
           echo "HTTP Status: $RESPONSE"
           cat comment_res.json | jq || cat comment_res.json
           [ "$RESPONSE" != "201" ] && { echo "❌ Failed to add comment (HTTP $RESPONSE)"; exit 1; }
-          echo "✅ Comment successfully added to Jira issue."
+          echo "✅ Rich comment successfully added to Jira issue."
 
       - name: 🔄 Transition Jira issue to 'In Review' (on PR open)
         if: env.JIRA_KEY != '' && github.event.action == 'opened'
