@@ -53,15 +53,30 @@ jobs:
           [ "$RESPONSE" != "200" ] && { echo "❌ Jira authentication failed."; exit 1; }
           echo "✅ Jira authentication successful."
 
-      - name: 💬 Add comment on Jira issue
+      - name: 💬 Add comment on Jira issue (commit link)
         if: env.JIRA_KEY != '' && github.event.action != 'closed'
         shell: bash
         run: |
-          echo "=== 💬 Adding comment on Jira issue ==="
-          COMMENT="🔗 PR [#${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }}) - *${{ github.event.pull_request.title }}* by ${{ github.actor }}"
-          ADF_JSON=$(jq -nc --arg text "$COMMENT" \
-            '{body: {type: "doc", version: 1, content: [{type: "paragraph", content: [{type: "text", text: $text}]}]}}')
+          echo "=== 💬 Adding commit comment on Jira issue ==="
 
+          # Extract latest commit info from PR payload
+          COMMIT_MESSAGE=$(echo "${{ github.event.pull_request.title }}" | sed 's/"/\\"/g')
+          COMMIT_SHA=${{ github.event.pull_request.head.sha }}
+          COMMIT_URL="https://github.com/${{ github.repository }}/commit/${COMMIT_SHA}"
+          AUTHOR="@${{ github.actor }}"
+
+          # Create formatted Jira comment text
+          COMMENT="🔗 Commit: [${COMMIT_MESSAGE}](${COMMIT_URL}) by ${AUTHOR}"
+
+          # Convert to Jira ADF JSON body
+          ADF_JSON=$(jq -nc --arg text "$COMMENT" \
+            '{body: {type: "doc", version: 1, content: [
+              {type: "paragraph", content: [
+                {type: "text", text: $text, marks: [{type: "link", attrs: {href: $text}}]}
+              ]}
+            ]}}')
+
+          # Send comment to Jira
           RESPONSE=$(curl -s -w "%{http_code}" -o comment_res.json \
             -X POST -H "Content-Type: application/json" \
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
