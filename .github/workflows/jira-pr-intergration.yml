@@ -9,6 +9,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: 🧩 Auto-update PR title using branch name
+        if: github.event.action == 'opened' || github.event.action == 'reopened'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          echo "=== 🧩 Auto-updating PR title ==="
+          BRANCH="${{ github.head_ref }}"
+          echo "Branch name: $BRANCH"
+          JIRA_KEY=$(echo "$BRANCH" | grep -oE 'RAP-[0-9]+')
+          if [ -n "$JIRA_KEY" ]; then
+            NEW_TITLE="$JIRA_KEY | ${BRANCH}"
+            echo "Updating PR title to: $NEW_TITLE"
+            curl -s -X PATCH \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }} \
+              -d "{\"title\":\"$NEW_TITLE\"}"
+          else
+            echo "⚠️ No Jira key found in branch name, skipping title update."
+          fi
+
       - name: 🧩 Extract Jira Key (RAP project only)
         id: extract
         shell: bash
@@ -17,7 +39,6 @@ jobs:
           TITLE="${{ github.event.pull_request.title }}"
           BRANCH="${{ github.head_ref }}"
           KEY=$(echo "$TITLE $BRANCH" | grep -oE 'RAP-[0-9]+' | head -n 1 || true)
-
           if [ -n "$KEY" ]; then
             echo "✅ Jira key found: $KEY"
             echo "JIRA_KEY=$KEY" >> "$GITHUB_ENV"
@@ -33,7 +54,6 @@ jobs:
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
             -H "Accept: application/json" \
             "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/serverInfo")
-
           echo "HTTP Status: $RESPONSE"
           cat serverinfo.json | jq || cat serverinfo.json
           [ "$RESPONSE" != "200" ] && { echo "❌ Jira connectivity failed."; exit 1; }
@@ -57,14 +77,13 @@ jobs:
         if: env.JIRA_KEY != '' && github.event.action != 'closed'
         shell: bash
         run: |
-          echo "=== 💬 Adding properly formatted Jira comment ==="
-
+          echo "=== 💬 Adding formatted Jira comment ==="
           COMMIT_MESSAGE="${{ github.event.pull_request.title }}"
           COMMIT_SHA=${{ github.event.pull_request.head.sha }}
           COMMIT_URL="https://github.com/${{ github.repository }}/commit/${COMMIT_SHA}"
           AUTHOR="@${{ github.actor }}"
 
-          # Build ADF JSON for Jira (Atlassian Document Format)
+          # Build Jira ADF JSON
           ADF_JSON=$(jq -nc \
             --arg msg "$COMMIT_MESSAGE" \
             --arg url "$COMMIT_URL" \
@@ -90,8 +109,6 @@ jobs:
               }
             }')
 
-          echo "$ADF_JSON" | jq
-
           RESPONSE=$(curl -s -w "%{http_code}" -o comment_res.json \
             -X POST -H "Content-Type: application/json" \
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
@@ -113,7 +130,6 @@ jobs:
             -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
             --data '{"transition": {"id": "31"}}' \
             "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/issue/${{ env.JIRA_KEY }}/transitions")
-
           echo "HTTP Status: $RESPONSE"
           cat transition_res.json | jq || cat transition_res.json
           [ "$RESPONSE" != "204" ] && { echo "⚠️ Transition may not have succeeded (HTTP $RESPONSE)"; exit 0; }
