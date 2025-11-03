@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class OfficerRole(Enum):
     CITIZEN = 0
     AGRICULTURE_OFFICER = 1
@@ -25,7 +26,7 @@ class OfficerRole(Enum):
         }
         if normalized not in mapping:
             raise ValueError(f"Invalid officer role string: '{role_str}'")
-        return mapping[normalized]
+        return mapping[normalized].value  # 🔥 Return int for blockchain
 
 
 class LicenseStatusEnum(Enum):
@@ -41,7 +42,8 @@ class LicenseStatusEnum(Enum):
     RENEWED = 9
 
     @classmethod
-    def from_string(cls, value: str):
+    def from_string(cls, value: str) -> int:
+        """Convert status string to blockchain integer enum."""
         normalized = value.strip().upper().replace(" ", "_")
         try:
             return cls[normalized].value
@@ -49,37 +51,38 @@ class LicenseStatusEnum(Enum):
             raise ValueError(f"Invalid license status: '{value}'")
 
 
-# Reverse mapping from integer status code to status name
-LICENSE_STATUS_REVERSE = {
-    status.value: status.name for status in LicenseStatusEnum
-}
+# Reverse mapping from integer → status name
+LICENSE_STATUS_REVERSE = {status.value: status.name for status in LicenseStatusEnum}
 
-REVERSE_OFFICER_ROLE = {
-    role.value: role.name for role in OfficerRole
-}
+REVERSE_OFFICER_ROLE = {role.value: role.name for role in OfficerRole}
 
-LICENSE_CATEGORY_MAP = {
-    "SEED": 0,
-    "FERTILIZER": 1,
-    "INSECTICIDE": 2
-}
-
-LEVEL_MAP = {
-    "DISTRICT": 0,
-    "DIVISION": 1,
-    "STATE": 2
-}
+LICENSE_CATEGORY_MAP = {"SEED": 0, "FERTILIZER": 1, "INSECTICIDE": 2}
+LEVEL_MAP = {"DISTRICT": 0, "DIVISION": 1, "STATE": 2}
 
 REVERSE_LICENSE_CATEGORY = {v: k for k, v in LICENSE_CATEGORY_MAP.items()}
-
 REVERSE_LEVEL_MAP = {v: k for k, v in LEVEL_MAP.items()}
 
-
 LICENSE_CATEGORIES = ["SEED", "FERTILIZER", "INSECTICIDE"]
-USER_ROLE = ["CITIZEN", "AGRICULTURE_OFFICER", "ASSISTANT_AGRICULTURE_OFFICER", "ASSISTANT_DIRECTOR", "DEPUTY_DIRECTOR", "JOINT_DIRECTOR", "JOINT_DIRECTOR_INPUT", "FIELD_INSPECTOR"]
+USER_ROLE = [
+    "CITIZEN",
+    "AGRICULTURE_OFFICER",
+    "ASSISTANT_AGRICULTURE_OFFICER",
+    "ASSISTANT_DIRECTOR",
+    "DEPUTY_DIRECTOR",
+    "JOINT_DIRECTOR",
+    "JOINT_DIRECTOR_INPUT",
+    "FIELD_INSPECTOR",
+]
 LICENSE_LEVELS = ["STATE", "DIVISION", "DISTRICT"]
 LICENSE_STATUSES = [
-    "SUBMITTED", "UNDER_REVIEW", "DOCUMENTS_VERIFIED", "INSPECTION_SCHEDULED",
-    "INSPECTION_COMPLETED", "APPROVED", "REJECTED", "REVOKED",
-    "EXPIRED", "RENEWED"
+    "SUBMITTED",
+    "UNDER_REVIEW",
+    "DOCUMENTS_VERIFIED",
+    "INSPECTION_SCHEDULED",
+    "INSPECTION_COMPLETED",
+    "APPROVED",
+    "REJECTED",
+    "REVOKED",
+    "EXPIRED",
+    "RENEWED",
 ]

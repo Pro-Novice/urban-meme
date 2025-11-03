@@ -51,19 +51,23 @@ contract LicenseStorage {
         LicenseCategory category;
         LicenseStatus status;
         LicenseLevel level;
+
         // Registering authority details---
         string registeringAuthority;
         string registeringOfficeName;
+        
         // Applicant details
         string applicantName;
         string aadhaarNumber;
         string applicantPermanentAddress;
+
         // Firm details
         string firmName;
         string firmType; // Private Ltd, Public Ltd, Partnership Firm, Proprietor Firm, etc.
         string firmAddress;
         string salePointAddress;
         string saleStorageAddress;
+
         // Crop details
         bool isSeedSelfProduced;
         string productionCompany;
@@ -71,6 +75,7 @@ contract LicenseStorage {
         string cropVariety;
         mapping(string => string) customFields;
         string[] customFieldKeys;
+
         // Payment paymentDetails;
         uint256 applicationDate;
         uint256 lastModifiedDate;
