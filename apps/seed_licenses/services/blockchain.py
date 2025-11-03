@@ -174,7 +174,11 @@ def write_to_contract(method_name: str, params: List[Any],
                 }
             address = DEFAULT_ADDRESS
             private_key = DEFAULT_PRIVATE_KEY
-        
+        address = Web3.to_checksum_address(address)
+        params = [
+            Web3.to_checksum_address(p) if isinstance(p, str) and p.startswith("0x") and len(p) == 42 else p
+            for p in params
+        ]
         contract_function = getattr(contract.functions, method_name)
         
         # Acquire lock to ensure atomic nonce fetching and transaction sending

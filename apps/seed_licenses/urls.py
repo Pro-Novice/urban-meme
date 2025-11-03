@@ -7,7 +7,7 @@ urlpatterns = [
 
      # Blockchain Utilities
      path('owner/', views.check_owner_blockchain, name='check-owner'),
-
+     path('officers/add/', views.add_officer_to_contract, name='add-officer-to-contract'),
      # License Management
      path('license/create/', views.submit_license_application, name='submit-license-application'),
      path('license/count/', views.check_total_license_count, name='license-count'),

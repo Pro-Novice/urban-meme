@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from rest_framework import serializers
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
-
+from .services.blockchain import DEFAULT_ADDRESS
 from .enums import LicenseStatusEnum, OfficerRole, LICENSE_CATEGORY_MAP, LEVEL_MAP
 
 class SubmitLicenseApplicationSerializer(serializers.Serializer):
@@ -182,3 +182,37 @@ class UpdateLicenseDetailsSerializer(serializers.Serializer):
             raise serializers.ValidationError("At least one field must be provided for update.")
 
         return data
+    
+class AddOfficerSerializer(serializers.Serializer):
+    address = serializers.CharField(max_length=42)
+    new_officer_address = serializers.CharField(max_length=42)
+
+    def validate_address(self, value):
+        if not isinstance(value, str) or not value.startswith("0x") or len(value) != 42:
+            raise serializers.ValidationError("Invalid Ethereum address format for 'address'.")
+        return value.lower()
+
+    def validate_new_officer_address(self, value):
+        if not isinstance(value, str) or not value.startswith("0x") or len(value) != 42:
+            raise serializers.ValidationError("Invalid Ethereum address format for 'new_officer_address'.")
+        return value.lower()
+
+    def validate(self, attrs):
+        caller_address = attrs.get("address", "").lower()
+        new_officer_address = attrs.get("new_officer_address", "").lower()
+
+        if not DEFAULT_ADDRESS:
+            raise serializers.ValidationError(
+                {"address": "Admin wallet address not initialized in blockchain configuration."}
+            )
+
+        if DEFAULT_ADDRESS and caller_address.lower() != DEFAULT_ADDRESS.lower():
+            raise serializers.ValidationError(
+                {"address": "Access denied. Only the admin wallet can add officers."}
+        )
+        if caller_address == new_officer_address:
+            raise serializers.ValidationError(
+                {"new_officer_address": "Admin and new officer address cannot be the same."}
+            )
+
+        return attrs

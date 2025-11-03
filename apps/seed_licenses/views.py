@@ -1,11 +1,11 @@
+import os
 from rest_framework.decorators import api_view
-from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_200_OK, HTTP_500_INTERNAL_SERVER_ERROR, HTTP_404_NOT_FOUND, HTTP_202_ACCEPTED
+from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_200_OK, HTTP_500_INTERNAL_SERVER_ERROR, HTTP_404_NOT_FOUND, HTTP_202_ACCEPTED, HTTP_403_FORBIDDEN
 import logging
 from django.conf import settings
 from cryptography.hazmat.primitives import serialization
-
 from .enums import LicenseStatusEnum, LICENSE_STATUS_REVERSE
-from .serializers import SubmitLicenseApplicationSerializer, UpdateLicenseStatusSerializer, VerifyLicenseSerializer, UpdateLicenseDetailsSerializer
+from .serializers import SubmitLicenseApplicationSerializer, UpdateLicenseStatusSerializer, VerifyLicenseSerializer, UpdateLicenseDetailsSerializer, AddOfficerSerializer
 
 from utils.api_response import ApiResponse
 from .services.blockchain import (
@@ -429,7 +429,37 @@ def contract_address_view(request):
         logger.exception("Contract methods error")
         return ApiResponse(err=f"Failed to get contract methods: {str(e)}", status=500)
 
-# 11. GET all available methods
+# 11. POST add officer to contract
+@api_view(["POST"])
+def add_officer_to_contract(request):
+    serializer = AddOfficerSerializer(data=request.data)
+    if not serializer.is_valid():
+        return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
+
+    validated = serializer.validated_data
+    caller_address = validated["address"]
+    new_officer_address = validated["new_officer_address"]
+
+    try:
+        result = write_to_contract(
+            method_name="manageAuthorizedApiCallers",
+            params=[new_officer_address, True],
+        )
+        if not result.get("success", False):
+            return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
+        return ApiResponse(
+            data={
+                "transaction_hash": result.get("transaction_hash"),
+                "status": "accepted",
+                "message": f"Officer {new_officer_address} successfully added by admin {caller_address}.",
+            },
+            status=HTTP_202_ACCEPTED,
+        )
+    except Exception as e:
+        logger.exception("Add officer failed")
+        return ApiResponse(err=f"Add officer failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
+
+# 12. GET all available methods
 @api_view(["GET"])
 def contract_methods_view(request):
     """Get all available methods for a contract"""
@@ -440,7 +470,7 @@ def contract_methods_view(request):
         logger.exception("Contract methods error")
         return ApiResponse(err=f"Failed to get contract methods: {str(e)}", status=500)
 
-# 12. GET transaction status
+# 13. GET transaction status
 @api_view(["GET"])
 def transaction_status_view(request, tx_hash):
     """Get transaction status and details by hash"""
