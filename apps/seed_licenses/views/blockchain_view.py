@@ -12,6 +12,8 @@ from apps.seed_licenses.services.blockchain import (
     w3,
 )
 
+from apps.seed_licenses.services.blockchain import TransactionService
+
 logger = logging.getLogger(__name__)
 
 # Create one shared TransactionService instance
@@ -159,3 +161,23 @@ def blockchain_network_info(request):
             err=f"Error fetching blockchain info: {str(e)}",
             status=HTTP_500_INTERNAL_SERVER_ERROR,
         )
+@api_view(["GET"])
+def get_block_details(request, block_number):
+    """
+    Get complete block info along with all transactions.
+    Example: /api/blockchain/block/56526/
+    """
+    try:
+        block_number = int(block_number)
+        if block_number < 0:
+            return ApiResponse(err="Block number must be positive integer", status=HTTP_400_BAD_REQUEST)
+    except ValueError:
+        return ApiResponse(err="Invalid block number format", status=HTTP_400_BAD_REQUEST)
+
+    result = tx_service.get_block_with_transactions(block_number)
+
+    if not result.get("success"):
+        logger.error(f"Block fetch failed: {result['error']}")
+        return ApiResponse(err=result["error"], status=HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return ApiResponse(data=result["data"], status=HTTP_200_OK)

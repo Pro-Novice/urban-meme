@@ -26,6 +26,7 @@ from .blockchain_view import (
     transaction_status_view,
     blockchain_health_check,
     blockchain_network_info,
+    get_block_details, 
 )
 
 from .security_view import (
@@ -51,6 +52,7 @@ __all__ = [
     "transaction_status_view",
     "blockchain_health_check",
     "blockchain_network_info",
+    "get_block_details", 
 
     # Security endpoints
     "get_public_key",

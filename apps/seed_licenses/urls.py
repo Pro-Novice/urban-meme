@@ -30,4 +30,5 @@ urlpatterns = [
     path("contract/methods/", views.contract_methods_view, name="contract-methods"),
     path("health/", views.blockchain_health_check, name="blockchain-health"),
     path("info/", views.blockchain_network_info, name="blockchain-network-info"),
+    path("block/<int:block_number>/", views.get_block_details, name="get-block-details"),
 ]
