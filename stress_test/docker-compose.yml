@@ -1,0 +1,14 @@
+# stress_test/docker-compose.yml
+version: '3.9'
+services:
+  stress_tester:
+    build:
+      context: ..
+      dockerfile: stress_test/Dockerfile
+    container_name: blockchain_stress_test
+    env_file:
+      - ../.env
+    volumes:
+      - ./reports:/app/reports
+    stdin_open: true
+    tty: true

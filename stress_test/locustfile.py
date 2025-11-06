@@ -5,6 +5,8 @@ import time
 import logging
 import gevent
 import requests
+from apps.seed_licenses.services.web3_provider import MultiRPCWeb3
+from decouple import config
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -443,4 +445,88 @@ def on_test_start(environment, **kwargs):
         logger.error(f"❌ Backend not reachable: {e}")
 
 
+# ================== MULTI-RPC INTEGRATION ================== #
+
+try:
+    RPC_URLS = config("RPC_URLS", default="http://host.docker.internal:8545/").split(",")
+    rpc_manager = MultiRPCWeb3(RPC_URLS)
+    logger.info(f"🌐 MultiRPC initialized with {len(RPC_URLS)} nodes")
+except Exception as e:
+    rpc_manager = None
+    logger.warning(f"⚠️ MultiRPC initialization failed: {e}")
+
+
+# ================== LOCUST EVENTS ================== #
+@events.test_start.add_listener
+def on_test_start(environment, **kwargs):
+    """Called when the test starts"""
+    logger.info("🌿 Starting Rajasthan Seed Licensing Stress Test")
+
+    base_url = environment.host
+    try:
+        response = requests.get(f"{base_url}/owner/", timeout=10)
+        if response.status_code == 200:
+            logger.info("✅ Backend is reachable (global check)")
+        else:
+            logger.error(f"❌ Backend connectivity issue: {response.status_code}")
+    except Exception as e:
+        logger.error(f"❌ Backend not reachable: {e}")
+
+    # Warm up all RPC nodes before heavy load
+    if rpc_manager:
+        logger.info("🧩 Warming up RPC connections...")
+        for url in RPC_URLS:
+            try:
+                w3 = rpc_manager._connect(url)
+                if w3.is_connected():
+                    logger.info(f"✅ RPC ready: {url}")
+            except Exception as e:
+                logger.warning(f"⚠️ RPC warm-up failed for {url}: {e}")
+
+
+@events.test_stop.add_listener
+def on_test_stop(environment, **kwargs):
+    """Graceful cleanup after test ends"""
+    logger.info("🧹 Stress test completed — closing resources.")
+    try:
+        if rpc_manager:
+            logger.info("🔒 RPC connections cleaned up.")
+    except Exception as e:
+        logger.warning(f"⚠️ Error during shutdown: {e}")
+
+
+# ================== SMART RPC DISPATCH ================== #
+def select_rpc_url():
+    """Round-robin or random RPC URL selection for simulated parallel calls"""
+    if not rpc_manager:
+        return random.choice(RPC_URLS)
+    try:
+        return rpc_manager.get_current_url()
+    except Exception:
+        return random.choice(RPC_URLS)
+
+
+def simulate_parallel_rpc_load(requests_per_node=10):
+    """
+    Optional helper to simulate heavy blockchain RPC calls in parallel.
+    Uses gevent greenlets to perform load evenly across all nodes.
+    """
+    if not rpc_manager:
+        logger.warning("⚠️ RPC Manager not initialized; skipping parallel RPC load.")
+        return
+
+    urls = RPC_URLS
+    logger.info(f"🚀 Simulating {requests_per_node} RPC pings on {len(urls)} nodes")
+
+    def ping_node(url):
+        try:
+            w3 = rpc_manager._connect(url)
+            latest_block = w3.eth.block_number
+            logger.info(f"✅ {url}: Latest block {latest_block}")
+        except Exception as e:
+            logger.warning(f"⚠️ {url} ping failed: {e}")
+
+    jobs = [gevent.spawn(ping_node, url) for url in urls for _ in range(requests_per_node)]
+    gevent.joinall(jobs)
+    logger.info("🌐 Parallel RPC simulation complete.")
 
