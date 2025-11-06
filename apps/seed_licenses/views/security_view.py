@@ -9,7 +9,7 @@ from cryptography.hazmat.backends import default_backend
 
 logger = logging.getLogger(__name__)
 
-# ✅ 1️⃣ Public Key Endpoint
+# ✅ 1️ Public Key Endpoint
 @api_view(["GET"])
 def get_public_key(request):
     """Return the public key for client-side encryption."""
@@ -23,7 +23,7 @@ def get_public_key(request):
         return ApiResponse(err=f"Error fetching public key: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# ✅ 2️⃣ Security Health Check Endpoint
+# ✅ 2️ Security Health Check Endpoint
 @api_view(["GET"])
 def security_health_check(request):
     """Check presence and validity of private/public keypair."""

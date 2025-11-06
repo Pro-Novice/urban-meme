@@ -58,7 +58,7 @@ class LicenseService(ILicenseService):
         current_enum = LicenseStatusEnum.from_string(current["status"])
         new_status = data["status"]
 
-        # 1️⃣ Idempotent same-status handling
+        # 1️ Idempotent same-status handling
         if new_status == current_enum:
             logger.info(
                 "No-op: License %s already in status %s",
@@ -72,7 +72,7 @@ class LicenseService(ILicenseService):
                 "message": f"License already in status {LICENSE_STATUS_REVERSE[current_enum]}",
             }
 
-        # 2️⃣ Validate allowed transitions
+        # 2️ Validate allowed transitions
         allowed = data["valid_transitions"].get(current_enum, [])
         if new_status not in allowed:
             err_msg = (
@@ -82,7 +82,7 @@ class LicenseService(ILicenseService):
             logger.warning("License %s: %s", license_id, err_msg)
             raise ValueError(err_msg)
 
-        # 3️⃣ Apply status update via blockchain transaction
+        # 3️ Apply status update via blockchain transaction
         logger.info(
             "Updating license %s: %s → %s by %s (%s)",
             license_id,

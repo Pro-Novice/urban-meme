@@ -26,7 +26,7 @@ def get_web3():
         multi_rpc = MultiRPCWeb3(settings.RPC_URLS)
         w3 = multi_rpc.get_connection()
 
-        # ✅ Inject PoA middleware safely (without isinstance check)
+        #  Inject PoA middleware safely (without isinstance check)
         middleware_names = [mw.__class__.__name__ for mw in w3.middleware_onion]
         if "ExtraDataToPOAMiddleware" not in middleware_names:
             w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)

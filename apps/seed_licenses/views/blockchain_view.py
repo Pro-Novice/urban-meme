@@ -37,7 +37,7 @@ def check_owner_blockchain(request):
 
 
 # ===============================================================
-# 1️⃣ GET Contract Address
+# 1 GET Contract Address
 # ===============================================================
 @api_view(["GET"])
 def contract_address_view(request):
@@ -58,7 +58,7 @@ def contract_address_view(request):
 
 
 # ===============================================================
-# 2️⃣ GET All Available Methods
+# 2️ GET All Available Methods
 # ===============================================================
 @api_view(["GET"])
 def contract_methods_view(request):
@@ -87,7 +87,7 @@ def contract_methods_view(request):
 
 
 # ===============================================================
-# 3️⃣ GET Transaction Status
+# 3️ GET Transaction Status
 # ===============================================================
 @api_view(["GET"])
 def transaction_status_view(request, tx_hash):
@@ -106,7 +106,7 @@ def transaction_status_view(request, tx_hash):
 
 
 # ===============================================================
-# 4️⃣ Health Check / Node Status
+# 4️ Health Check / Node Status
 # ===============================================================
 @api_view(["GET"])
 def blockchain_health_check(request):
@@ -135,7 +135,7 @@ def blockchain_health_check(request):
 
 
 # ===============================================================
-# 5️⃣ GET Gas Price & Chain Info
+# 5️ GET Gas Price & Chain Info
 # ===============================================================
 @api_view(["GET"])
 def blockchain_network_info(request):

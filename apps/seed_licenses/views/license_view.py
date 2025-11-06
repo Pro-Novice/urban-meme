@@ -56,7 +56,7 @@ VALID_STATUS_TRANSITIONS = {
 }
 
 # --------------------------------------------------------------------
-# 1️⃣ Get Total License Count
+# 1️ Get Total License Count
 # --------------------------------------------------------------------
 @api_view(["GET"])
 def check_total_license_count(request):
@@ -74,7 +74,7 @@ def check_total_license_count(request):
         )
 
 # --------------------------------------------------------------------
-# 2️⃣ Submit License Application
+# 2️ Submit License Application
 # --------------------------------------------------------------------
 @api_view(["POST"])
 def submit_license_application(request):
@@ -94,7 +94,7 @@ def submit_license_application(request):
         )
 
 # --------------------------------------------------------------------
-# 3️⃣ Get License Basic Info
+# 3️ Get License Basic Info
 # --------------------------------------------------------------------
 @api_view(["GET"])
 def get_license_basic_info(request, license_id: int):
@@ -109,7 +109,7 @@ def get_license_basic_info(request, license_id: int):
         return ApiResponse(err=str(e), status=HTTP_500_INTERNAL_SERVER_ERROR)
 
 # --------------------------------------------------------------------
-# 4️⃣ Get License QR Data
+# 4️ Get License QR Data
 # --------------------------------------------------------------------
 @api_view(["GET"])
 def get_license_qr_data(request, license_id: int):
@@ -128,7 +128,7 @@ def get_license_qr_data(request, license_id: int):
         )
 
 # --------------------------------------------------------------------
-# 5️⃣ Get License Action History
+# 5️ Get License Action History
 # --------------------------------------------------------------------
 @api_view(["GET"])
 def get_license_action_history(request, license_id: int):
@@ -143,7 +143,7 @@ def get_license_action_history(request, license_id: int):
         return ApiResponse(err=str(e), status=HTTP_500_INTERNAL_SERVER_ERROR)
 
 # --------------------------------------------------------------------
-# 6️⃣ Update License Status
+# 6️ Update License Status
 # --------------------------------------------------------------------
 @api_view(["POST"])
 def update_license_status_view(request):
@@ -179,7 +179,7 @@ def update_license_status_view(request):
         )
 
 # --------------------------------------------------------------------
-# 7️⃣ Verify License Document
+# 7️ Verify License Document
 # --------------------------------------------------------------------
 @api_view(["POST"])
 def verify_license_document(request):
@@ -199,7 +199,7 @@ def verify_license_document(request):
         )
 
 # --------------------------------------------------------------------
-# 8️⃣ Update License Details
+# 8️ Update License Details
 # --------------------------------------------------------------------
 @api_view(["POST"])
 def update_license_details(request):
