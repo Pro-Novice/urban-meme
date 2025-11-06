@@ -1,32 +1,36 @@
 # apps/seed_licenses/services/blockchain/connection.py
 import threading, requests, logging
 from django.conf import settings
+from web3.middleware import ExtraDataToPOAMiddleware   # ✅ correct import
 from apps.seed_licenses.services.web3_provider import MultiRPCWeb3
-
 
 logger = logging.getLogger(__name__)
 
-# Thread safety for transaction nonces
+# Thread-safe nonce management
 NONCE_LOCK = threading.Lock()
 
 
 def get_web3():
     """
     Return a configured Web3 instance using MultiRPCWeb3 for
-    automatic failover and connection pooling.
+    automatic failover, connection pooling, and PoA compatibility.
     """
     try:
-        # Setup requests session for performance
+        # Setup optimized HTTP session
         session = requests.Session()
         adapter = requests.adapters.HTTPAdapter(pool_connections=20, pool_maxsize=20)
         session.mount("http://", adapter)
         session.mount("https://", adapter)
 
-        # Initialize Multi-RPC manager with all URLs from settings
+        # Initialize Multi-RPC (with random load balancing + failover)
         multi_rpc = MultiRPCWeb3(settings.RPC_URLS)
-
-        # Get a working connection (it will test connectivity)
         w3 = multi_rpc.get_connection()
+
+        # ✅ Inject PoA middleware safely (without isinstance check)
+        middleware_names = [mw.__class__.__name__ for mw in w3.middleware_onion]
+        if "ExtraDataToPOAMiddleware" not in middleware_names:
+            w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
+            logger.info("✅ ExtraDataToPOAMiddleware injected (Besu QBFT compatibility)")
 
         logger.info(f"✅ Connected to blockchain RPC: {multi_rpc.get_current_url()}")
         return w3, multi_rpc
@@ -36,14 +40,12 @@ def get_web3():
         raise
 
 
-# Initialize once and reuse globally
+# Global singleton
 w3, multi_rpc = get_web3()
 
 
 def get_default_account():
-    """
-    Load default system account (admin wallet) for on-chain writes.
-    """
+    """Load default system wallet from PRIVATE_KEY."""
     if hasattr(settings, "PRIVATE_KEY") and settings.PRIVATE_KEY:
         try:
             account = w3.eth.account.from_key(settings.PRIVATE_KEY)
@@ -61,9 +63,7 @@ def get_default_account():
 
 
 def get_current_rpc_url():
-    """
-    Utility to expose current active RPC URL (for diagnostics/logging).
-    """
+    """Return active RPC URL (for logging or debugging)."""
     try:
         return multi_rpc.get_current_url()
     except Exception:
