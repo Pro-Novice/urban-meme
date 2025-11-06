@@ -100,7 +100,7 @@ def submit_license_application(request):
 def get_license_basic_info(request, license_id: int):
     """Retrieve basic license details by license ID."""
     try:
-        data = license_service.get_basic_info(int(license_id))
+        data = license_service.get_basic_info((license_id))
         return ApiResponse(data=data, status=HTTP_200_OK)
     except ValueError:
         return ApiResponse(err="License ID must be an integer.", status=HTTP_400_BAD_REQUEST)

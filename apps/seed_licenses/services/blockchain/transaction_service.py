@@ -62,9 +62,11 @@ class TransactionService:
     ) -> Dict[str, Any]:
         """
         Send a transaction to the contract.
-        Uses thread-safe nonce, async confirmation, and MultiRPCWeb3 load-balancing.
+        Uses thread-safe nonce locking (per address), async confirmation,
+        and MultiRPCWeb3 load-balancing.
         """
         try:
+            #  Validate method existence
             if not hasattr(self.contract.functions, method_name):
                 available = [f["name"] for f in self.abi if f.get("type") == "function"]
                 return {
@@ -76,40 +78,54 @@ class TransactionService:
             creds = self._resolve_credentials(address, private_key)
             func = getattr(self.contract.functions, method_name)
 
-            # Lock nonce to avoid race conditions across concurrent writes
-            with NONCE_LOCK:
+            # ------------------------------------------------------------
+            #  Lock only for nonce fetching to prevent race conditions
+            # ------------------------------------------------------------
+            if not hasattr(self, "_nonce_locks"):
+                from collections import defaultdict
+                import threading
+                self._nonce_locks = defaultdict(threading.Lock)
+
+            with self._nonce_locks[creds["address"]]:
                 nonce = w3.eth.get_transaction_count(creds["address"], "pending")
-                tx = func(*params).build_transaction({
-                    "from": creds["address"],
-                    "gasPrice": w3.eth.gas_price,
-                    "nonce": nonce,
-                    "chainId": w3.eth.chain_id,
-                })
 
-                gas_estimate = w3.eth.estimate_gas(tx)
-                tx["gas"] = int(gas_estimate * 1.2)
+            # ------------------------------------------------------------
+            #  Build and sign transaction OUTSIDE the lock
+            # ------------------------------------------------------------
+            tx = func(*params).build_transaction({
+                "from": creds["address"],
+                "gasPrice": w3.eth.gas_price,
+                "nonce": nonce,
+                "chainId": w3.eth.chain_id,
+            })
 
-                signed_tx = w3.eth.account.sign_transaction(tx, creds["private_key"])
+            gas_estimate = w3.eth.estimate_gas(tx)
+            tx["gas"] = int(gas_estimate * 1.2)
 
-                # 🚀 NEW: async parallel send via rpc_manager (load-balanced)
-                async def _send_async(raw_tx):
-                    try:
-                        result = await rpc_manager.call("eth_sendRawTransaction", [raw_tx.hex()])
-                        return result.get("result")
-                    except Exception as e:
-                        logger.warning(f"[RPC] Fallback send failed: {e}")
-                        # fallback to sync
-                        return w3.eth.send_raw_transaction(raw_tx).hex()
+            signed_tx = w3.eth.account.sign_transaction(tx, creds["private_key"])
 
+            # ------------------------------------------------------------
+            #  Async RPC send (with fallback to sync)
+            # ------------------------------------------------------------
+            async def _send_async(raw_tx):
                 try:
-                    tx_hash_hex = asyncio.run(_send_async(signed_tx.raw_transaction))
-                except RuntimeError:
-                    # Already inside event loop (Celery async worker)
-                    tx_hash_hex = asyncio.get_event_loop().run_until_complete(
-                        _send_async(signed_tx.raw_transaction)
-                    )
+                    result = await rpc_manager.call("eth_sendRawTransaction", [raw_tx.hex()])
+                    return result.get("result")
+                except Exception as e:
+                    logger.warning(f"[RPC] Fallback send failed: {e}")
+                    return w3.eth.send_raw_transaction(raw_tx).hex()
 
-            # Celery async confirmation
+            try:
+                tx_hash_hex = asyncio.run(_send_async(signed_tx.raw_transaction))
+            except RuntimeError:
+                # Handles case when already inside event loop (e.g. Celery)
+                tx_hash_hex = asyncio.get_event_loop().run_until_complete(
+                    _send_async(signed_tx.raw_transaction)
+                )
+
+            # ------------------------------------------------------------
+            #  Schedule async confirmation
+            # ------------------------------------------------------------
             process_transaction_confirmation.delay(tx_hash_hex, self.abi, self.address)
 
             return {
@@ -123,6 +139,7 @@ class TransactionService:
         except Exception as e:
             logger.error(f"Transaction error in {method_name}: {e}")
             return self._parse_error(e)
+
 
     # ------------------------------------------------------
     # STATUS
