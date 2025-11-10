@@ -1,9 +1,9 @@
 import logging
 from typing import List, Dict, Tuple, Any
-from datetime import datetime
+from datetime import datetime,timezone
 from web3._utils.events import get_event_data
 from django.db import transaction
-
+from asgiref.sync import sync_to_async
 from apps.seed_licenses.models import EventLog
 from apps.seed_licenses.enums import (
     REVERSE_LICENSE_CATEGORY,
@@ -40,52 +40,132 @@ class EventParser:
         }
 
     # ---------------- Decode and Persist ---------------- #
-    def parse_and_store(self, receipt: Any) -> Tuple[int, List[Dict]]:
+    async def parse_and_store(self, receipt: Any) -> Tuple[int, List[Dict]]:
         """
-        Decodes all matching events from a transaction receipt and stores them in DB.
+        Decode all matching events from a transaction receipt and store them in DB.
         Returns: (license_id, decoded_events)
         """
+        from types import SimpleNamespace
+
         license_id = None
         decoded_events = []
 
         try:
-            for log in receipt.logs:
-                # Filter only logs emitted by this contract
-                if log.address.lower() != self.contract_address:
-                    continue
+            # Normalize receipt
+            if isinstance(receipt, SimpleNamespace):
+                receipt = vars(receipt)
+            elif not isinstance(receipt, dict):
+                receipt = receipt.__dict__
 
-                # Try decoding this log with each ABI event definition
-                for abi_event in [a for a in self.abi if a.get("type") == "event"]:
-                    try:
-                        if not self._matches_event(log, abi_event):
-                            continue
+            tx_hash = receipt.get("transactionHash")
+            block_number = receipt.get("blockNumber")
 
-                        decoded = get_event_data(w3.codec, abi_event, log)
-                        event_name = abi_event["name"]
-                        event_args = dict(decoded["args"])
+            logger.info(f"[EVENT PARSER] Starting event decoding for tx={tx_hash}")
+            logger.debug(f"[EVENT DEBUG] Raw receipt keys: {list(receipt.keys())}")
+            logs = receipt.get("logs", [])
+            logger.debug(f"[EVENT DEBUG] Logs count: {len(logs)}")
 
-                        # Apply field transformations
-                        event_args = self._transform_event_fields(event_args)
+            if not logs:
+                logger.warning(f"[EVENT PARSER] No logs found in receipt for tx={tx_hash}")
+                return None, []
 
-                        # Capture license_id if present
-                        if "licenseId" in event_args:
-                            license_id = event_args["licenseId"]
+            for idx, log in enumerate(logs):
+                try:
+                    # Normalize each log to dict
+                    if isinstance(log, SimpleNamespace):
+                        log = vars(log)
+                    elif not isinstance(log, dict):
+                        log = log.__dict__
 
-                        # Append structured event
-                        decoded_events.append({"event": event_name, **event_args})
+                    # Ensure topics and data are normalized
+                    topics = []
+                    for t in log.get("topics", []):
+                        if hasattr(t, "hex"):
+                            topics.append(t.hex())
+                        elif isinstance(t, bytes):
+                            topics.append(t.hex())
+                        else:
+                            topics.append(str(t))
+                    data = log.get("data", "0x")
 
-                        # Persist event
-                        self._persist_event(receipt, event_name, event_args)
+                    log_dict = {
+                        "address": log.get("address"),
+                        "data": data,
+                        "topics": topics,
+                        "logIndex": log.get("logIndex", 0),
+                        "transactionIndex": log.get("transactionIndex", 0),
+                        "transactionHash": tx_hash,
+                        "blockNumber": block_number,
+                        "blockHash": receipt.get("blockHash"),
+                    }
 
-                        break  # Move to next log once matched
-                    except Exception as e:
-                        logger.debug(f"Failed to decode {abi_event.get('name')} event: {e}")
+                    if not log_dict["address"]:
+                        logger.debug(f"[EVENT SKIP] Missing address at log {idx}")
                         continue
 
-        except Exception as e:
-            logger.warning(f"Event parsing failed: {e}")
+                    if log_dict["address"].lower() != self.contract_address.lower():
+                        logger.debug(f"[EVENT SKIP] Log from {log_dict['address']} ≠ {self.contract_address}")
+                        continue
 
+                    for abi_event in [a for a in self.abi if a.get("type") == "event"]:
+                        try:
+                            # Match event topic
+                            input_types = ",".join(i["type"] for i in abi_event["inputs"])
+                            event_topic = w3.keccak(text=f"{abi_event['name']}({input_types})").hex().lower()
+
+                            topic0 = topics[0].lower() if topics else None
+                            if topic0 != event_topic:
+                                continue
+
+                            decoded = get_event_data(w3.codec, abi_event, log_dict)
+                            event_name = abi_event["name"]
+                            event_args = dict(decoded["args"])
+
+                            # Transform timestamps + enums
+                            timestamp_fields = [
+                                "approvalDate", "expiryDate", "renewalDate",
+                                "rejectionDate", "revokedDate", "applicationDate",
+                                "verifiedDate", "detectedDate", "lastModifiedDate"
+                            ]
+                            for field in timestamp_fields:
+                                if field in event_args and isinstance(event_args[field], (int, float)):
+                                    event_args[field] = datetime.fromtimestamp(
+                                        event_args[field], tz=timezone.utc
+                                    ).strftime("%d %B %Y")
+
+                            enum_transforms = {
+                                "category": REVERSE_LICENSE_CATEGORY,
+                                "oldStatus": LICENSE_STATUS_REVERSE,
+                                "newStatus": LICENSE_STATUS_REVERSE,
+                                "status": LICENSE_STATUS_REVERSE,
+                                "changedByRole": REVERSE_OFFICER_ROLE
+                            }
+                            for field, mapping in enum_transforms.items():
+                                if field in event_args:
+                                    event_args[field] = mapping.get(event_args[field], event_args[field])
+
+                            if "licenseId" in event_args:
+                                license_id = event_args["licenseId"]
+
+                            decoded_events.append({"event": event_name, **event_args})
+                            await self._persist_event_async(receipt, event_name, event_args)
+
+                            logger.info(f"[EVENT DECODED] ✅ {event_name} | license_id={license_id} | args={event_args}")
+                            break
+                        except Exception as e:
+                            logger.debug(f"[EVENT FAIL] Failed to decode {abi_event.get('name')} event: {e}")
+                            continue
+                except Exception as e:
+                    logger.warning(f"[EVENT LOG ERROR] Skipping log {idx} due to {e}")
+                    continue
+
+        except Exception as e:
+            logger.warning(f"[EVENT PARSER ERROR] {e}")
+
+        logger.info(f"[EVENT PARSER COMPLETE] Parsed {len(decoded_events)} events for license_id={license_id}")
         return license_id, decoded_events
+
+
 
     # ---------------- Internal Helpers ---------------- #
     def _matches_event(self, log, abi_event: Dict) -> bool:
@@ -117,17 +197,54 @@ class EventParser:
 
         return transformed
 
-    @transaction.atomic
-    def _persist_event(self, receipt, event_name: str, event_args: Dict[str, Any]) -> None:
-        """Save decoded event to EventLog table."""
+    async def _persist_event_async(self, receipt, event_name: str, event_args: Dict[str, Any]):
+        """Async-safe event persistence using sync_to_async wrapper for Django ORM."""
         try:
-            EventLog.objects.create(
+            # ---------------- Normalize transaction hash ---------------- #
+            tx_hash = None
+            if isinstance(receipt, dict):
+                tx_hash = receipt.get("transactionHash")
+            else:
+                tx_hash = getattr(receipt, "transactionHash", None)
+
+            # Convert bytes / HexBytes → readable hex string
+            if isinstance(tx_hash, (bytes, bytearray)):
+                tx_hash = tx_hash.hex()
+            elif hasattr(tx_hash, "hex"):
+                tx_hash = tx_hash.hex()
+
+            # Prefix with '0x' if missing
+            if tx_hash and not str(tx_hash).startswith("0x"):
+                tx_hash = f"0x{tx_hash}"
+
+            # Truncate if it somehow exceeds DB length
+            if tx_hash and len(tx_hash) > 66:
+                logger.warning(f"[DB] Truncating long tx_hash ({len(tx_hash)} chars): {tx_hash}")
+                tx_hash = tx_hash[:66]
+
+            # ---------------- Normalize block number ---------------- #
+            block_number = getattr(receipt, "blockNumber", None)
+            if isinstance(receipt, dict):
+                block_number = receipt.get("blockNumber", block_number)
+
+            # ---------------- Extract license_id ---------------- #
+            license_id = event_args.get("licenseId") or 0
+
+            logger.info(
+                f"[DB] Async saving event '{event_name}' "
+                f"(license_id={license_id}, tx={tx_hash}, block={block_number})"
+            )
+
+            # ---------------- Async ORM persistence ---------------- #
+            await sync_to_async(EventLog.objects.create)(
                 event_name=event_name,
-                license_id=event_args.get("licenseId") or 0,
-                block_number=receipt.blockNumber,
-                transaction_hash=receipt.transactionHash.hex(),
+                license_id=license_id,
+                block_number=block_number,
+                transaction_hash=tx_hash,
                 event_data=event_args,
             )
-            logger.info(f"Saved event '{event_name}' (block {receipt.blockNumber})")
+
+            logger.info(f"[DB] ✅ Persisted event '{event_name}' (license_id={license_id})")
+
         except Exception as e:
-            logger.error(f"Failed to persist event {event_name}: {e}")
+            logger.error(f"[DB ERROR] ❌ Failed to persist {event_name}: {e}", exc_info=True)

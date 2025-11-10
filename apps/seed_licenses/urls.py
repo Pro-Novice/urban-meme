@@ -3,12 +3,12 @@ from . import views
 
 urlpatterns = [
     # ===============================================================
-    # 🔐 SECURITY ENDPOINTS
+    #  SECURITY ENDPOINTS
     # ===============================================================
     path("security/public-key/", views.get_public_key, name="get-public-key"),
 
     # ===============================================================
-    # 🧾 LICENSE MANAGEMENT
+    #  LICENSE MANAGEMENT
     # ===============================================================
     path("license/create/", views.submit_license_application, name="submit-license-application"),
     path("license/count/", views.check_total_license_count, name="license-count"),
@@ -22,7 +22,7 @@ urlpatterns = [
     path("license/verify/", views.verify_license_document, name="verify-license-document"),
 
     # ===============================================================
-    # ⚙️ SMART CONTRACT / BLOCKCHAIN UTILITIES
+    #  SMART CONTRACT / BLOCKCHAIN UTILITIES
     # ===============================================================
     path("owner/", views.check_owner_blockchain, name="check-owner"),
     path("transaction/<str:tx_hash>/", views.transaction_status_view, name="transaction-status"),

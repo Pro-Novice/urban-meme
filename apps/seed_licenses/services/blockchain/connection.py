@@ -1,7 +1,7 @@
 # apps/seed_licenses/services/blockchain/connection.py
 import threading, requests, logging
 from django.conf import settings
-from web3.middleware import ExtraDataToPOAMiddleware   # ✅ correct import
+from web3.middleware import ExtraDataToPOAMiddleware   
 from apps.seed_licenses.services.web3_provider import MultiRPCWeb3
 
 logger = logging.getLogger(__name__)
@@ -68,3 +68,5 @@ def get_current_rpc_url():
         return multi_rpc.get_current_url()
     except Exception:
         return "Unknown"
+
+rpc_manager = multi_rpc
