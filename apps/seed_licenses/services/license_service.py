@@ -124,8 +124,17 @@ class LicenseService(ILicenseService):
                 match = next(
                     (
                         log for log in logs
-                        if log["event_name"].upper().find(action["actionType"]) != -1
-                        or log["event_data"].get("remarks") == action.get("remarks")
+                        if (
+                            # Direct event name match (e.g., LicenseApplicationSubmitted)
+                            log["event_name"].upper().find(action["actionType"]) != -1
+                            # For StatusChanged → match by newStatus field
+                            or (
+                                log["event_name"] == "StatusChanged"
+                                and log["event_data"].get("newStatus", "").upper() == action["actionType"].upper()
+                            )
+                            # Backup match using remarks (for user-facing messages)
+                            or log["event_data"].get("remarks") == action.get("remarks")
+                        )
                     ),
                     None,
                 )

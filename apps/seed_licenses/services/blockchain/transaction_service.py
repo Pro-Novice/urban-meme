@@ -5,7 +5,6 @@ from web3.exceptions import ContractLogicError
 from hexbytes import HexBytes
 from celery import shared_task
 from django.conf import settings
-
 from .connection import multi_rpc as rpc_manager, w3, NONCE_LOCK, get_default_account
 from .contract_manager import get_contract
 from .data_transformer import format_and_transform_response
@@ -288,7 +287,7 @@ class TransactionService:
 # ======================================================
 # ASYNC CONFIRMATION (CELERY)
 # ======================================================
-@shared_task(bind=True, max_retries=3, default_retry_delay=15)
+@shared_task(bind=True, max_retries=3, default_retry_delay=5)
 def process_transaction_confirmation(self, tx_hash: str, abi: List[Dict], contract_address: str):
     """
     Celery background task:
@@ -301,66 +300,128 @@ def process_transaction_confirmation(self, tx_hash: str, abi: List[Dict], contra
     async def _confirm_transaction(tx_hash: str) -> Optional[Dict]:
         """
         Query all RPC endpoints in parallel until one returns a confirmed receipt.
+        Includes timeout protection per node.
         """
         try:
-            # Create parallel calls for all RPCs
-            calls = [
-                ("eth_getTransactionReceipt", [tx_hash])
-                for _ in rpc_manager.rpc_urls
-            ]
+            logger.info(f"[CONFIRM] 🔍 Querying all RPCs for transaction {tx_hash}")
 
-            # Execute in parallel
-            results = await rpc_manager.run_parallel(calls)
+            async def safe_call(url):
+                """Send JSON-RPC call safely with timeout."""
+                import aiohttp, asyncio
+                payload = {
+                    "jsonrpc": "2.0",
+                    "method": "eth_getTransactionReceipt",
+                    "params": [tx_hash],
+                    "id": 1,
+                }
+                try:
+                    timeout = aiohttp.ClientTimeout(total=8)
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                        async with session.post(url, json=payload) as resp:
+                            return await resp.json()
+                except asyncio.TimeoutError:
+                    logger.warning(f"[TIMEOUT] RPC {url} timed out for {tx_hash}")
+                    return {"error": "timeout"}
+                except Exception as e:
+                    logger.warning(f"[ERROR] RPC {url} failed for {tx_hash}: {e}")
+                    return {"error": str(e)}
+
+            # Launch all requests concurrently
+            tasks = [safe_call(url) for url in rpc_manager.rpc_urls]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # logger.info(f"[CONFIRM DEBUG] Received {len(results)} RPC responses for {tx_hash}")
+            # for i, res in enumerate(results):
+            #     logger.info(f"[CONFIRM DEBUG] RPC[{i}] → {res}")
 
             # Filter valid receipts
-            receipts = [r.get("result") for r in results if r.get("result")]
+            receipts = [
+                r.get("result") for r in results
+                if isinstance(r, dict) and r.get("result")
+            ]
+
             if not receipts:
-                logger.debug(f"⏳ Tx {tx_hash} not yet confirmed on any node.")
+                logger.warning(f"[CONFIRM WARN] No confirmed receipts yet for {tx_hash}")
                 return None
 
-            # Pick the first confirmed one
+            # Return first confirmed one
             for receipt in receipts:
-                if receipt and receipt.get("blockNumber"):
+                if receipt.get("blockNumber"):
+                    # logger.info(f"[CONFIRM ✅] Found confirmed receipt on node: {receipt}")
                     return receipt
 
+            logger.warning(f"[CONFIRM WARN] No blockNumber found yet for {tx_hash}")
             return None
 
         except Exception as e:
-            logger.warning(f"[Confirm] Async confirmation failed for {tx_hash}: {e}")
+            logger.warning(f"[CONFIRM ERROR] Async confirmation failed for {tx_hash}: {e}")
             return None
 
     async def _process_async():
         try:
+            logger.info(f"[ASYNC START] Processing transaction confirmation for {tx_hash}")
+
             # Try up to 20 rounds (≈300s total)
             for attempt in range(20):
+                logger.info(f"[ASYNC CHECK] Attempt {attempt+1}/20 for {tx_hash}")
                 receipt = await _confirm_transaction(tx_hash)
-                if receipt:
-                    # Normalize receipt block number
-                    block_number = int(receipt["blockNumber"], 16)
-                    tx_status = int(receipt["status"], 16)
 
-                    # Get logs (may be hex or topic)
-                    parser = EventParser(abi, contract_address)
-                    license_id, events = parser.parse_and_store(receipt)
+                if receipt:
+                    try:
+                        # Normalize receipt block number and status
+                        block_number = int(receipt["blockNumber"], 16)
+                        tx_status = int(receipt["status"], 16)
+                    except Exception:
+                        block_number = receipt.get("blockNumber", "?")
+                        tx_status = receipt.get("status", "?")
 
                     logger.info(
-                        f"✅ Tx {tx_hash} confirmed on block {block_number} "
-                        f"({len(events)} events parsed, status={tx_status})"
+                        f"[ASYNC CONFIRMED] ✅ Tx {tx_hash} confirmed "
+                        f"on block {block_number} (status={tx_status})"
+                    )
+
+                    from types import SimpleNamespace
+                    from hexbytes import HexBytes
+
+                    parsed_receipt = SimpleNamespace(
+                        blockNumber = block_number,
+                        transactionHash=HexBytes(receipt["transactionHash"]),
+                        logs=[
+                            SimpleNamespace(
+                                address=log.get("address"),
+                                data=log.get("data"),
+                                topics=[HexBytes(t) for t in log.get("topics", [])],
+                            )
+                            for log in receipt.get("logs", [])
+                        ],
+
+                    )
+
+                    # Instantiate parser and store events
+                    parser = EventParser(abi, contract_address)
+                    logger.info(f"[EVENT PARSER] Starting event parsing for tx={tx_hash}")
+                    license_id, events = await parser.parse_and_store(parsed_receipt)
+
+                    logger.info(
+                        f"[EVENT PARSER] ✅ Parsed {len(events)} events for license_id={license_id}"
                     )
                     return True
 
-                await asyncio.sleep(15)
+                logger.info(f"[ASYNC WAIT] Tx {tx_hash} not confirmed yet, retrying in 15s...")
+                await asyncio.sleep(1)
 
-            logger.warning(f"⚠️ Tx {tx_hash} not confirmed after 5 minutes.")
+            logger.warning(f"[TIMEOUT ⚠️] Tx {tx_hash} not confirmed after 5 minutes.")
             return False
 
         except Exception as e:
-            logger.error(f"❌ Error processing tx {tx_hash}: {e}")
+            logger.error(f"[ASYNC ERROR] ❌ Error processing tx {tx_hash}: {e}")
             return False
 
     try:
+        logger.info(f"[CELERY TASK] 🚀 Starting async confirmation task for {tx_hash}")
         asyncio.run(_process_async())
     except RuntimeError:
         # If inside an already running loop (Celery async pool)
         loop = asyncio.get_event_loop()
+        logger.info(f"[CELERY TASK] 🔁 Using existing event loop for {tx_hash}")
         loop.run_until_complete(_process_async())

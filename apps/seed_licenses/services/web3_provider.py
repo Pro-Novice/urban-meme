@@ -54,12 +54,12 @@ class _NodeState:
 class MultiRPCWeb3:
     """
     Intelligent Web3 manager with:
-    ✅ Async parallelism (via asyncio)
-    ✅ Adaptive load-balancing
-    ✅ Failover and latency tracking
-    ✅ TTL-based connection cache with auto-expiry
-    ✅ Bounded retries + exponential backoff
-    ✅ Compatible with both sync and async contexts
+     Async parallelism (via asyncio)
+     Adaptive load-balancing
+     Failover and latency tracking
+     TTL-based connection cache with auto-expiry
+     Bounded retries + exponential backoff
+     Compatible with both sync and async contexts
     """
 
     CACHE_TTL_SECONDS = 600  #  cache lifetime (10 min)
