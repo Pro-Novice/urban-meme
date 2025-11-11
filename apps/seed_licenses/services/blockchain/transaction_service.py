@@ -75,6 +75,11 @@ class TransactionService:
                 }
 
             creds = self._resolve_credentials(address, private_key)
+            creds["address"] = Web3.to_checksum_address(creds["address"])
+            params = [
+                Web3.to_checksum_address(p) if isinstance(p, str) and p.startswith("0x") and len(p) == 42 else p
+                for p in params
+            ]
             func = getattr(self.contract.functions, method_name)
 
             # ------------------------------------------------------------
@@ -268,10 +273,12 @@ class TransactionService:
     # ------------------------------------------------------
     def _resolve_credentials(self, address, private_key):
         if address and private_key:
+            address = Web3.to_checksum_address(address)
             return {"address": address, "private_key": private_key}
         default = get_default_account()
         if not default:
             raise ValueError("No credentials provided and no default PRIVATE_KEY configured.")
+        default["address"] = Web3.to_checksum_address(default["address"])
         return default
 
     def _parse_error(self, e: Exception) -> Dict[str, Any]:

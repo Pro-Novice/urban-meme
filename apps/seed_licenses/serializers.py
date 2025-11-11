@@ -207,3 +207,47 @@ class UpdateLicenseDetailsSerializer(serializers.Serializer):
             )
 
         return data
+
+# ============================================================
+# 5️⃣ Add Officer Serializer
+# ============================================================
+class AddOfficerSerializer(serializers.Serializer):
+    address = serializers.CharField(max_length=42)
+    new_officer_address = serializers.CharField(max_length=42)
+
+    def validate_address(self, value):
+        if not isinstance(value, str) or not value.startswith("0x") or len(value) != 42:
+            raise serializers.ValidationError("Invalid Ethereum address format for 'address'.")
+        return value.lower()
+
+    def validate_new_officer_address(self, value):
+        if not isinstance(value, str) or not value.startswith("0x") or len(value) != 42:
+            raise serializers.ValidationError("Invalid Ethereum address format for 'new_officer_address'.")
+        return value.lower()
+
+    def validate(self, attrs):
+        from apps.seed_licenses.services.blockchain.connection import get_default_account
+        
+        caller_address = attrs.get("address", "").lower()
+        new_officer_address = attrs.get("new_officer_address", "").lower()
+
+        # Get admin address from default account
+        default_account = get_default_account()
+        if not default_account:
+            raise serializers.ValidationError(
+                {"address": "Admin wallet address not initialized in blockchain configuration."}
+            )
+
+        admin_address = default_account["address"].lower()
+
+        if caller_address != admin_address:
+            raise serializers.ValidationError(
+                {"address": "Access denied. Only the admin wallet can add officers."}
+            )
+        
+        if caller_address == new_officer_address:
+            raise serializers.ValidationError(
+                {"new_officer_address": "Admin and new officer address cannot be the same."}
+            )
+
+        return attrs

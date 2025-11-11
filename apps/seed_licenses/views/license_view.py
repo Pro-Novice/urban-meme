@@ -12,6 +12,7 @@ from apps.seed_licenses.serializers import (
     UpdateLicenseStatusSerializer,
     VerifyLicenseSerializer,
     UpdateLicenseDetailsSerializer,
+    AddOfficerSerializer,
 )
 from apps.seed_licenses.services.license_service import LicenseService
 from apps.seed_licenses.services.blockchain import TransactionService
@@ -218,6 +219,27 @@ def update_license_details(request):
             status=HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
+# --------------------------------------------------------------------
+# 9️ Add Officer to Contract
+# --------------------------------------------------------------------
+@api_view(["POST"])
+def add_officer_to_contract(request):
+    """
+    Add a new officer to the authorized callers list.
+    Only the admin wallet can perform this action.
+    """
+    serializer = AddOfficerSerializer(data=request.data)
+    if not serializer.is_valid():
+        return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
+
+    try:
+        result = license_service.add_officer(serializer.validated_data)
+        return _tx_response(result)  
+
+    except Exception as e:
+        logger.exception("Add officer failed")
+        return ApiResponse(err=f"Add officer failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
+    
 # --------------------------------------------------------------------
 # Helper Function: Uniform Transaction Response
 # --------------------------------------------------------------------

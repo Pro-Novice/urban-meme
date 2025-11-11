@@ -17,7 +17,7 @@ class ILicenseService:
     def verify_document(self, payload: Dict[str, Any]) -> Dict[str, Any]: ...
     def update_details(self, payload: Dict[str, Any]) -> Dict[str, Any]: ...
     def get_qr_data(self, license_id: int) -> Dict[str, Any]: ...
-
+    def add_officer(self, payload: Dict[str, Any]) -> Dict[str, Any]: ...
 
 class LicenseService(ILicenseService):
     """Business logic layer for license-related operations."""
@@ -179,3 +179,24 @@ class LicenseService(ILicenseService):
     def get_qr_data(self, license_id: int) -> Dict[str, Any]:
         """Read-only blockchain call to fetch QR data for a given license."""
         return self.tx.read("getLicenseQRData", [license_id])
+    
+    # ---------- ADD OFFICER (ADMIN ONLY) ---------- #
+    def add_officer(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Add a new officer to authorized callers list.
+        Only admin can perform this action.
+        """
+        caller_address = data["address"]
+        new_officer_address = data["new_officer_address"]
+        
+        logger.info(
+            "Adding new officer %s by admin %s",
+            new_officer_address,
+            caller_address
+        )
+
+        return self.tx.write(
+            "manageAuthorizedApiCallers",
+            [new_officer_address, True],
+            address=caller_address  
+        )

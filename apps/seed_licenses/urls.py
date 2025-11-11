@@ -25,6 +25,7 @@ urlpatterns = [
     #  SMART CONTRACT / BLOCKCHAIN UTILITIES
     # ===============================================================
     path("owner/", views.check_owner_blockchain, name="check-owner"),
+    path("officers/add/", views.add_officer_to_contract, name="add-officer-to-contract"),
     path("transaction/<str:tx_hash>/", views.transaction_status_view, name="transaction-status"),
     path("contract/address/", views.contract_address_view, name="contract-address"),
     path("contract/methods/", views.contract_methods_view, name="contract-methods"),

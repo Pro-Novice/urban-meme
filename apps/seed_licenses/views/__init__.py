@@ -17,6 +17,7 @@ from .license_view import (
     update_license_details,
     verify_license_document,
     check_total_license_count,
+    add_officer_to_contract, 
 )
 
 from .blockchain_view import (
@@ -44,6 +45,7 @@ __all__ = [
     "update_license_details",
     "verify_license_document",
     "check_total_license_count",
+    "add_officer_to_contract", 
 
     # Blockchain endpoints
     "check_owner_blockchain",
