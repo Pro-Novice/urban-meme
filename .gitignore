@@ -11,3 +11,4 @@ encrypted_aadhaar.json
 blockhain/node_modules/
 stress_report.html
 locust_report.html
+node_modules/
