@@ -62,11 +62,33 @@ def get_default_account():
     return None
 
 
+def get_random_account():
+    """Get a random account from multi-account manager."""
+    from apps.seed_licenses.services.multi_account_manager import multi_account_manager
+    
+    account = multi_account_manager.get_random_account()
+    if account:
+        return {
+            "account": w3.eth.account.from_key(account["private_key"]),
+            "address": account["address"],
+            "private_key": account["private_key"],
+            "source": account["source"]
+        }
+    return None
+
+
 def get_current_rpc_url():
     """Return active RPC URL (for logging or debugging)."""
     try:
         return multi_rpc.get_current_url()
     except Exception:
         return "Unknown"
+
+
+def get_accounts_info():
+    """Get information about all available accounts."""
+    from apps.seed_licenses.services.multi_account_manager import multi_account_manager
+    return multi_account_manager.get_accounts_info()
+
 
 rpc_manager = multi_rpc

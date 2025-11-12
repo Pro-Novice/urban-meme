@@ -3,7 +3,7 @@ from typing import Dict, Any, List
 from apps.seed_licenses.models import EventLog
 from apps.seed_licenses.services.blockchain import TransactionService
 from apps.seed_licenses.enums import LicenseStatusEnum, LICENSE_STATUS_REVERSE
-
+from apps.seed_licenses.services.multi_account_manager import multi_account_manager
 logger = logging.getLogger(__name__)
 
 
@@ -195,8 +195,16 @@ class LicenseService(ILicenseService):
             caller_address
         )
 
+        admin_account = multi_account_manager.get_account_by_address(caller_address)
+        if not admin_account:
+            return {
+                "success": False,
+                "error": f"No private key found for admin address {caller_address}"
+            }
+
         return self.tx.write(
             "manageAuthorizedApiCallers",
             [new_officer_address, True],
-            address=caller_address  
+            address=admin_account["address"],
+            private_key=admin_account["private_key"]  
         )
