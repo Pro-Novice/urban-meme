@@ -138,7 +138,7 @@ BLOCKCHAIN_URL = RPC_URLS[0] if RPC_URLS else "http://127.0.0.1:8545/"
 
 CHAIN_ID = config("CHAIN_ID", default=1337, cast=int)
 PRIVATE_KEY = config("PRIVATE_KEY", default=None)
-
+CONTRACT_ADDRESS = config("CONTRACT_ADDRESS", default="")
 
 RAW_PRIVATE_KEYS = config("PRIVATE_KEYS", default="")
 RAW_CONTRACT_ADDRESSES = config("CONTRACT_ADDRESSES", default="")

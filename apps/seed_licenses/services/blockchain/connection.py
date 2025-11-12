@@ -3,7 +3,7 @@ import threading, requests, logging
 from django.conf import settings
 from web3.middleware import ExtraDataToPOAMiddleware   
 from apps.seed_licenses.services.web3_provider import MultiRPCWeb3
-
+from apps.seed_licenses.services.multi_account_manager import multi_account_manager
 logger = logging.getLogger(__name__)
 
 # Thread-safe nonce management
@@ -64,8 +64,6 @@ def get_default_account():
 
 def get_random_account():
     """Get a random account from multi-account manager."""
-    from apps.seed_licenses.services.multi_account_manager import multi_account_manager
-    
     account = multi_account_manager.get_random_account()
     if account:
         return {
@@ -87,7 +85,6 @@ def get_current_rpc_url():
 
 def get_accounts_info():
     """Get information about all available accounts."""
-    from apps.seed_licenses.services.multi_account_manager import multi_account_manager
     return multi_account_manager.get_accounts_info()
 
 
