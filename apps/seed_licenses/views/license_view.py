@@ -86,7 +86,7 @@ def submit_license_application(request):
 
     try:
         result = license_service.submit_application(serializer.validated_data)
-        return _tx_response(result)
+        return _tx_response(result,include_sender_address=True)
     except Exception as e:
         logger.exception("Submit license failed")
         return ApiResponse(
@@ -243,7 +243,7 @@ def add_officer_to_contract(request):
 # --------------------------------------------------------------------
 # Helper Function: Uniform Transaction Response
 # --------------------------------------------------------------------
-def _tx_response(result: dict):
+def _tx_response(result: dict, include_sender_address=False):
     """Standardized response wrapper for blockchain transactions."""
     # If LicenseService returns "changed": False, handle no-op gracefully
     if result.get("changed") is False:
@@ -260,11 +260,12 @@ def _tx_response(result: dict):
         return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
 
     # Normal accepted blockchain transaction
-    return ApiResponse(
-        data={
-            "transaction_hash": result.get("transaction_hash"),
-            "status": "accepted",
-            "message": "Transaction submitted successfully.",
-        },
-        status=HTTP_202_ACCEPTED,
-    )
+    response_data = {
+        "transaction_hash": result.get("transaction_hash"),
+        "status": "accepted",
+        "message": "Transaction submitted successfully.",
+    }
+    if include_sender_address and "sender_address" in result:
+        response_data["sender_address"] = result["sender_address"]
+    
+    return ApiResponse(data=response_data, status=HTTP_202_ACCEPTED)
