@@ -12,3 +12,9 @@ blockhain/node_modules/
 stress_report.html
 locust_report.html
 node_modules/
+integration_test_logs/
+.coverage
+htmlcov_integration/
+htmlcov_unit/
+htmlcov_e2e/
+pytest_cache/
