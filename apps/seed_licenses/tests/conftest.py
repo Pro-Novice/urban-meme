@@ -29,30 +29,29 @@ def reset_blockchain():
 def valid_license_payload():
     """Valid license application payload"""
     return {
-        "licenseCategory": "SEED",
-        "licenseLevel": "DISTRICT",
-        "registeringAuthority": "Govt",
-        "registeringOfficeName": "Dept",
-        "applicantName": "Alice",
+         "licenseCategory": "SEED",
+        "licenseLevel": "STATE",
+        "registeringAuthority": "Department of Agriculture",
+        "registeringOfficeName": "State Agriculture Office",
+        "applicantName": "Rajesh Kumar",
         "aadhaarNumber": encrypt_aadhaar("234567890123"),
-        "applicantPermanentAddress": "Addr1",
-        "firmName": "Firm",
-        "firmType": "Private",
-        "firmAddress": "Firm Addr",
-        "salePointAddress": "Sale Addr",
-        "saleStorageAddress": "Storage Addr",
-        "cropName": "Crop",
-        "cropVariety": "Variety",
-        "isSeedSelfProduced": False,
-        "productionCompany": "Company"
+        "applicantPermanentAddress": "123 Main St, Jaipur, Rajasthan",
+        "firmName": "Kumar Seeds Pvt Ltd",
+        "firmType": "Private Limited",
+        "firmAddress": "456 Industrial Area, Jaipur",
+        "salePointAddress": "789 Market Road, Jaipur",
+        "saleStorageAddress": "101 Warehouse District, Jaipur",
+        "cropName": "Wheat",
+        "cropVariety": "HD-2967",
+        "isSeedSelfProduced": False, 
+        "productionCompany": "Kumar Seeds Pvt Ltd",
     }
-
 
 @pytest.fixture
 def valid_status_payload():
     """Valid status update payload"""
     return {
-        "licenseId": 2,
+        "licenseId": 1,
         "status": "UNDER_REVIEW",
         "officerName": "Officer Smith",
         "role": "AGRICULTURE_OFFICER",

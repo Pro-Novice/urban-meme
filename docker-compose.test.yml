@@ -1,0 +1,66 @@
+services:
+  test-db:
+    image: postgres:15-alpine
+    container_name: test-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: test_db
+    ports:
+      - "5433:5432"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d test_db"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - test-db-data:/var/lib/postgresql/data
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.tests
+    container_name: test-runner
+    depends_on:
+      test-db:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: test-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: test_db
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      DJANGO_SETTINGS_MODULE: config.test_settings
+      PYTHONDONTWRITEBYTECODE: 1
+      PYTHONUNBUFFERED: 1
+      TESTING: 1
+      WEB3_ENABLED: 0
+    # FIXED: Only mount specific directories to avoid overwriting /app
+    volumes:
+      - ./apps:/app/apps:ro
+      - ./config:/app/config:ro
+      - ./run_tests.sh:/app/run_tests.sh:ro
+      # Create volumes for test artifacts (read-write)
+      - test-cache:/app/.pytest_cache
+      - test-static:/app/test_static
+      - test-media:/app/test_media
+    networks:
+      - test-network
+    working_dir: /app
+    # Remove command here - use Dockerfile CMD
+
+networks:
+  test-network:
+    driver: bridge
+    name: test-network
+
+volumes:
+  test-db-data:
+    name: test-db-data
+  test-cache:
+  test-static:
+  test-media:
