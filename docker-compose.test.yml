@@ -25,6 +25,8 @@ services:
       context: .
       dockerfile: Dockerfile.tests
     container_name: test-runner
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       test-db:
         condition: service_healthy
@@ -38,25 +40,25 @@ services:
       PYTHONDONTWRITEBYTECODE: 1
       PYTHONUNBUFFERED: 1
       TESTING: 1
-      WEB3_ENABLED: 0
-    # FIXED: Only mount specific directories to avoid overwriting /app
     volumes:
       - ./apps:/app/apps:ro
       - ./config:/app/config:ro
       - ./run_tests.sh:/app/run_tests.sh:ro
-      # Create volumes for test artifacts (read-write)
       - test-cache:/app/.pytest_cache
       - test-static:/app/test_static
       - test-media:/app/test_media
     networks:
       - test-network
+      - qbft_testnet
     working_dir: /app
-    # Remove command here - use Dockerfile CMD
 
 networks:
   test-network:
     driver: bridge
     name: test-network
+  qbft_testnet:
+    name: rajasthan-blockchain-besu_qbft_testnet
+    external: true
 
 volumes:
   test-db-data:
