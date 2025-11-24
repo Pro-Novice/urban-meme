@@ -1,4 +1,5 @@
 import logging
+from django.core.cache import cache  
 from rest_framework.decorators import api_view
 from rest_framework.status import (
     HTTP_200_OK,
@@ -12,6 +13,7 @@ from apps.seed_licenses.serializers import (
     UpdateLicenseStatusSerializer,
     VerifyLicenseSerializer,
     UpdateLicenseDetailsSerializer,
+    AddOfficerSerializer,
 )
 from apps.seed_licenses.services.license_service import LicenseService
 from apps.seed_licenses.services.blockchain import TransactionService
@@ -85,7 +87,7 @@ def submit_license_application(request):
 
     try:
         result = license_service.submit_application(serializer.validated_data)
-        return _tx_response(result)
+        return _tx_response(result,include_sender_address=True)
     except Exception as e:
         logger.exception("Submit license failed")
         return ApiResponse(
@@ -100,7 +102,20 @@ def submit_license_application(request):
 def get_license_basic_info(request, license_id: int):
     """Retrieve basic license details by license ID."""
     try:
+
+        cache_key = f"license_basic_info_{license_id}"
+        
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            logger.info(f"Cache hit for license {license_id}")
+            return ApiResponse(data=cached_data, status=HTTP_200_OK)
+
+        logger.info(f"Cache miss for license {license_id}, reading from blockchain")
         data = license_service.get_basic_info((license_id))
+        
+
+        cache.set(cache_key, data, timeout=1800)
+        
         return ApiResponse(data=data, status=HTTP_200_OK)
     except ValueError:
         return ApiResponse(err="License ID must be an integer.", status=HTTP_400_BAD_REQUEST)
@@ -116,7 +131,22 @@ def get_license_qr_data(request, license_id: int):
     """Retrieve QR-code verification data for a license."""
     try:
         license_id = int(license_id)
+        
+
+        cache_key = f"license_qr_data_{license_id}"
+        
+
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            logger.info(f"Cache hit for QR data {license_id}")
+            return ApiResponse(data=cached_data, status=HTTP_200_OK)
+        
+ 
+        logger.info(f"Cache miss for QR data {license_id}")
         data = license_service.get_qr_data(license_id)
+        
+        cache.set(cache_key, data, timeout=1800)
+        
         return ApiResponse(data=data, status=HTTP_200_OK)
     except ValueError:
         return ApiResponse(err="License ID must be an integer.", status=HTTP_400_BAD_REQUEST)
@@ -165,6 +195,13 @@ def update_license_status_view(request):
         }
 
         result = license_service.update_status(payload)
+        
+
+        license_id = validated["license_id"]
+        cache.delete(f"license_basic_info_{license_id}")
+        cache.delete(f"license_qr_data_{license_id}")
+        logger.info(f"Cache invalidated for license {license_id}")
+        
         return _tx_response(result)
 
     except ValueError as e:
@@ -210,6 +247,14 @@ def update_license_details(request):
 
     try:
         result = license_service.update_details(serializer.validated_data)
+        
+
+        license_id = serializer.validated_data.get("license_id")
+        if license_id:
+            cache.delete(f"license_basic_info_{license_id}")
+            cache.delete(f"license_qr_data_{license_id}")
+            logger.info(f"Cache invalidated for license {license_id}")
+        
         return _tx_response(result)
     except Exception as e:
         logger.exception("License update failed")
@@ -219,9 +264,30 @@ def update_license_details(request):
         )
 
 # --------------------------------------------------------------------
+# 9️ Add Officer to Contract
+# --------------------------------------------------------------------
+@api_view(["POST"])
+def add_officer_to_contract(request):
+    """
+    Add a new officer to the authorized callers list.
+    Only the admin wallet can perform this action.
+    """
+    serializer = AddOfficerSerializer(data=request.data)
+    if not serializer.is_valid():
+        return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
+
+    try:
+        result = license_service.add_officer(serializer.validated_data)
+        return _tx_response(result)  
+
+    except Exception as e:
+        logger.exception("Add officer failed")
+        return ApiResponse(err=f"Add officer failed: {str(e)}", status=HTTP_500_INTERNAL_SERVER_ERROR)
+    
+# --------------------------------------------------------------------
 # Helper Function: Uniform Transaction Response
 # --------------------------------------------------------------------
-def _tx_response(result: dict):
+def _tx_response(result: dict, include_sender_address=False):
     """Standardized response wrapper for blockchain transactions."""
     # If LicenseService returns "changed": False, handle no-op gracefully
     if result.get("changed") is False:
@@ -238,11 +304,12 @@ def _tx_response(result: dict):
         return ApiResponse(data=result, status=HTTP_400_BAD_REQUEST)
 
     # Normal accepted blockchain transaction
-    return ApiResponse(
-        data={
-            "transaction_hash": result.get("transaction_hash"),
-            "status": "accepted",
-            "message": "Transaction submitted successfully.",
-        },
-        status=HTTP_202_ACCEPTED,
-    )
+    response_data = {
+        "transaction_hash": result.get("transaction_hash"),
+        "status": "accepted",
+        "message": "Transaction submitted successfully.",
+    }
+    if include_sender_address and "sender_address" in result:
+        response_data["sender_address"] = result["sender_address"]
+    
+    return ApiResponse(data=response_data, status=HTTP_202_ACCEPTED)

@@ -17,6 +17,7 @@ from .license_view import (
     update_license_details,
     verify_license_document,
     check_total_license_count,
+    add_officer_to_contract, 
 )
 
 from .blockchain_view import (
@@ -27,6 +28,9 @@ from .blockchain_view import (
     blockchain_health_check,
     blockchain_network_info,
     get_block_details, 
+    view_all_cache_keys,
+    clear_cache_view,
+    redis_health_check
 )
 
 from .security_view import (
@@ -44,6 +48,7 @@ __all__ = [
     "update_license_details",
     "verify_license_document",
     "check_total_license_count",
+    "add_officer_to_contract", 
 
     # Blockchain endpoints
     "check_owner_blockchain",
@@ -57,4 +62,7 @@ __all__ = [
     # Security endpoints
     "get_public_key",
     "security_health_check",
+    "view_all_cache_keys",
+    "clear_cache_view",
+    "redis_health_check"
 ]

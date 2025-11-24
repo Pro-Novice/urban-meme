@@ -75,6 +75,11 @@ class TransactionService:
                 }
 
             creds = self._resolve_credentials(address, private_key)
+            creds["address"] = Web3.to_checksum_address(creds["address"])
+            params = [
+                Web3.to_checksum_address(p) if isinstance(p, str) and p.startswith("0x") and len(p) == 42 else p
+                for p in params
+            ]
             func = getattr(self.contract.functions, method_name)
 
             # ------------------------------------------------------------
@@ -87,12 +92,12 @@ class TransactionService:
 
             with self._nonce_locks[creds["address"]]:
                 nonce = w3.eth.get_transaction_count(creds["address"], "pending")
-
+            sender_address = creds["address"]
             # ------------------------------------------------------------
             #  Build and sign transaction OUTSIDE the lock
             # ------------------------------------------------------------
             tx = func(*params).build_transaction({
-                "from": creds["address"],
+                "from": sender_address,
                 "gasPrice": w3.eth.gas_price,
                 "nonce": nonce,
                 "chainId": w3.eth.chain_id,
@@ -133,6 +138,7 @@ class TransactionService:
                 "status": "pending",
                 "rpc_url": rpc_manager.get_current_url(),
                 "message": "Transaction submitted successfully. Await confirmation.",
+                "sender_address": sender_address,
             }
 
         except Exception as e:
@@ -268,12 +274,38 @@ class TransactionService:
     # ------------------------------------------------------
     def _resolve_credentials(self, address, private_key):
         if address and private_key:
+            address = Web3.to_checksum_address(address)
             return {"address": address, "private_key": private_key}
+        
+        if address and not private_key:
+            from apps.seed_licenses.services.multi_account_manager import multi_account_manager
+            account = multi_account_manager.get_account_by_address(address)
+            if account:
+                logger.info(f"🔑 Found private key for address: {address}")
+                return {
+                    "address": account["address"],
+                    "private_key": account["private_key"]
+                }
+            else:
+                logger.warning(f"❌ No private key found for address: {address}")
+        
+        # ✅ Use multi-account manager as fallback for other operations
+        from apps.seed_licenses.services.blockchain.connection import get_random_account
+        random_account = get_random_account()
+        if random_account:
+            logger.info(f"🎲 Using random account from pool: {random_account['address']}")
+            return {
+                "address": random_account["address"],
+                "private_key": random_account["private_key"]
+            }
+        
+        # ✅ Fallback to original single account (backward compatibility)
         default = get_default_account()
         if not default:
-            raise ValueError("No credentials provided and no default PRIVATE_KEY configured.")
+            raise ValueError("No credentials provided and no accounts configured.")
+        
+        default["address"] = Web3.to_checksum_address(default["address"])
         return default
-
     def _parse_error(self, e: Exception) -> Dict[str, Any]:
         try:
             error_details_str = str(e.args[0])

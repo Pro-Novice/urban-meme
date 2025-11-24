@@ -112,6 +112,19 @@ DATABASES = {
     }
 }
 
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache', 
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient', 
+        },
+        'KEY_PREFIX': 'agri_license',  
+        'TIMEOUT': 1800, 
+    }
+}
+
+
 # ================== AUTH ================== #
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -119,7 +132,11 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
+import os, json, logging
+from hexbytes import HexBytes
+from django.core.serializers.json import DjangoJSONEncoder
 
+logger = logging.getLogger("blockchain")
 # ================== I18N ================== #
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
@@ -134,12 +151,31 @@ BLOCKCHAIN_URL = RPC_URLS[0] if RPC_URLS else "http://127.0.0.1:8545/"
 
 CHAIN_ID = config("CHAIN_ID", default=1337, cast=int)
 PRIVATE_KEY = config("PRIVATE_KEY", default=None)
+CONTRACT_ADDRESS = config("CONTRACT_ADDRESS", default="")
 
-if not PRIVATE_KEY:
-    raise ImproperlyConfigured("PRIVATE_KEY not found in environment variables.")
+RAW_PRIVATE_KEYS = config("PRIVATE_KEYS", default="")
+RAW_CONTRACT_ADDRESSES = config("CONTRACT_ADDRESSES", default="")
 
-# Derive default wallet address
-WALLET_ADDRESS = Web3().eth.account.from_key(PRIVATE_KEY).address
+# Parse multiple private keys and addresses
+PRIVATE_KEYS = [key.strip() for key in RAW_PRIVATE_KEYS.split(",") if key.strip()]
+CONTRACT_ADDRESSES = [addr.strip() for addr in RAW_CONTRACT_ADDRESSES.split(",") if addr.strip()]
+
+# Validate that private keys and addresses have matching counts
+if PRIVATE_KEYS and CONTRACT_ADDRESSES:
+    if len(PRIVATE_KEYS) != len(CONTRACT_ADDRESSES):
+        logger.warning(f"⚠️ Mismatch: {len(PRIVATE_KEYS)} private keys vs {len(CONTRACT_ADDRESSES)} addresses")
+    else:
+        logger.info(f"✅ Loaded {len(PRIVATE_KEYS)} private key-address pairs from environment")
+
+# Derive default wallet address from single PRIVATE_KEY (backward compatibility)
+if PRIVATE_KEY:
+    WALLET_ADDRESS = Web3().eth.account.from_key(PRIVATE_KEY).address
+elif PRIVATE_KEYS:
+    # Use first private key as default for backward compatibility
+    PRIVATE_KEY = PRIVATE_KEYS[0]
+    WALLET_ADDRESS = Web3().eth.account.from_key(PRIVATE_KEYS[0]).address
+else:
+    raise ImproperlyConfigured("No PRIVATE_KEY or PRIVATE_KEYS found in environment variables.")
 
 # Optional: main contract address for decoding
 BESU_CONTRACT_ADDRESS = config("BESU_CONTRACT_ADDRESS", default="")
@@ -162,11 +198,7 @@ except FileNotFoundError:
     raise ImproperlyConfigured("Key files (private_key.pem or public_key.pem) not found in project root.")
 
 # ================== CONTRACT ABI PATH & JSON SERIALIZER ================== #
-import os, json, logging
-from hexbytes import HexBytes
-from django.core.serializers.json import DjangoJSONEncoder
 
-logger = logging.getLogger("blockchain")
 
 # Primary & fallback paths
 PRIMARY_DEPLOYMENT_PATH = BASE_DIR / "blockchain" / "deployment_info.json"

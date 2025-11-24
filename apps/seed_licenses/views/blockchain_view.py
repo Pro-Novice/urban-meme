@@ -181,3 +181,111 @@ def get_block_details(request, block_number):
         return ApiResponse(err=result["error"], status=HTTP_500_INTERNAL_SERVER_ERROR)
 
     return ApiResponse(data=result["data"], status=HTTP_200_OK)
+
+@api_view(["GET"])
+def view_all_cache_keys(request):
+    """View all cached keys and their values (DEBUG ONLY)."""
+    try:
+        from django_redis import get_redis_connection  
+        
+
+        redis_client = get_redis_connection("default")
+        
+ 
+        pattern = "agri_license*"
+        all_keys = redis_client.keys(pattern)
+        
+        cache_data = {}
+        for key in all_keys:
+
+            key_str = key.decode('utf-8') if isinstance(key, bytes) else key
+            
+
+            raw_value = redis_client.get(key)
+            
+
+            if raw_value:
+                try:
+                    import pickle
+                    value = pickle.loads(raw_value)
+                except:
+                    value = raw_value.decode('utf-8') if isinstance(raw_value, bytes) else raw_value
+            else:
+                value = None
+                
+            cache_data[key_str] = value
+        
+        return ApiResponse(
+            data={
+                "total_keys": len(all_keys),
+                "keys": [k.decode('utf-8') if isinstance(k, bytes) else k for k in all_keys],
+                "cache_data": cache_data
+            },
+            status=HTTP_200_OK
+        )
+    except Exception as e:
+        logger.exception("Failed to list cache keys")
+        return ApiResponse(
+            err=f"Cache inspection failed: {str(e)}", 
+            status=HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(["GET"])
+def clear_cache_view(request):
+    """Clear all cache data (DEBUG ONLY)."""
+    try:
+        from django.core.cache import cache
+        cache.clear()
+        return ApiResponse(
+            data={"status": "success", "message": "All cache cleared"},
+            status=HTTP_200_OK
+        )
+    except Exception as e:
+        return ApiResponse(
+            err=f"Cache clear failed: {str(e)}", 
+            status=HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(["GET"]) 
+def redis_health_check(request):
+    """Check Redis cache connectivity and performance."""
+    try:
+        from django_redis import get_redis_connection
+        
+        redis_client = get_redis_connection("default")
+        
+        # Test Redis ping
+        redis_client.ping()
+        
+
+        test_key = "agri_license:health_check_test"  # ← ADD PREFIX
+        test_value = "ok"
+        redis_client.set(test_key, test_value, ex=10)
+        cached_value = redis_client.get(test_key)
+        
+        is_connected = cached_value == test_value.encode('utf-8')
+        
+        # Get Redis info
+        info = redis_client.info()
+        
+        # Count keys with YOUR prefix only
+        app_keys = redis_client.keys("agri_license*")  
+        
+        return ApiResponse(
+            data={
+                "redis_connected": is_connected,
+                "redis_version": info.get("redis_version", "unknown"),
+                "connected_clients": info.get("connected_clients", 0),
+                "used_memory_human": info.get("used_memory_human", "unknown"),
+                "total_keys_in_db": redis_client.dbsize(),  # ← ALL KEYS
+                "app_cache_keys": len(app_keys),  
+            },
+            status=HTTP_200_OK if is_connected else HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+    except Exception as e:
+        logger.exception("Redis health check failed")
+        return ApiResponse(
+            err=f"Redis connection failed: {str(e)}",
+            status=HTTP_500_INTERNAL_SERVER_ERROR,
+        )

@@ -3,7 +3,7 @@ from typing import Dict, Any, List
 from apps.seed_licenses.models import EventLog
 from apps.seed_licenses.services.blockchain import TransactionService
 from apps.seed_licenses.enums import LicenseStatusEnum, LICENSE_STATUS_REVERSE
-
+from apps.seed_licenses.services.multi_account_manager import multi_account_manager
 logger = logging.getLogger(__name__)
 
 
@@ -17,7 +17,7 @@ class ILicenseService:
     def verify_document(self, payload: Dict[str, Any]) -> Dict[str, Any]: ...
     def update_details(self, payload: Dict[str, Any]) -> Dict[str, Any]: ...
     def get_qr_data(self, license_id: int) -> Dict[str, Any]: ...
-
+    def add_officer(self, payload: Dict[str, Any]) -> Dict[str, Any]: ...
 
 class LicenseService(ILicenseService):
     """Business logic layer for license-related operations."""
@@ -179,3 +179,32 @@ class LicenseService(ILicenseService):
     def get_qr_data(self, license_id: int) -> Dict[str, Any]:
         """Read-only blockchain call to fetch QR data for a given license."""
         return self.tx.read("getLicenseQRData", [license_id])
+    
+    # ---------- ADD OFFICER (ADMIN ONLY) ---------- #
+    def add_officer(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Add a new officer to authorized callers list.
+        Only admin can perform this action.
+        """
+        caller_address = data["address"]
+        new_officer_address = data["new_officer_address"]
+        
+        logger.info(
+            "Adding new officer %s by admin %s",
+            new_officer_address,
+            caller_address
+        )
+
+        admin_account = multi_account_manager.get_account_by_address(caller_address)
+        if not admin_account:
+            return {
+                "success": False,
+                "error": f"No private key found for admin address {caller_address}"
+            }
+
+        return self.tx.write(
+            "manageAuthorizedApiCallers",
+            [new_officer_address, True],
+            address=admin_account["address"],
+            private_key=admin_account["private_key"]  
+        )
