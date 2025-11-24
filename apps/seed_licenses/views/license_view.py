@@ -105,7 +105,6 @@ def get_license_basic_info(request, license_id: int):
 
         cache_key = f"license_basic_info_{license_id}"
         
-
         cached_data = cache.get(cache_key)
         if cached_data:
             logger.info(f"Cache hit for license {license_id}")
