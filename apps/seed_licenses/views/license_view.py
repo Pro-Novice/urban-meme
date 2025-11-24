@@ -100,7 +100,7 @@ def submit_license_application(request):
 # --------------------------------------------------------------------
 @api_view(["GET"])
 def get_license_basic_info(request, license_id: int):
-    """Retrieve basic license details by license ID"""
+    """Retrieve basic license details by license ID."""
     try:
 
         cache_key = f"license_basic_info_{license_id}"

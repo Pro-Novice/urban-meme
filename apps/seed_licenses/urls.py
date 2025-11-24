@@ -34,8 +34,6 @@ urlpatterns = [
     path("block/<int:block_number>/", views.get_block_details, name="get-block-details"),
     path('cache/view/', views.view_all_cache_keys,name="get-cache-details"),
     path('cache/clear/', views.clear_cache_view,name="get-cache-details"),
-    path('blockchain/redis-health/',views.redis_health_check,name="health-cache-details", ),
-
-
+    path('blockchain/redis-health/',views.redis_health_check,name="health-cache-details"),
 
 ]
