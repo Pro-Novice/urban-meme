@@ -113,16 +113,16 @@ DATABASES = {
 }
 
 
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache', 
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient', 
-        },
-        'KEY_PREFIX': 'agri_license',  
-        'TIMEOUT': 1800, 
-    }
-}
+# CACHES = {
+#     'default': {
+#         'BACKEND': 'django_redis.cache.RedisCache', 
+#         'OPTIONS': {
+#             'CLIENT_CLASS': 'django_redis.client.DefaultClient', 
+#         },
+#         'KEY_PREFIX': 'agri_license',  
+#         'TIMEOUT': 1800, 
+#     }
+# }
 
 
 # ================== AUTH ================== #

@@ -269,8 +269,8 @@ class TestGetLicenseBasicInfo:
             MagicMock(side_effect=Exception("License not found"))
         )
         
-        resp = client.get(reverse("license-basic-info", args=[9999]))
-        
+        resp = client.get(reverse("license-basic-info", args=[999]))
+        print(resp.json())
         assert_error_response(resp, status.HTTP_500_INTERNAL_SERVER_ERROR, ["license", "not found"])
     
     @pytest.mark.parametrize("invalid_id", ["abc", "12.34", "-1"])
@@ -301,7 +301,8 @@ class TestGetLicenseBasicInfo:
             MagicMock(side_effect=exception)
         )
         
-        resp = client.get(reverse("license-basic-info", args=[1]))
+        resp = client.get(reverse("license-basic-info", args=[15]))
+        print(resp.json())
         
         assert_error_response(resp, status.HTTP_500_INTERNAL_SERVER_ERROR, ["error"])
 
@@ -369,7 +370,7 @@ class TestGetLicenseQRData:
             MagicMock(side_effect=exception)
         )
         
-        resp = client.get(reverse("license-qr-data", args=[1]))
+        resp = client.get(reverse("license-qr-data", args=[19]))
         
         assert_error_response(resp, status.HTTP_500_INTERNAL_SERVER_ERROR, [keyword])
 
