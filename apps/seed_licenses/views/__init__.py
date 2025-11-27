@@ -28,6 +28,9 @@ from .blockchain_view import (
     blockchain_health_check,
     blockchain_network_info,
     get_block_details, 
+    view_all_cache_keys,
+    clear_cache_view,
+    redis_health_check
 )
 
 from .security_view import (
@@ -59,4 +62,7 @@ __all__ = [
     # Security endpoints
     "get_public_key",
     "security_health_check",
+    "view_all_cache_keys",
+    "clear_cache_view",
+    "redis_health_check"
 ]

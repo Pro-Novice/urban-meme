@@ -112,6 +112,19 @@ DATABASES = {
     }
 }
 
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache', 
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient', 
+        },
+        'KEY_PREFIX': 'agri_license',  
+        'TIMEOUT': 1800, 
+    }
+}
+
+
 # ================== AUTH ================== #
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},

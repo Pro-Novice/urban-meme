@@ -1,4 +1,5 @@
 import logging
+from django.core.cache import cache  
 from rest_framework.decorators import api_view
 from rest_framework.status import (
     HTTP_200_OK,
@@ -101,7 +102,20 @@ def submit_license_application(request):
 def get_license_basic_info(request, license_id: int):
     """Retrieve basic license details by license ID."""
     try:
+
+        cache_key = f"license_basic_info_{license_id}"
+        
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            logger.info(f"Cache hit for license {license_id}")
+            return ApiResponse(data=cached_data, status=HTTP_200_OK)
+
+        logger.info(f"Cache miss for license {license_id}, reading from blockchain")
         data = license_service.get_basic_info((license_id))
+        
+
+        cache.set(cache_key, data, timeout=1800)
+        
         return ApiResponse(data=data, status=HTTP_200_OK)
     except ValueError:
         return ApiResponse(err="License ID must be an integer.", status=HTTP_400_BAD_REQUEST)
@@ -117,7 +131,22 @@ def get_license_qr_data(request, license_id: int):
     """Retrieve QR-code verification data for a license."""
     try:
         license_id = int(license_id)
+        
+
+        cache_key = f"license_qr_data_{license_id}"
+        
+
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            logger.info(f"Cache hit for QR data {license_id}")
+            return ApiResponse(data=cached_data, status=HTTP_200_OK)
+        
+ 
+        logger.info(f"Cache miss for QR data {license_id}")
         data = license_service.get_qr_data(license_id)
+        
+        cache.set(cache_key, data, timeout=1800)
+        
         return ApiResponse(data=data, status=HTTP_200_OK)
     except ValueError:
         return ApiResponse(err="License ID must be an integer.", status=HTTP_400_BAD_REQUEST)
@@ -166,6 +195,13 @@ def update_license_status_view(request):
         }
 
         result = license_service.update_status(payload)
+        
+
+        license_id = validated["license_id"]
+        cache.delete(f"license_basic_info_{license_id}")
+        cache.delete(f"license_qr_data_{license_id}")
+        logger.info(f"Cache invalidated for license {license_id}")
+        
         return _tx_response(result)
 
     except ValueError as e:
@@ -211,6 +247,14 @@ def update_license_details(request):
 
     try:
         result = license_service.update_details(serializer.validated_data)
+        
+
+        license_id = serializer.validated_data.get("license_id")
+        if license_id:
+            cache.delete(f"license_basic_info_{license_id}")
+            cache.delete(f"license_qr_data_{license_id}")
+            logger.info(f"Cache invalidated for license {license_id}")
+        
         return _tx_response(result)
     except Exception as e:
         logger.exception("License update failed")
