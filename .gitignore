@@ -18,3 +18,4 @@ htmlcov_integration/
 htmlcov_unit/
 htmlcov_e2e/
 pytest_cache/
+reports
