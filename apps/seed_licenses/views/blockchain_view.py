@@ -1,4 +1,5 @@
 import logging
+import time
 from rest_framework.decorators import api_view
 from rest_framework.status import (
     HTTP_200_OK,
@@ -11,7 +12,7 @@ from apps.seed_licenses.services.blockchain import (
     get_contract,
     w3,
 )
-
+from django.core.cache import cache 
 from apps.seed_licenses.services.blockchain import TransactionService
 
 logger = logging.getLogger(__name__)
@@ -114,18 +115,30 @@ def blockchain_health_check(request):
     Health check endpoint for blockchain connectivity.
     Verifies Web3 connection and node synchronization status.
     """
+    cache_key = "blockchain_health_v2"
+    cached = cache.get(cache_key)
+    
+    # Return cached result (30 second cache)
+    if cached:
+        cached["cached"] = True
+        return ApiResponse(data=cached, status=HTTP_200_OK)
+    
     try:
+        # Quick connection check only
         connected = w3.is_connected()
-        latest_block = w3.eth.block_number if connected else None
-        node_info = w3.client_version if connected else "Not connected"
-        return ApiResponse(
-            data={
-                "connected": connected,
-                "latest_block": latest_block,
-                "node_info": node_info,
-            },
-            status=HTTP_200_OK,
-        )
+        
+        result = {
+            "connected": connected,
+            "status": "healthy" if connected else "degraded",
+            "timestamp": time.time(),
+            "cached": False
+        }
+        
+        # Cache for 30 seconds
+        cache.set(cache_key, result, timeout=30)
+        
+        return ApiResponse(data=result, status=HTTP_200_OK)
+        
     except Exception as e:
         logger.exception("Blockchain health check failed")
         return ApiResponse(

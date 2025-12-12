@@ -45,7 +45,7 @@ fi
 
 # Default RPC URLs if not set
 if [ -z "$RPC_URLS" ]; then
-  RPC_URLS="http://host.docker.internal:8545,http://host.docker.internal:8546,http://host.docker.internal:8547,http://host.docker.internal:8548"
+  RPC_URLS="http://host.docker.internal:8545,http://host.docker.internal:8546,http://host.docker.internal:8547,http://localhost:8548"
   echo "⚙️  Using default RPC_URLS: $RPC_URLS"
 fi
 
@@ -62,7 +62,7 @@ echo "-------------------------------------"
 
 # Timestamped report
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
-REPORT_DIR="./reports"
+REPORT_DIR="stress_test/reports"
 mkdir -p "$REPORT_DIR"
 REPORT_PATH="${REPORT_DIR}/${TEST_TYPE}_${TIMESTAMP}.html"
 
@@ -98,23 +98,42 @@ else
     echo "📊 Running Locust stress test..."
     echo "Command: locust -f $TEST_FILE --host=\"$BASE_URL\" --users $USERS --spawn-rate $SPAWN_RATE --run-time $RUNTIME --headless --html $REPORT_PATH"
 
-    if ! command -v locust &>/dev/null; then
+        if ! command -v locust &>/dev/null; then
         echo "🐳 Locust not found locally — running via Docker..."
 
-        docker run --rm -i \
-          -v "$PROJECT_ROOT":/mnt/project \
-          -w /mnt/project/stress_test \
-          -e PYTHONPATH="/mnt/project" \
-          -e BASE_URL="$BASE_URL" \
-          -e RPC_URLS="$RPC_URLS" \
-          locustio/locust \
-          -f "$TEST_FILE" \
-          --host="$BASE_URL" \
-          --users "$USERS" \
-          --spawn-rate "$SPAWN_RATE" \
-          --run-time "$RUNTIME" \
-          --headless \
-          --html "$REPORT_PATH"
+        # Prevent Git Bash / MSYS from rewriting POSIX paths to Windows paths
+        # for this docker invocation only.
+        if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+          MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*" docker run --rm -i \
+            -v "$PROJECT_ROOT":/mnt/project \
+            -w /mnt/project/stress_test \
+            -e PYTHONPATH="/mnt/project" \
+            -e BASE_URL="$BASE_URL" \
+            -e RPC_URLS="$RPC_URLS" \
+            stress_test-stress_tester \
+            -f "$TEST_FILE" \
+            --host="$BASE_URL" \
+            --users "$USERS" \
+            --spawn-rate "$SPAWN_RATE" \
+            --run-time "$RUNTIME" \
+            --headless \
+            --html "$REPORT_PATH"
+        else
+          docker run --rm -i \
+            -v "$PROJECT_ROOT":/mnt/project \
+            -w /mnt/project/stress_test \
+            -e PYTHONPATH="/mnt/project" \
+            -e BASE_URL="$BASE_URL" \
+            -e RPC_URLS="$RPC_URLS" \
+            stress_test-stress_tester \
+            -f "$TEST_FILE" \
+            --host="$BASE_URL" \
+            --users "$USERS" \
+            --spawn-rate "$SPAWN_RATE" \
+            --run-time "$RUNTIME" \
+            --headless \
+            --html "$REPORT_PATH"
+        fi
     else
         locust -f "stress_test/$TEST_FILE" \
           --host="$BASE_URL" \
@@ -132,7 +151,7 @@ else
       PROJECT_NAME="🌿 Blockchain License System Stress Test"
       DATE_GENERATED="$(date +"%a, %b %d, %Y %I:%M:%S %p")"
       sed -i "s|Locust Test Report|$PROJECT_NAME|g" "$REPORT_PATH" || true
-      sed -i "0,/<h3>.*<\/h3>/s|<h3>.*<\/h3>|<h3 style='text-align:center;color:#2E8B57;'>$PROJECT_NAME</h3><p style='text-align:center;font-style:italic;'>Generated on: $DATE_GENERATED</p>|" "$REPORT_PATH" || true
+      sed -i "0,/<h3>.*<\/h3>/s|<h3>.*<\/h3>|<h3 style='text-align:center;color:#2E8B57;'>$PROJECT_NAME</h3><p style='text-align:center;font-style:italic;'>$DATE_GENERATED</p>|" "$REPORT_PATH" || true
     fi
 
     [ $LOCUST_EXIT_CODE -eq 0 ] && echo "✅ Locust stress test completed!" || echo "❌ Locust test failed"
