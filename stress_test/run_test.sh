@@ -27,6 +27,8 @@ esac
 # 🧾 Load environment variables
 if [ -f ".env" ]; then
   export $(grep -v '^#' .env | xargs)
+elif [ -f "../.env" ]; then
+  export $(grep -v '^#' ../.env | xargs)
 else
   echo "❌ .env file not found!"
   exit 1
@@ -43,7 +45,7 @@ fi
 
 # Default RPC URLs if not set
 if [ -z "$RPC_URLS" ]; then
-  RPC_URLS="http://host.docker.internal:8545,http://host.docker.internal:8546,http://host.docker.internal:8547,http://host.docker.internal:8548"
+  RPC_URLS="http://host.docker.internal:8545,http://host.docker.internal:8546,http://host.docker.internal:8547,http://localhost:8548"
   echo "⚙️  Using default RPC_URLS: $RPC_URLS"
 fi
 
@@ -60,74 +62,80 @@ echo "-------------------------------------"
 
 # Timestamped report
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
-REPORT_DIR="./reports"
+REPORT_DIR="stress_test/reports"
 mkdir -p "$REPORT_DIR"
 REPORT_PATH="${REPORT_DIR}/${TEST_TYPE}_${TIMESTAMP}.html"
+
+# Detect project root (directory with manage.py or git)
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+
+# Ensure correct PYTHONPATH for local runs
+export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 
 # ---------------------- K6 TEST ---------------------- #
 if [ "$TEST_TYPE" = "k6" ]; then
     echo "📊 Running K6 stress test..."
     echo "Command: k6 run $TEST_FILE"
 
-    # Prefer local k6; fallback to Docker if not found
     if ! command -v k6 &>/dev/null; then
         echo "🐳 k6 not found locally — running via Docker..."
-        
-        # Detect correct mount path dynamically
-        if [ -f "stress_test/$TEST_FILE" ]; then
-            SCRIPT_DIR="$(pwd)/stress_test"
-        else
-            SCRIPT_DIR="$(pwd)"
-        fi
-        
+
         docker run --rm -i \
-          -v "$SCRIPT_DIR":/scripts \
-          -w /scripts \
-          -e BASE_URL="$BASE_URL" \
-          -e RPC_URLS="$RPC_URLS" \
-          grafana/k6 run "$TEST_FILE"
+            -v "$PROJECT_ROOT":/scripts \
+            -w /scripts/stress_test \
+            -e BASE_URL="$BASE_URL" \
+            -e RPC_URLS="$RPC_URLS" \
+            grafana/k6 run "$TEST_FILE"
     else
-        BASE_URL="$BASE_URL" RPC_URLS="$RPC_URLS" \
-        k6 run "$TEST_FILE"
+        BASE_URL="$BASE_URL" RPC_URLS="$RPC_URLS" k6 run "stress_test/$TEST_FILE"
     fi
 
     K6_EXIT_CODE=$?
-
-    if [ $K6_EXIT_CODE -eq 0 ]; then
-        echo "✅ K6 stress test completed successfully"
-    else
-        echo "❌ K6 stress test failed with exit code: $K6_EXIT_CODE"
-    fi
+    [ $K6_EXIT_CODE -eq 0 ] && echo "✅ K6 stress test completed!" || echo "❌ K6 test failed"
 
 # ---------------------- LOCUST TEST ---------------------- #
 else
     echo "📊 Running Locust stress test..."
     echo "Command: locust -f $TEST_FILE --host=\"$BASE_URL\" --users $USERS --spawn-rate $SPAWN_RATE --run-time $RUNTIME --headless --html $REPORT_PATH"
 
-    if ! command -v locust &>/dev/null; then
+        if ! command -v locust &>/dev/null; then
         echo "🐳 Locust not found locally — running via Docker..."
-        
-        # Detect correct mount path dynamically
-        if [ -f "stress_test/$TEST_FILE" ]; then
-            SCRIPT_DIR="$(pwd)/stress_test"
-        else
-            SCRIPT_DIR="$(pwd)"
-        fi
 
-        docker run --rm -i \
-          -v "$SCRIPT_DIR":/mnt/locust \
-          -w /mnt/locust \
-          -e BASE_URL="$BASE_URL" \
-          -e RPC_URLS="$RPC_URLS" \
-          locustio/locust -f "$TEST_FILE" \
-          --host="$BASE_URL" \
-          --users "$USERS" \
-          --spawn-rate "$SPAWN_RATE" \
-          --run-time "$RUNTIME" \
-          --headless \
-          --html "$REPORT_PATH"
+        # Prevent Git Bash / MSYS from rewriting POSIX paths to Windows paths
+        # for this docker invocation only.
+        if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+          MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*" docker run --rm -i \
+            -v "$PROJECT_ROOT":/mnt/project \
+            -w /mnt/project/stress_test \
+            -e PYTHONPATH="/mnt/project" \
+            -e BASE_URL="$BASE_URL" \
+            -e RPC_URLS="$RPC_URLS" \
+            stress_test-stress_tester \
+            -f "$TEST_FILE" \
+            --host="$BASE_URL" \
+            --users "$USERS" \
+            --spawn-rate "$SPAWN_RATE" \
+            --run-time "$RUNTIME" \
+            --headless \
+            --html "$REPORT_PATH"
+        else
+          docker run --rm -i \
+            -v "$PROJECT_ROOT":/mnt/project \
+            -w /mnt/project/stress_test \
+            -e PYTHONPATH="/mnt/project" \
+            -e BASE_URL="$BASE_URL" \
+            -e RPC_URLS="$RPC_URLS" \
+            stress_test-stress_tester \
+            -f "$TEST_FILE" \
+            --host="$BASE_URL" \
+            --users "$USERS" \
+            --spawn-rate "$SPAWN_RATE" \
+            --run-time "$RUNTIME" \
+            --headless \
+            --html "$REPORT_PATH"
+        fi
     else
-        locust -f "$TEST_FILE" \
+        locust -f "stress_test/$TEST_FILE" \
           --host="$BASE_URL" \
           --users "$USERS" \
           --spawn-rate "$SPAWN_RATE" \
@@ -138,24 +146,18 @@ else
 
     LOCUST_EXIT_CODE=$?
 
-    # Custom report header
+    # Custom report branding
     if [ -f "$REPORT_PATH" ]; then
       PROJECT_NAME="🌿 Blockchain License System Stress Test"
       DATE_GENERATED="$(date +"%a, %b %d, %Y %I:%M:%S %p")"
       sed -i "s|Locust Test Report|$PROJECT_NAME|g" "$REPORT_PATH" || true
-      sed -i "0,/<h3>.*<\/h3>/s|<h3>.*<\/h3>|<h3 style='text-align:center;color:#2E8B57;'>$PROJECT_NAME</h3><p style='text-align:center;font-style:italic;'>Generated on: $DATE_GENERATED</p>|" "$REPORT_PATH" || true
+      sed -i "0,/<h3>.*<\/h3>/s|<h3>.*<\/h3>|<h3 style='text-align:center;color:#2E8B57;'>$PROJECT_NAME</h3><p style='text-align:center;font-style:italic;'>$DATE_GENERATED</p>|" "$REPORT_PATH" || true
     fi
 
-    if [ $LOCUST_EXIT_CODE -eq 0 ]; then
-        echo "✅ Locust stress test completed successfully"
-    else
-        echo "❌ Locust stress test failed with exit code: $LOCUST_EXIT_CODE"
-    fi
+    [ $LOCUST_EXIT_CODE -eq 0 ] && echo "✅ Locust stress test completed!" || echo "❌ Locust test failed"
 fi
 
 echo "-------------------------------------"
-echo "✅ $TEST_TYPE stress test completed!"
 echo "📊 HTML report saved as: $REPORT_PATH"
-echo "💡 Open it in your browser to view the performance graphs."
-
+echo "💡 Open it in browser to view results."
 exit 0

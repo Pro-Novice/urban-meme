@@ -4,14 +4,17 @@ import json
 import base64
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
-
-# SETUP DJANGO ENVIRONMENT
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(BASE_DIR)
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
-
 import django
 from django.conf import settings
+# SETUP DJANGO ENVIRONMENT
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))  
+PROJECT_ROOT = os.path.dirname(PROJECT_ROOT)              
+
+print("Using PROJECT_ROOT:", PROJECT_ROOT)
+sys.path.insert(0, PROJECT_ROOT)
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+
 django.setup()
 
 # ENCRYPTION FUNCTION (MATCHES SERIALIZER LOGIC)
@@ -50,7 +53,7 @@ if __name__ == "__main__":
             encrypted_list.append(encrypted_value)
 
     # Save output for stress test or Postman
-    output_path = os.path.join(BASE_DIR, "stress_test", "encrypted_aadhaar.json")
+    output_path = os.path.join(PROJECT_ROOT, "stress_test", "encrypted_aadhaar.json")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     with open(output_path, "w") as f:

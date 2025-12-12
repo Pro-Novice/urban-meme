@@ -14,6 +14,18 @@ DEBUG = True
 DJANGO_ENV = "test"
 ALLOWED_HOSTS = ["*"]
 
+# ==============================================================
+# REDIS CONFIGURATION FOR TESTING
+# ==============================================================
+
+# Use in-memory cache for testing instead of Redis
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
+
 
 # ==============================================================
 # REDUCE LOG SPAM

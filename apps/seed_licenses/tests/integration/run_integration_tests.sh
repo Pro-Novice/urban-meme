@@ -74,7 +74,10 @@ TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 MAIN_LOG="${LOG_DIR}/integration_test_run_${TIMESTAMP}.log"
 SUMMARY_LOG="${LOG_DIR}/summary_${TIMESTAMP}.log"
 FAILED_LOG="${LOG_DIR}/failed_tests_${TIMESTAMP}.log"
-SETTINGS_MODULE="config.settings"
+SETTINGS_MODULE="config.test_settings"
+
+# Global flag to track if we're in interactive mode
+INTERACTIVE_MODE=false
 
 # Portable test file collection (keeps order by name)
 TEST_FILES=()
@@ -250,7 +253,16 @@ run_all_tests() {
 
 run_failed_tests() {
     echo -e "${CYAN}Running only failed tests...${NC}"
-    docker_pytest_interactive "/app/${TEST_BASE_PATH}" "--lf -v"
+    
+    if [ "$INTERACTIVE_MODE" = true ]; then
+        # In interactive mode, run with proper logging
+        local failed_log="${LOG_DIR}/failed_tests_interactive_${TIMESTAMP}.log"
+        echo -e "${BLUE}📄 Log: ${failed_log}${NC}"
+        echo ""
+        docker_pytest_interactive "/app/${TEST_BASE_PATH}" "--lf -v --tb=short --color=yes" 2>&1 | tee "$failed_log"
+    else
+        docker_pytest "/app/${TEST_BASE_PATH}" "--lf -v --tb=short --color=yes" 2>&1 | tee "$FAILED_LOG"
+    fi
 }
 
 capture_failed_tests() {
@@ -259,7 +271,15 @@ capture_failed_tests() {
 
 run_debug_tests() {
     echo -e "${CYAN}Running tests with debugging (stop on first failure)...${NC}"
-    docker_pytest_interactive "/app/${TEST_BASE_PATH}" "-v -x --pdb"
+    
+    if [ "$INTERACTIVE_MODE" = true ]; then
+        local debug_log="${LOG_DIR}/debug_tests_${TIMESTAMP}.log"
+        echo -e "${BLUE}📄 Log: ${debug_log}${NC}"
+        echo ""
+        docker_pytest_interactive "/app/${TEST_BASE_PATH}" "-v -x --pdb --tb=short" 2>&1 | tee "$debug_log"
+    else
+        docker_pytest "/app/${TEST_BASE_PATH}" "-v -x --pdb --tb=short" 2>&1 | tee "${LOG_DIR}/debug_tests_${TIMESTAMP}.log"
+    fi
 }
 
 show_test_coverage() {
@@ -272,7 +292,15 @@ show_test_coverage() {
         run_docker exec "$CONTAINER_NAME" pip install pytest-cov
     fi
     
-    docker_pytest "/app/${TEST_BASE_PATH}" "--cov=apps.seed_licenses --cov-report=term-missing --cov-report=html:htmlcov_integration -v" 2>&1 | tee "${LOG_DIR}/coverage_integration_${TIMESTAMP}.log"
+    local coverage_log="${LOG_DIR}/coverage_integration_${TIMESTAMP}.log"
+    
+    if [ "$INTERACTIVE_MODE" = true ]; then
+        echo -e "${BLUE}📄 Log: ${coverage_log}${NC}"
+        echo ""
+        docker_pytest_interactive "/app/${TEST_BASE_PATH}" "--cov=apps.seed_licenses --cov-report=term-missing --cov-report=html:htmlcov_integration -v" 2>&1 | tee "$coverage_log"
+    else
+        docker_pytest "/app/${TEST_BASE_PATH}" "--cov=apps.seed_licenses --cov-report=term-missing --cov-report=html:htmlcov_integration -v" 2>&1 | tee "$coverage_log"
+    fi
 }
 
 run_specific_test_file() {
@@ -285,8 +313,13 @@ run_specific_test_file() {
 
     if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#TEST_FILES[@]}" ]; then
         local test_file="${TEST_FILES[$((choice-1))]}"
+        local file_log="${LOG_DIR}/${test_file%.py}_interactive_${TIMESTAMP}.log"
+        
         echo -e "${CYAN}Running: ${test_file}${NC}"
-        docker_pytest_interactive "/app/${TEST_BASE_PATH}/${test_file}" "-v --tb=short"
+        echo -e "${BLUE}📄 Log: ${file_log}${NC}"
+        echo ""
+        
+        docker_pytest_interactive "/app/${TEST_BASE_PATH}/${test_file}" "-v --tb=short --color=yes" 2>&1 | tee "$file_log"
     else
         echo -e "${RED}Invalid choice${NC}"
     fi
@@ -295,8 +328,18 @@ run_specific_test_file() {
 run_specific_test_class() {
     echo "Enter test file and class (e.g., test_license_lifecycle.py::TestCompleteLicenseLifecycle):"
     read test_class
-    echo -e "${CYAN}Running: ${test_class}${NC}"
-    docker_pytest_interactive "/app/${TEST_BASE_PATH}/${test_class}" "-v"
+    
+    if [ -n "$test_class" ]; then
+        local class_log="${LOG_DIR}/class_${test_class//\:\:/_}_interactive_${TIMESTAMP}.log"
+        
+        echo -e "${CYAN}Running: ${test_class}${NC}"
+        echo -e "${BLUE}📄 Log: ${class_log}${NC}"
+        echo ""
+        
+        docker_pytest_interactive "/app/${TEST_BASE_PATH}/${test_class}" "-v --tb=short --color=yes" 2>&1 | tee "$class_log"
+    else
+        echo -e "${RED}No test class specified${NC}"
+    fi
 }
 
 list_test_files() {
@@ -372,15 +415,20 @@ print_summary() {
         echo ""
 
         for test_file in "${TEST_FILES[@]}"; do
-            local file_log="${LOG_DIR}/${test_file%.py}_${TIMESTAMP}.log"
-            if [ -f "$file_log" ]; then
-                local failed_count=$(grep -oP '\d+(?= failed)' "$file_log" 2>/dev/null | tail -1 || echo 0)
-                if [ -n "$failed_count" ] && [ "$failed_count" -gt 0 ]; then
-                    echo -e "${RED}   ❌ ${test_file}: ${failed_count} test(s) failed${NC}"
-                    grep "FAILED" "$file_log" 2>/dev/null | head -5 | sed 's/^/      /' || true
-                    echo ""
+            local file_pattern="${test_file%.py}_*${TIMESTAMP}.log"
+            local matching_logs=($(find "$LOG_DIR" -name "$file_pattern" 2>/dev/null))
+            
+            for file_log in "${matching_logs[@]}"; do
+                if [ -f "$file_log" ]; then
+                    local failed_count=$(grep -oP '\d+(?= failed)' "$file_log" 2>/dev/null | tail -1 || echo 0)
+                    if [ -n "$failed_count" ] && [ "$failed_count" -gt 0 ]; then
+                        echo -e "${RED}   ❌ ${test_file}: ${failed_count} test(s) failed${NC}"
+                        grep "FAILED" "$file_log" 2>/dev/null | head -5 | sed 's/^/      /' || true
+                        echo ""
+                        break
+                    fi
                 fi
-            fi
+            done
         done
     fi
 
