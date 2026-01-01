@@ -45,7 +45,7 @@ fi
 
 # Default RPC URLs if not set
 if [ -z "$RPC_URLS" ]; then
-  RPC_URLS="http://host.docker.internal:8545,http://host.docker.internal:8546,http://host.docker.internal:8547,http://localhost:8548"
+  RPC_URLS="http://host.docker.internal:8545,http://host.docker.internal:8546,http://host.docker.internal:8547,http://host.docker.internal:8548"
   echo "⚙️  Using default RPC_URLS: $RPC_URLS"
 fi
 
@@ -60,34 +60,52 @@ for url in "${RPCS[@]}"; do
 done
 echo "-------------------------------------"
 
+# Detect if running inside Docker container
+if [ "$PWD" = "/app" ] || [ -f "/.dockerenv" ]; then
+    IN_DOCKER=true
+    WORK_DIR="."
+    REPORT_DIR="./reports"
+else
+    IN_DOCKER=false
+    WORK_DIR="stress_test"
+    REPORT_DIR="stress_test/reports"
+fi
+
 # Timestamped report
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
-REPORT_DIR="stress_test/reports"
 mkdir -p "$REPORT_DIR"
 REPORT_PATH="${REPORT_DIR}/${TEST_TYPE}_${TIMESTAMP}.html"
 
-# Detect project root (directory with manage.py or git)
-PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-
-# Ensure correct PYTHONPATH for local runs
-export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
+# Detect project root (directory with manage.py or git) - only if not in Docker
+if [ "$IN_DOCKER" = false ]; then
+    PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+    export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
+fi
 
 # ---------------------- K6 TEST ---------------------- #
 if [ "$TEST_TYPE" = "k6" ]; then
     echo "📊 Running K6 stress test..."
-    echo "Command: k6 run $TEST_FILE"
-
-    if ! command -v k6 &>/dev/null; then
-        echo "🐳 k6 not found locally — running via Docker..."
-
-        docker run --rm -i \
-            -v "$PROJECT_ROOT":/scripts \
-            -w /scripts/stress_test \
-            -e BASE_URL="$BASE_URL" \
-            -e RPC_URLS="$RPC_URLS" \
-            grafana/k6 run "$TEST_FILE"
+    
+    if [ "$IN_DOCKER" = true ]; then
+        # Already in Docker, just run k6
+        echo "Command: k6 run $TEST_FILE"
+        BASE_URL="$BASE_URL" RPC_URLS="$RPC_URLS" k6 run "$TEST_FILE"
     else
-        BASE_URL="$BASE_URL" RPC_URLS="$RPC_URLS" k6 run "stress_test/$TEST_FILE"
+        # Running locally
+        echo "Command: k6 run $WORK_DIR/$TEST_FILE"
+        
+        if ! command -v k6 &>/dev/null; then
+            echo "🐳 k6 not found locally — running via Docker..."
+            
+            docker run --rm -i \
+                -v "$PROJECT_ROOT":/scripts \
+                -w /scripts/stress_test \
+                -e BASE_URL="$BASE_URL" \
+                -e RPC_URLS="$RPC_URLS" \
+                grafana/k6 run "$TEST_FILE"
+        else
+            BASE_URL="$BASE_URL" RPC_URLS="$RPC_URLS" k6 run "$WORK_DIR/$TEST_FILE"
+        fi
     fi
 
     K6_EXIT_CODE=$?
@@ -96,62 +114,76 @@ if [ "$TEST_TYPE" = "k6" ]; then
 # ---------------------- LOCUST TEST ---------------------- #
 else
     echo "📊 Running Locust stress test..."
-    echo "Command: locust -f $TEST_FILE --host=\"$BASE_URL\" --users $USERS --spawn-rate $SPAWN_RATE --run-time $RUNTIME --headless --html $REPORT_PATH"
-
-        if ! command -v locust &>/dev/null; then
-        echo "🐳 Locust not found locally — running via Docker..."
-
-        # Prevent Git Bash / MSYS from rewriting POSIX paths to Windows paths
-        # for this docker invocation only.
-        if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
-          MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*" docker run --rm -i \
-            -v "$PROJECT_ROOT":/mnt/project \
-            -w /mnt/project/stress_test \
-            -e PYTHONPATH="/mnt/project" \
-            -e BASE_URL="$BASE_URL" \
-            -e RPC_URLS="$RPC_URLS" \
-            stress_test-stress_tester \
-            -f "$TEST_FILE" \
+    
+    if [ "$IN_DOCKER" = true ]; then
+        # Already in Docker, just run locust
+        echo "Command: locust -f $TEST_FILE --host=\"$BASE_URL\" --users $USERS --spawn-rate $SPAWN_RATE --run-time $RUNTIME --headless --html $REPORT_PATH"
+        
+        locust -f "$TEST_FILE" \
             --host="$BASE_URL" \
             --users "$USERS" \
             --spawn-rate "$SPAWN_RATE" \
             --run-time "$RUNTIME" \
             --headless \
             --html "$REPORT_PATH"
-        else
-          docker run --rm -i \
-            -v "$PROJECT_ROOT":/mnt/project \
-            -w /mnt/project/stress_test \
-            -e PYTHONPATH="/mnt/project" \
-            -e BASE_URL="$BASE_URL" \
-            -e RPC_URLS="$RPC_URLS" \
-            stress_test-stress_tester \
-            -f "$TEST_FILE" \
-            --host="$BASE_URL" \
-            --users "$USERS" \
-            --spawn-rate "$SPAWN_RATE" \
-            --run-time "$RUNTIME" \
-            --headless \
-            --html "$REPORT_PATH"
-        fi
     else
-        locust -f "stress_test/$TEST_FILE" \
-          --host="$BASE_URL" \
-          --users "$USERS" \
-          --spawn-rate "$SPAWN_RATE" \
-          --run-time "$RUNTIME" \
-          --headless \
-          --html "$REPORT_PATH"
+        # Running locally
+        echo "Command: locust -f $WORK_DIR/$TEST_FILE --host=\"$BASE_URL\" --users $USERS --spawn-rate $SPAWN_RATE --run-time $RUNTIME --headless --html $REPORT_PATH"
+        
+        if ! command -v locust &>/dev/null; then
+            echo "🐳 Locust not found locally — running via Docker..."
+
+            # Prevent Git Bash / MSYS from rewriting POSIX paths to Windows paths
+            if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+                MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*" docker run --rm -i \
+                    -v "$PROJECT_ROOT":/mnt/project \
+                    -w /mnt/project/stress_test \
+                    -e PYTHONPATH="/mnt/project" \
+                    -e BASE_URL="$BASE_URL" \
+                    -e RPC_URLS="$RPC_URLS" \
+                    stress_test-stress_tester \
+                    -f "$TEST_FILE" \
+                    --host="$BASE_URL" \
+                    --users "$USERS" \
+                    --spawn-rate "$SPAWN_RATE" \
+                    --run-time "$RUNTIME" \
+                    --headless \
+                    --html "$REPORT_PATH"
+            else
+                docker run --rm -i \
+                    -v "$PROJECT_ROOT":/mnt/project \
+                    -w /mnt/project/stress_test \
+                    -e PYTHONPATH="/mnt/project" \
+                    -e BASE_URL="$BASE_URL" \
+                    -e RPC_URLS="$RPC_URLS" \
+                    stress_test-stress_tester \
+                    -f "$TEST_FILE" \
+                    --host="$BASE_URL" \
+                    --users "$USERS" \
+                    --spawn-rate "$SPAWN_RATE" \
+                    --run-time "$RUNTIME" \
+                    --headless \
+                    --html "$REPORT_PATH"
+            fi
+        else
+            locust -f "$WORK_DIR/$TEST_FILE" \
+                --host="$BASE_URL" \
+                --users "$USERS" \
+                --spawn-rate "$SPAWN_RATE" \
+                --run-time "$RUNTIME" \
+                --headless \
+                --html "$REPORT_PATH"
+        fi
     fi
 
     LOCUST_EXIT_CODE=$?
 
     # Custom report branding
     if [ -f "$REPORT_PATH" ]; then
-      PROJECT_NAME="🌿 Blockchain License System Stress Test"
-      DATE_GENERATED="$(date +"%a, %b %d, %Y %I:%M:%S %p")"
-      sed -i "s|Locust Test Report|$PROJECT_NAME|g" "$REPORT_PATH" || true
-      sed -i "0,/<h3>.*<\/h3>/s|<h3>.*<\/h3>|<h3 style='text-align:center;color:#2E8B57;'>$PROJECT_NAME</h3><p style='text-align:center;font-style:italic;'>$DATE_GENERATED</p>|" "$REPORT_PATH" || true
+        PROJECT_NAME="🌿 Blockchain License System Stress Test"
+        DATE_GENERATED="$(date +"%a, %b %d, %Y %I:%M:%S %p")"
+        sed -i "s|Locust Test Report|$PROJECT_NAME|g" "$REPORT_PATH" || true
+        sed -i "0,/<h3>.*<\/h3>/s|<h3>.*<\/h3>|<h3 style='text-align:center;color:#2E8B57;'>$PROJECT_NAME</h3><p style='text-align:center;font-style:italic;'>$DATE_GENERATED</p>|" "$REPORT_PATH" || true
     fi
 
     [ $LOCUST_EXIT_CODE -eq 0 ] && echo "✅ Locust stress test completed!" || echo "❌ Locust test failed"
