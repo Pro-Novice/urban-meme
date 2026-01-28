@@ -418,28 +418,35 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         LicenseStatus _newStatus,
         string memory _remarks
     ) private pure returns (string memory) {
+        string memory baseMessage;
+
         if (_newStatus == LicenseStatus.REVOKED) {
-            return string(abi.encodePacked("License revoked: ", _remarks));
+            baseMessage = "License revoked";
         } else if (_newStatus == LicenseStatus.APPROVED) {
             if (_oldStatus == LicenseStatus.EXPIRED) {
-                return "License renewed";
+                baseMessage = "License renewed";
             } else {
-                return "License approved";
+                baseMessage = "License approved";
             }
         } else {
-            return
-                string(
-                    abi.encodePacked(
-                        "Status changed from ",
-                        _licenseStatusToString(_oldStatus),
-                        " to ",
-                        _licenseStatusToString(_newStatus),
-                        ": ",
-                        _remarks
-                    )
-                );
+            baseMessage = string(
+                abi.encodePacked(
+                    "Status changed from ",
+                    _licenseStatusToString(_oldStatus),
+                    " to ",
+                    _licenseStatusToString(_newStatus)
+                )
+            );
         }
+
+        // Append officer remarks ONLY if provided
+        if (bytes(_remarks).length > 0) {
+            return string(abi.encodePacked(baseMessage, ": ", _remarks));
+        }
+
+        return baseMessage;
     }
+
 
     function _emitStatusEvent(
         uint256 _licenseId,

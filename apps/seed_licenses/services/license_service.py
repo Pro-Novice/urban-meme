@@ -133,7 +133,7 @@ class LicenseService(ILicenseService):
                         log for log in logs
                         if (
                             # Direct event name match (e.g., LicenseApplicationSubmitted)
-                            log["event_name"] == "LicenseApplicationSubmitted" and action["actionType"] == "SUBMITTED"
+                            log["event_name"].upper().find(action["actionType"]) != -1
                             # For StatusChanged → match by newStatus field
                             or (
                                 log["event_name"] == "StatusChanged"
