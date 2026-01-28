@@ -13,7 +13,7 @@ contract LicenseStorage {
     enum LicenseCategory {
         SEED,
         FERTILIZER,
-        INSECTICIDE
+        PESTICIDE
     }
     enum LicenseLevel {
         STATE,
@@ -84,6 +84,8 @@ contract LicenseStorage {
         uint256 expiryDate;
         uint256 revokedDate;
         uint256 renewalDate;
+        int256 latitude;
+        int256 longitude;
         Action[] actionHistory;
         bool isActive;
         bool isPaid;
@@ -131,6 +133,8 @@ contract LicenseStorage {
         uint256 expiryDate;
         uint256 revokedDate;
         uint256 renewalDate;
+        int256 latitude;
+        int256 longitude;
         bool isActive;
         bool isPaid;
         bool documentsVerified;
@@ -167,6 +171,8 @@ contract LicenseStorage {
         string productionCompany;
         string cropName;
         string cropVariety;
+        int256 latitude;
+        int256 longitude;
     }
 
     // Main storage mappings

@@ -32,6 +32,9 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
     production_company = serializers.CharField(required=False, allow_blank=True)
     crop_name = serializers.CharField()
     crop_variety = serializers.CharField()
+    latitude = serializers.FloatField(required=False)
+    longitude = serializers.FloatField(required=False)
+
 
     def validate_license_category(self, value):
         enum_value = LICENSE_CATEGORY_MAP.get(value.upper())
@@ -44,6 +47,33 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
         if enum_value is None:
             raise serializers.ValidationError("Invalid license level.")
         return enum_value
+    
+    def to_internal_value(self, data):
+        ret = super().to_internal_value(data)
+        # Scale latitude/longitude to integers
+        for field in ["latitude", "longitude"]:
+            if field in ret and ret[field] is not None:
+                ret[field] = int(ret[field] * 1_000_000)
+
+        # Drop isSeedSelfProduced unless category is SEED
+        if ret["license_category"] != LICENSE_CATEGORY_MAP["SEED"]:
+            ret.pop("is_seed_self_produced", None)
+
+        return ret
+    def validate(self, attrs):
+        category = attrs["license_category"]
+
+        if category in {LICENSE_CATEGORY_MAP["FERTILIZER"], LICENSE_CATEGORY_MAP["PESTICIDE"]}:
+            if attrs.get("latitude") is None or attrs.get("longitude") is None:
+                raise serializers.ValidationError(
+                    "Latitude and longitude are required for this category"
+                )
+        else:
+            # SEED
+            attrs.pop("latitude", None)
+            attrs.pop("longitude", None)
+
+        return attrs
 
     def validate_aadhaar_number(self, value):
         """
