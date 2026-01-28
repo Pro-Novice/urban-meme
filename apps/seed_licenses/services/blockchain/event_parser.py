@@ -119,7 +119,10 @@ class EventParser:
 
                             decoded = get_event_data(w3.codec, abi_event, log_dict)
                             event_name = abi_event["name"]
-                            event_args = dict(decoded["args"])
+                            event_args = self._transform_event_fields(dict(decoded["args"]))
+                            if event_args.get("category") == "SEED":
+                                event_args["latitude"] = None
+                                event_args["longitude"] = None
 
                             # Transform timestamps + enums
                             timestamp_fields = [
@@ -192,7 +195,9 @@ class EventParser:
                 mapping = self.enum_transforms[field]
                 transformed[field] = mapping.get(value, value)
                 continue
-
+            if field in {"latitude", "longitude"} and isinstance(value, int): 
+                transformed[field] = float(value) / 1_000_000 
+                continue
             transformed[field] = value
 
         return transformed

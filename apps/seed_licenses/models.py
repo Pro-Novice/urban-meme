@@ -11,8 +11,6 @@ class EventLog(models.Model):
     event_data = models.JSONField()
     timestamp = models.DateTimeField(auto_now_add=True)
     license_id = models.IntegerField(db_index=True)
-    latitude = models.FloatField(null=True, blank=True)
-    longitude = models.FloatField(null=True, blank=True)
     
 
 
