@@ -2,7 +2,7 @@ import logging
 from typing import Dict, Any, List
 from apps.seed_licenses.models import EventLog
 from apps.seed_licenses.services.blockchain import TransactionService
-from apps.seed_licenses.enums import LicenseStatusEnum, LICENSE_STATUS_REVERSE
+from apps.seed_licenses.enums import LICENSE_CATEGORY_MAP, LicenseStatusEnum, LICENSE_STATUS_REVERSE
 from apps.seed_licenses.services.multi_account_manager import multi_account_manager
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,11 @@ class LicenseService(ILicenseService):
 
     # ---------- SUBMIT APPLICATION ---------- #
     def submit_application(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        category = data["license_category"]
+
+        lat = data.get("latitude", 0)
+        lng = data.get("longitude", 0)
+        
         struct_input = {
             "category": data["license_category"],
             "level": data["license_level"],
@@ -43,6 +48,8 @@ class LicenseService(ILicenseService):
             "productionCompany": data["production_company"],
             "cropName": data["crop_name"],
             "cropVariety": data["crop_variety"],
+            "latitude": int(lat),   
+            "longitude": int(lng),   
         }
         return self.tx.write("submitLicenseApplication", [struct_input])
 

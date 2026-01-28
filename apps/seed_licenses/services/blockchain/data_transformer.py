@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 from apps.seed_licenses.enums import (
     LICENSE_CATEGORIES,
+    LICENSE_CATEGORY_MAP,
     LICENSE_LEVELS,
     LICENSE_STATUSES,
     USER_ROLE,
@@ -19,7 +20,8 @@ GENERIC_TRANSFORM_MAP = {
             "firmName", "firmType", "firmAddress", "salePointAddress", "saleStorageAddress",
             "productionCompany", "cropName", "cropVariety", "registeringOfficeName",
             "registeringAuthority", "applicationDate", "approvalDate", "rejectionDate",
-            "expiryDate", "revokedDate", "renewalDate", "isActive"
+            "expiryDate", "revokedDate", "renewalDate", "latitude", "longitude", "isActive"
+            
         ],
         "enum_mappings": {
             "category": LICENSE_CATEGORIES,
@@ -101,12 +103,22 @@ def generic_transform(method_name: str, raw_data: Any) -> Any:
         # Timestamp formatting
         elif field in timestamp_fields and value:
             transformed[field] = format_unix_timestamp(value)
+        
+        elif field in {"latitude", "longitude"}:
+            if value is not None:
+                transformed[field] = float(value) / 1_000_000
+            else:
+                transformed[field] = None
 
         else:
             transformed[field] = value
 
+
     # Cleanup irrelevant date fields based on license status
     _cleanup_dates(transformed, status_str)
+    if transformed.get("category") == "SEED":
+        transformed.pop("latitude", None)
+        transformed.pop("longitude", None)
     return transformed
 
 

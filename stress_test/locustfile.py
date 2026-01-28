@@ -66,13 +66,18 @@ officer_data = [
 ]
 
 status_flow = [
-    {"status": "SUBMITTED", "remarks": "Application submitted"},
-    {"status": "UNDER_REVIEW", "remarks": "Application under review"},
-    {"status": "DOCUMENTS_VERIFIED", "remarks": "Documents verified"},
-    {"status": "INSPECTION_SCHEDULED", "remarks": "Inspection scheduled"},
-    {"status": "INSPECTION_COMPLETED", "remarks": "Inspection completed"},
-    {"status": "APPROVED", "remarks": "License approved", "renewalPeriodDays": 365},
+    {"status": "SUBMITTED", "remarks": "Application submitted", "next": ["UNDER_REVIEW"]},
+    {"status": "UNDER_REVIEW", "remarks": "Application under review", "next": ["DOCUMENTS_VERIFIED", "REJECTED"]},
+    {"status": "DOCUMENTS_VERIFIED", "remarks": "Documents verified successfully", "next": ["INSPECTION_SCHEDULED"]},
+    {"status": "INSPECTION_SCHEDULED", "remarks": "Inspection scheduled", "next": ["INSPECTION_COMPLETED"]},
+    {"status": "INSPECTION_COMPLETED", "remarks": "Inspection completed", "next": ["APPROVED", "REJECTED"]},
+    {"status": "APPROVED", "remarks": "License approved", "renewal_period_days": 365, "next": ["REVOKED", "EXPIRED", "RENEWED"]},
+    {"status": "EXPIRED", "remarks": "License expired", "next": ["RENEWED"]},
+    {"status": "RENEWED", "remarks": "License renewed", "renewal_period_days": 365, "next": ["EXPIRED", "REVOKED"]},
 ]
+
+# Status index for quick lookup
+STATUS_INDEX = {item["status"]: item for item in status_flow}
 
 # ---------------- MULTI-ACCOUNT MANAGEMENT ----------------
 accounts = CONTRACT_ADDRESSES if CONTRACT_ADDRESSES and CONTRACT_ADDRESSES[0] else ['single_default_account']
@@ -211,14 +216,18 @@ class CacheManager:
     
     def __init__(self, hit_rate=0.75):
         self.cache_store = {}
-        self.CACHE_DEFAULT_TTL_MS = 60 * 1000  # 60 seconds
+        self.CACHE_DEFAULT_TTL_MS = 60 * 1000  # 60 seconds for license data
+        self.QR_CACHE_TTL_MS = 1800 * 1000  # 30 minutes for QR data 
         self.CACHE_HIT_RATE = hit_rate
         self.hits = 0
         self.misses = 0
     
-    def get(self, license_id):
-        """Get from cache"""
-        key = f"license:{license_id}"
+    def now_ms(self):
+        """Get current time in milliseconds"""
+        return int(time.time() * 1000)
+    
+    def get(self, key):
+        """Get from cache with TTL check"""
         entry = self.cache_store.get(key)
         
         if not entry:
@@ -239,25 +248,62 @@ class CacheManager:
         self.hits += 1
         return entry['data']
     
-    def set(self, license_id, data, ttl_ms=None):
-        """Set cache entry"""
-        key = f"license:{license_id}"
+    def set(self, key, data, ttl_ms=None):
+        """Set cache entry with custom TTL"""
         self.cache_store[key] = {
             'data': data,
             'ts': self.now_ms(),
             'ttl': ttl_ms or self.CACHE_DEFAULT_TTL_MS
         }
     
-    def invalidate(self, license_id):
-        """Invalidate cache entry"""
-        key = f"license:{license_id}"
+    def delete(self, key):
+        """Delete cache entry (matches Django cache.delete)"""
         if key in self.cache_store:
             del self.cache_store[key]
-            logger.debug(f"INFO Cache invalidated for license {license_id}")
     
-    def now_ms(self):
-        """Get current time in milliseconds"""
-        return int(time.time() * 1000)
+    # -------- LICENSE CACHE FUNCTIONS --------
+    
+    def get_license_basic_info(self, license_id):
+        """Get license basic info from cache (matches Django cache key)"""
+        cache_key = f"license_basic_info_{license_id}"
+        return self.get(cache_key)
+    
+    def set_license_basic_info(self, license_id, data):
+        """Cache license basic info with 30-min TTL (matches Django timeout=1800)"""
+        cache_key = f"license_basic_info_{license_id}"
+        self.set(cache_key, data, self.QR_CACHE_TTL_MS)  # 1800 seconds = 30 minutes
+    
+    def delete_license_basic_info(self, license_id):
+        """Delete license basic info cache (matches Django cache.delete)"""
+        cache_key = f"license_basic_info_{license_id}"
+        self.delete(cache_key)
+    
+    # -------- QR CACHE FUNCTIONS  --------
+    
+    def get_qr_data(self, license_id):
+        """Get QR data from cache (matches Django cache key)"""
+        cache_key = f"license_qr_data_{license_id}"
+        return self.get(cache_key)
+    
+    def set_qr_data(self, license_id, data):
+        """Cache QR data with 30-min TTL (matches Django timeout=1800)"""
+        cache_key = f"license_qr_data_{license_id}"
+        self.set(cache_key, data, self.QR_CACHE_TTL_MS)  # 1800 seconds = 30 minutes
+    
+    def delete_qr_data(self, license_id):
+        """Delete QR data cache (matches Django cache.delete)"""
+        cache_key = f"license_qr_data_{license_id}"
+        self.delete(cache_key)
+    
+    # -------- INVALIDATION --------
+    
+    def invalidate_license_cache(self, license_id):
+        """
+        Invalidate both license and QR cache for a license.
+        Matches Django backend's cache invalidation on status update.
+        """
+        self.delete_license_basic_info(license_id)
+        self.delete_qr_data(license_id)
 
 # Initialize Cache
 cache_manager = CacheManager()
@@ -437,14 +483,18 @@ def handle_create_license(user, payload):
                 # Parse and cache response
                 body = safe_json(response)
                 license_id = None
-                if body and 'data' in body and 'licenseId' in body['data']:
-                    license_id = body['data']['licenseId']
-                elif body and 'licenseId' in body:
-                    license_id = body['licenseId']
+                
+                # Extract license_id from response
+                if body and 'data' in body:
+                    # Check for transaction_hash (new license) or licenseId (if present)
+                    if 'transaction_hash' in body['data']:
+                        log_message(user, f"🟢 POST /license/create → {response.status_code} ({int(duration)} ms) • tx: {body['data']['transaction_hash'][:10]}...")
+                        # License ID will need to be fetched later
+                        return None
+                    elif 'license_id' in body['data']:
+                        license_id = body['data']['license_id']
                 
                 if license_id:
-                    cache_manager.set(license_id, body.get('data', body), 
-                                     (15 + random_int(0, 30)) * 1000)
                     log_message(user, f"🟢 POST /license/create → {response.status_code} ({int(duration)} ms) • licenseId: {license_id}")
                 else:
                     log_message(user, f"🟢 POST /license/create → {response.status_code} ({int(duration)} ms)")
@@ -454,7 +504,7 @@ def handle_create_license(user, payload):
                 metrics.create_fail += 1
                 metrics.errors += 1
                 body_snippet = response.text[:400] if response.text else '[Empty response]'
-                log_message(user, f"❌ License Creation Failed:\n• Status: {response.status_code}\n• Response Body: {body_snippet}")
+                log_message(user, f"❌ License Creation Failed:\n• Status: {response.status_code}\n• Response: {body_snippet}")
                 response.failure(f"Status: {response.status_code}")
                 return None
     except Exception as e:
@@ -487,8 +537,6 @@ def handle_get_license_count(user):
                     total = int(body['data']['total_licenses'])
                 elif body and 'total_licenses' in body:
                     total = int(body['total_licenses'])
-                elif body and 'count' in body:
-                    total = int(body['count'])
                 
                 return total
             else:
@@ -502,14 +550,15 @@ def handle_get_license_count(user):
         return 0
 
 def handle_get_license_details(user, license_id):
-    """Handle license details retrieval"""
-    # Try cache first
-    cached_data = cache_manager.get(license_id)
+    """Handle license details retrieval with cache (MATCHING DJANGO BACKEND)"""
+    # Try cache first 
+    cached_data = cache_manager.get_license_basic_info(license_id)
     if cached_data:
-        log_message(user, f"INFO Cache hit for license {license_id}")
+        log_message(user, f"INFO 💾 Cache hit for license basic info {license_id}")
         return cached_data
     
-    # Cache miss - fetch from backend
+  
+    log_message(user, f"INFO 🔍 Cache miss for license {license_id}, reading from backend")
     start_time = time.time()
     
     try:
@@ -528,18 +577,18 @@ def handle_get_license_details(user, license_id):
                 tps_monitor.incr()
 
                 body = safe_json(response)
-                license_data = body.get('data', body)
+           
+                license_data = body.get('data', {})
                 
-                # Cache the data
+                # Cache with 30-min TTL 
                 if license_data and 'status' in license_data:
-                    cache_manager.set(license_id, license_data, 
-                                     (30 + random_int(0, 90)) * 1000)
-                    log_message(user, f"INFO Cache miss for license {license_id}, reading from backend and set TTL")
+                    cache_manager.set_license_basic_info(license_id, license_data)
+                    log_message(user, f"INFO 💾 Cached license basic info {license_id} with 30-min TTL")
                 
                 return license_data
             elif response.status_code == 404:
-                log_message(user, f"WARNING Not Found: /license/info/{license_id}/")
-                response.success()  # Mark as success since 404 is expected sometimes
+                log_message(user, f"WARNING ⚠️ Not Found: /license/info/{license_id}/")
+                response.success()
                 return None
             else:
                 metrics.details_fail += 1
@@ -552,25 +601,62 @@ def handle_get_license_details(user, license_id):
         log_message(user, f"❌ GET /license/info/{license_id} request error: {str(e)}")
         return None
 
+def handle_get_qr(user, license_id):
+    """Handle QR code retrieval with cache (MATCHING DJANGO BACKEND)"""
+    # Try cache first 
+    cached_qr = cache_manager.get_qr_data(license_id)
+    if cached_qr:
+        log_message(user, f"INFO 💾 Cache hit for QR data {license_id}")
+        metrics.qr_ok += 1
+        return cached_qr
+    
+    # Cache miss
+    log_message(user, f"INFO 🔍 Cache miss for QR data {license_id}")
+    start_time = time.time()
+    
+    try:
+        with user.client.get(
+            f"/license/qr/{license_id}/", 
+            catch_response=True, 
+            name="/license/qr/license_id",
+            timeout=60
+        ) as response:
+            duration = (time.time() - start_time) * 1000
+            metrics.add_qr_time(duration)
+            
+            if response.status_code in [200, 202]:
+                metrics.qr_ok += 1
+                response.success()
+                tps_monitor.incr()
+
+                body = safe_json(response)
+              
+                qr_data = body.get('data', {})
+                
+                # Cache with 30-min TTL 
+                if qr_data and 'license_number' in qr_data:
+                    cache_manager.set_qr_data(license_id, qr_data)
+                    log_message(user, f"📦 QR data retrieved and cached for license {license_id} with 30-min TTL")
+                
+                return qr_data
+            else:
+                metrics.qr_fail += 1
+                metrics.errors += 1
+                log_message(user, f"❌ QR fetch failed for {license_id}: {response.status_code}")
+                response.failure(f"Status: {response.status_code}")
+                return None
+    except Exception as e:
+        metrics.errors += 1
+        log_message(user, f"❌ GET /license/qr/{license_id} error: {str(e)}")
+        return None
+
 def handle_update_status(user, payload, license_id):
-    """Handle status update with retry logic"""
+    """Handle status update with retry logic and cache invalidation (MATCHING DJANGO BACKEND)"""
     account = select_account()
     if user.iter_num % 250 == 0:
         log_message(user, f"INFO 🎲 Using random account from pool: {account}")
     
-    # Prepare payload for backend
-    clean_payload = {
-        "license_id": license_id,
-        "status": payload["status"],
-        "officer_name": payload["officerName"],
-        "role": payload["role"].lower().replace(" ", "_"),
-        "remarks": payload["remarks"],
-    }
-    
-    if payload["status"] == "APPROVED":
-        clean_payload["renewal_period_days"] = payload.get("renewalPeriodDays", 365)
-    
-    log_message(user, f"📋 License {license_id}: {payload.get('current_status', 'UNKNOWN')} → {payload['status']} (by {payload['officerName']})")
+    log_message(user, f"📋 License {license_id}: {payload.get('current_status', 'UNKNOWN')} → {payload['status']} (by {payload['officer_name']})")
     
     # Retry logic
     for attempt in range(3):
@@ -579,7 +665,7 @@ def handle_update_status(user, payload, license_id):
         try:
             with user.client.post(
                 "/license/update-status/", 
-                json=clean_payload, 
+                json=payload, 
                 headers=JSON_HEADERS, 
                 catch_response=True, 
                 name="/license/update-status",
@@ -588,23 +674,34 @@ def handle_update_status(user, payload, license_id):
                 duration = (time.time() - start_time) * 1000
                 metrics.add_status_time(duration)
                 
+                # Backend returns 202 for successful status update or 200 for no change
                 if response.status_code in [200, 202]:
+                    body = safe_json(response)
+                    
+                    # Check if it's a "no change" response
+                    if body.get('data', {}).get('status') == 'no_change':
+                        metrics.status_ok += 1
+                        response.success()
+                        log_message(user, f"ℹ️ No change: License {license_id} already in status {payload['status']}")
+                        return False
+                    
                     metrics.status_ok += 1
                     response.success()
                     tps_monitor.incr()
 
-                    # Invalidate cache
-                    cache_manager.invalidate(license_id)
+                    # Invalidate cache on successful status update
+                    cache_manager.invalidate_license_cache(license_id)
+                    
                     log_message(user, f"✅ Status update success for {license_id}: {payload.get('current_status', 'UNKNOWN')} → {payload['status']} (http {response.status_code})")
                     return True
                 else:
                     body_text = (response.text or "").lower()
                     
                     # Business logic errors - don't retry
-                    if response.status_code == 400 or "already in status" in body_text or "invalid transition" in body_text:
+                    if response.status_code == 400:
                         metrics.status_fail += 1
                         log_message(user, f"ℹ️ Business logic prevented update: {response.text[:200]}")
-                        response.success()  # Mark as success since it's expected behavior
+                        response.success()
                         return False
                     
                     # Transient errors - retry
@@ -628,53 +725,14 @@ def handle_update_status(user, payload, license_id):
     
     return False
 
-def handle_get_qr(user, license_id):
-    """Handle QR code retrieval"""
-    start_time = time.time()
-    
-    try:
-        with user.client.get(
-            f"/license/qr/{license_id}/", 
-            catch_response=True, 
-            name="/license/qr/license_id",
-            timeout=60
-        ) as response:
-            duration = (time.time() - start_time) * 1000
-            metrics.add_qr_time(duration)
-            
-            if response.status_code in [200, 202]:
-                metrics.qr_ok += 1
-                response.success()
-                tps_monitor.incr()
-
-                body = safe_json(response)
-                qr_data = body.get('data', body)
-                log_message(user, f"📦 QR data for {license_id}: {json.dumps(qr_data)[:200]}")
-                return qr_data
-            else:
-                metrics.qr_fail += 1
-                metrics.errors += 1
-                log_message(user, f"❌ QR fetch failed for {license_id}: {response.status_code}")
-                response.failure(f"Status: {response.status_code}")
-                return None
-    except Exception as e:
-        metrics.errors += 1
-        log_message(user, f"❌ GET /license/qr/{license_id} error: {str(e)}")
-        return None
-
 def handle_verify_license(user, payload):
     """Handle license verification"""
-    clean_payload = {
-        "license_number": payload["licenseNumber"],
-        "expected_hash": payload["expectedHash"]
-    }
-    
     start_time = time.time()
     
     try:
         with user.client.post(
             "/license/verify/", 
-            json=clean_payload, 
+            json=payload, 
             headers=JSON_HEADERS, 
             catch_response=True, 
             name="/license/verify",
@@ -686,9 +744,8 @@ def handle_verify_license(user, payload):
             if response.status_code in [200, 202]:
                 metrics.verify_ok += 1
                 response.success()
-                log_message(user, f"✅ License verified successfully")
                 tps_monitor.incr()
-
+                log_message(user, f"✅ License verified successfully ({int(duration)}ms)")
                 return True
             else:
                 metrics.verify_fail += 1
@@ -700,6 +757,15 @@ def handle_verify_license(user, payload):
         metrics.errors += 1
         log_message(user, f"❌ POST /license/verify error: {str(e)}")
         return False
+
+def get_next_valid_status(current_status):
+    """Get next valid status from the workflow"""
+    status_info = STATUS_INDEX.get(current_status)
+    if not status_info or not status_info.get('next'):
+        return None
+    
+    # Return a random next valid status
+    return random.choice(status_info['next'])
 
 # ---------------- LOCUST USER CLASS ----------------
 class SeedLicensingUser(HttpUser):
@@ -723,13 +789,6 @@ class SeedLicensingUser(HttpUser):
         payload = generate_application()
         license_id = handle_create_license(self, payload)
         
-        if license_id:
-            # Success
-            pass
-        else:
-            # Failure
-            pass
-        
         async_sleep(random_int(2, 4))
     
     @task(7)
@@ -751,87 +810,139 @@ class SeedLicensingUser(HttpUser):
         # Select license ID
         license_id = random_int(1, total_licenses)
         
-        # Try to get from cache first
-        cached_keys = list(cache_manager.cache_store.keys())
-        if cached_keys and random.random() < 0.7:
-            key = random.choice(cached_keys)
-            parts = key.split(':')
-            if len(parts) == 2:
+        # Try to use a cached license ID (70% chance)
+        if random.random() < 0.7:
+            cached_keys = list(cache_manager.cache_store.keys())
+            license_keys = [k for k in cached_keys if k.startswith('license_basic_info_')]
+            if license_keys:
+                key = random.choice(license_keys)
                 try:
-                    cached_id = int(parts[1])
+                    cached_id = int(key.split('_')[-1])
                     if 1 <= cached_id <= total_licenses:
                         license_id = cached_id
                 except ValueError:
                     pass
         
-        # Get license details
+        # Get license details (with cache)
         license_data = handle_get_license_details(self, license_id)
         if not license_data or 'status' not in license_data:
             log_message(self, f"⚠️ Invalid license data for ID {license_id}")
             async_sleep(0.5)
             return
         
+        # Status is returned as string from backend (e.g., "APPROVED")
         current_status = license_data['status']
         
-        # Skip if in final state
-        if current_status in ['APPROVED', 'REJECTED', 'REVOKED', 'EXPIRED']:
+        # ========== SCENARIO 1: License is already APPROVED ==========
+        if current_status == 'APPROVED':
+            log_message(self, f"🎯 License {license_id} is already APPROVED. Performing QR fetch and verification...")
+            
+            # Get QR code with cache 
+            qr_data = handle_get_qr(self, license_id)
+            
+            # Debug: Log the QR data structure
+            if qr_data:
+                log_message(self, f"DEBUG 🔍 QR data keys: {list(qr_data.keys())}")
+            else:
+                log_message(self, f"⚠️ No QR data returned for license {license_id}")
+                async_sleep(random_int(1, 3))
+                return
+            
+            # Check various possible field names in QR response
+            license_number = qr_data.get('license_number') or qr_data.get('licenseNumber') or qr_data.get('license_id')
+            verification_hash = qr_data.get('verification_hash') or qr_data.get('verificationHash') or qr_data.get('hash')
+            
+            if license_number and verification_hash:
+                # Verify license
+                verify_payload = {
+                    "license_number": str(license_number),
+                    "expected_hash": str(verification_hash)
+                }
+                log_message(self, f"DEBUG 🔍 Verification payload: license_number={license_number}, hash={verification_hash[:20]}...")
+                verify_success = handle_verify_license(self, verify_payload)
+                if verify_success:
+                    log_message(self, f"✅ Approved license {license_id} verified successfully")
+                else:
+                    log_message(self, f"❌ Verification failed for approved license {license_id}")
+            else:
+                log_message(self, f"⚠️ Approved license {license_id} has incomplete QR data - license_number: {license_number}, hash: {verification_hash}")
+            
+            async_sleep(random_int(1, 3))
+            return
+        
+        # ========== SCENARIO 2: License is in other final state ==========
+        if current_status in ['REJECTED', 'REVOKED']:
             log_message(self, f"⏭️ Skipping license {license_id} in final state: {current_status}")
             async_sleep(0.2)
             return
         
-        # Find current status in flow
-        current_idx = -1
-        for i, status_item in enumerate(status_flow):
-            if status_item['status'] == current_status:
-                current_idx = i
-                break
+        # ========== SCENARIO 3: Normal workflow to move to next status ==========
+        next_status = get_next_valid_status(current_status)
         
-        if current_idx == -1 or current_idx >= len(status_flow) - 1:
+        if not next_status:
             log_message(self, f"⚠️ No valid next status for {current_status} (id {license_id})")
             async_sleep(0.2)
             return
         
-        # Get next status
-        next_status_item = status_flow[current_idx + 1]
+        # Get status info for the next status
+        next_status_info = STATUS_INDEX.get(next_status)
+        if not next_status_info:
+            log_message(self, f"⚠️ Status info not found for {next_status}")
+            async_sleep(0.2)
+            return
+        
         officer = random_item(officer_data)
         
-        # Prepare payload
+        # Prepare payload with correct field names (snake_case)
         payload = {
-            "licenseId": license_id,
-            "status": next_status_item['status'],
-            "officerName": officer['name'],
+            "license_id": license_id,
+            "status": next_status,
+            "officer_name": officer['name'],
             "role": officer['role'],
-            "remarks": f"{next_status_item['remarks']} by {officer['name']} at {time.strftime('%Y-%m-%d %H:%M:%S')}",
+            "remarks": f"{next_status_info['remarks']} by {officer['name']} at {time.strftime('%Y-%m-%d %H:%M:%S')}",
             "current_status": current_status
         }
         
-        if next_status_item['status'] == 'APPROVED':
-            payload['renewalPeriodDays'] = next_status_item.get('renewalPeriodDays', 365)
-        
-        log_message(self, f"📋 License {license_id}: {current_status} → {next_status_item['status']} (by {officer['name']})")
+        # Add renewal_period_days if required
+        if next_status in ['APPROVED', 'RENEWED']:
+            payload['renewal_period_days'] = next_status_info.get('renewal_period_days', 365)
         
         # Update status
         update_success = handle_update_status(self, payload, license_id)
         
-        # If approved, fetch QR and verify
-        if update_success and next_status_item['status'] == 'APPROVED':
+        # ========== SCENARIO 4: If we just approved a license ==========
+        if update_success and next_status == 'APPROVED':
+            log_message(self, f"🎉🎉🎉 License {license_id} JUST APPROVED! Fetching QR and verifying...")
             async_sleep(random.uniform(0.5, 1.5))
             
-            # Get QR code
+            # Get QR code 
             qr_data = handle_get_qr(self, license_id)
-            if qr_data and qr_data.get('licenseNumber') and qr_data.get('verificationHash'):
+            
+            if qr_data:
+                log_message(self, f"DEBUG 🔍 Newly approved QR data keys: {list(qr_data.keys())}")
+            else:
+                log_message(self, f"⚠️ No QR data returned for newly approved license {license_id}")
+                async_sleep(random_int(1, 3))
+                return
+            
+            # Check various possible field names
+            license_number = qr_data.get('license_number') or qr_data.get('licenseNumber') or qr_data.get('license_id')
+            verification_hash = qr_data.get('verification_hash') or qr_data.get('verificationHash') or qr_data.get('hash')
+            
+            if license_number and verification_hash:
                 # Verify license
                 verify_payload = {
-                    "licenseNumber": qr_data['licenseNumber'],
-                    "expectedHash": qr_data['verificationHash']
+                    "license_number": str(license_number),
+                    "expected_hash": str(verification_hash)
                 }
+                log_message(self, f"DEBUG 🔍 Newly approved verification payload: license_number={license_number}, hash={verification_hash[:20]}...")
                 verify_success = handle_verify_license(self, verify_payload)
                 if verify_success:
-                    log_message(self, f"✅ License {license_id} verified successfully")
+                    log_message(self, f"✅✅✅ Newly approved license {license_id} verified successfully!")
                 else:
-                    log_message(self, f"❌ Verification failed for {license_id}")
+                    log_message(self, f"❌ Verification failed for newly approved license {license_id}")
             else:
-                log_message(self, f"⚠️ Missing licenseNumber or verificationHash for {license_id}")
+                log_message(self, f"⚠️ Newly approved license {license_id} has incomplete QR data - license_number: {license_number}, hash: {verification_hash}")
         
         # Occasionally refresh RPC stats
         if self.iter_num % 3 == 0:
@@ -876,11 +987,12 @@ def on_test_stop(environment, **kwargs):
         logger.info(f"⏱️  Create Avg: {metrics.calculate_avg(metrics.create_times):.2f}ms, P95: {metrics.calculate_p95(metrics.create_times):.2f}ms")
     if metrics.status_times:
         logger.info(f"⏱️  Status Avg: {metrics.calculate_avg(metrics.status_times):.2f}ms, P95: {metrics.calculate_p95(metrics.status_times):.2f}ms")
-    if metrics.verify_times:
-        logger.info(f"⏱️  Verify Avg: {metrics.calculate_avg(metrics.verify_times):.2f}ms, P95: {metrics.calculate_p95(metrics.verify_times):.2f}ms")
-    
+   
     # Cache statistics
+    total_cache_ops = cache_manager.hits + cache_manager.misses
+    hit_rate = (cache_manager.hits / total_cache_ops * 100) if total_cache_ops > 0 else 0
     logger.info(f"💾 Cache Hits: {cache_manager.hits}, Misses: {cache_manager.misses}")
+    logger.info(f"💾 Cache Hit Rate: {hit_rate:.2f}%")
     
     # RPC statistics
     logger.info(f"🔗 RPC Failures: {rpc_manager.rpc_failures}")
@@ -888,7 +1000,7 @@ def on_test_stop(environment, **kwargs):
     # Total errors
     logger.info(f"❌ Total Errors: {metrics.errors}")
     
-   
+    # TPS Summary
     summary = tps_monitor.get_summary()
     logger.info("\n==================== TPS SUMMARY ====================")
     logger.info(f"Total Requests:   {summary['total_requests']}")
@@ -896,6 +1008,7 @@ def on_test_stop(environment, **kwargs):
     logger.info(f"Peak TPS:         {summary['peak_tps']}")
     logger.info(f"Last Reported TPS:{summary['current_tps']}")
     logger.info("=====================================================\n")
+    
     # Cleanup
     if hasattr(rpc_manager, '_session'):
         rpc_manager._session.close()

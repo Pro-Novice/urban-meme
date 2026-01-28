@@ -43,6 +43,16 @@ export let cacheMissCounter = new Counter('cache_misses');
 export let nodeSwitchGauge = new Gauge('node_switch_count');
 export let errorRate = new Counter('errors');
 
+// Aggregated counters
+export let create_ok = new Counter('create_ok');
+export let create_fail = new Counter('create_fail');
+export let status_ok = new Counter('status_ok');
+export let status_fail = new Counter('status_fail');
+export let qr_ok = new Counter('qr_ok');
+export let qr_fail = new Counter('qr_fail');
+export let verify_ok = new Counter('verify_ok');
+export let verify_fail = new Counter('verify_fail');
+
 // ---------------- HELPERS ----------------
 function nowMs(){ return Date.now(); }
 function randInt(min, max){ return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -118,16 +128,6 @@ const statusFlow = [
   { status: 'APPROVED', remarks: 'License approved', renewalPeriodDays: 365 },
 ];
 
-const stats = {
-  create_ok: 0,
-  create_fail: 0,
-  status_ok: 0,
-  status_fail: 0,
-  qr_ok: 0,
-  qr_fail: 0,
-  verify_ok: 0,
-  verify_fail: 0,
-};
 // ---------------- MULTI-ACCOUNT ----------------
 const accounts = MULTI_ACCOUNTS.length ? MULTI_ACCOUNTS : ['single_default_account'];
 function selectAccount(){
@@ -197,9 +197,9 @@ function recordNodeFailure(node){
 let cacheStore = {};
 const CACHE_DEFAULT_TTL_MS = 60 * 1000; // 60s
 const CACHE_HIT_RATE = 0.75;
+const QR_CACHE_TTL_MS = 1800 * 1000; // 30 minutes
 
-function cacheGet(licenseId){
-  const key = `license:${licenseId}`;
+function cacheGet(key){
   const entry = cacheStore[key];
   if(!entry){
     cacheMissCounter.add(1);
@@ -217,21 +217,49 @@ function cacheGet(licenseId){
   cacheHitCounter.add(1);
   return entry.data;
 }
-function cacheSet(licenseId, data, ttlMs){
-  const key = `license:${licenseId}`;
+
+function cacheSet(key, data, ttlMs){
   cacheStore[key] = { data, ts: nowMs(), ttl: ttlMs || CACHE_DEFAULT_TTL_MS };
 }
-function cacheInvalidate(licenseId){
-  const key = `license:${licenseId}`;
-  if(cacheStore[key]) delete cacheStore[key];
-  // visible log for debugging
-  log(`INFO Cache invalidated for license ${licenseId}`);
+
+function cacheInvalidate(key){
+  if(cacheStore[key]) {
+    delete cacheStore[key];
+    log(`INFO Cache invalidated for key: ${key}`);
+  }
+}
+
+// Specific cache functions
+function getLicenseFromCache(licenseId){
+  return cacheGet(`license:${licenseId}`);
+}
+
+function setLicenseInCache(licenseId, data, ttlMs){
+  cacheSet(`license:${licenseId}`, data, ttlMs);
+}
+
+function getQRFromCache(licenseId){
+  return cacheGet(`qr:${licenseId}`);
+}
+
+function setQRInCache(licenseId, data){
+  cacheSet(`qr:${licenseId}`, data, QR_CACHE_TTL_MS);
+}
+
+function invalidateLicenseCache(licenseId){
+  cacheInvalidate(`license:${licenseId}`);
+  cacheInvalidate(`qr:${licenseId}`);
+  log(`INFO Cache invalidated for license ${licenseId} (both license and QR data)`);
 }
 
 // ---------------- RPC PING SIMULATION (via backend health endpoint) ----------------
 function simulatedRpcPing(){
   const node = chooseBestNode();
   if(!node) return;
+  
+  // Only increment occasionally to reduce load
+  if(Math.random() > 0.3) return; // Skip 70% of health checks
+  
   nodeSwitchCount++;
   nodeSwitchGauge.add(nodeSwitchCount);
 
@@ -244,8 +272,11 @@ function simulatedRpcPing(){
 
   let res = null;
   try {
-    // call backend health endpoint (the backend will check blockchain node connectivity)
-    res = http.get(`${BASE_URL}/health/`, { timeout: '30s' });
+    //Use params object with tags to exclude from main stats
+    res = http.get(`${BASE_URL}/health/`, { 
+      timeout: '30s',
+      tags: { name: 'rpc_health_check' }  // Tag for separation
+    });
   } catch (e) {
     recordNodeFailure(node);
     node.activeRequests = Math.max(0, node.activeRequests - 1);
@@ -283,9 +314,10 @@ export function setup() {
   console.log(`🌐 Backend URL: ${BASE_URL}`)
   console.log(`🔗 RPC Nodes: ${Object.keys(nodes).join(', ')}`);
   console.log(`👥 Using ${accounts.length} blockchain account(s)`)
-  // initial API connectivity check;
+  
+  // Initial API connectivity check
   try {
-    const res = http.get(`${BASE_URL}/owner/`);
+    const res = http.get(`${BASE_URL}/owner/`, { timeout: '30s' });
     console.log(`API connectivity check: ${res.status}`);
     if (res.status !== 200) {
       console.error('❌ Backend not reachable — check Django + blockchain nodes.');
@@ -299,8 +331,8 @@ export function setup() {
 
 // ---------------- MAIN FLOW ----------------
 export default function(){
-  // periodically refresh node stats
-  if(__ITER % 4 === 0) simulatedRpcPing();
+  //Reduce health check frequency - only every 10th iteration instead of every 4th
+  if(__ITER % 10 === 0) simulatedRpcPing();
 
   const isCitizen = randInt(0, 1) === 0;
 
@@ -313,11 +345,12 @@ export default function(){
       const start = nowMs();
       let res = null;
       try {
-        res = http.post(`${BASE_URL}/license/create/`, JSON.stringify(payload), JSON_HEADERS, { timeout: '120s' });
+        // Increased timeout to 180s (matching typical Django timeout)
+        res = http.post(`${BASE_URL}/license/create/`, JSON.stringify(payload), JSON_HEADERS, { timeout: '180s' });
       } catch (e) {
         errorRate.add(1);
         log(`❌ POST /license/create request error: ${e.message}`);
-        sleep(randInt(1,3));
+        sleep(randInt(2,4));  // Increased sleep on error
         return;
       }
 
@@ -326,25 +359,21 @@ export default function(){
       requestCounter.add(1);
 
       const ok = check(res, { 'Application submitted successfully': (r) => [200, 201, 202].includes(r.status) });
-      if ([200, 201, 202].includes(res.status)) stats.create_ok++;
-      else {
-        stats.create_fail++;
+      
+      if ([200, 201, 202].includes(res.status)) {
+        create_ok.add(1);  
+      } else {
+        create_fail.add(1);
         log(`❌ License Creation Failed:
           • Status: ${res.status}
           • Response Body: ${res.body ? res.body.substring(0, 400) : '[Empty response]'}`);
       }
-      if (ok) {
-          stats.create_ok++;
-      } else {
-          stats.create_fail++;
-      }
+      
       if(ok){
-        // parse, store potential returned license id to cache
         const body = safeJson(res);
-        // backend returns wrapped data sometimes: { data: {...} } or directly { transaction_hash:... }
         const licenseId = (body && body.data && body.data.licenseId) || (body && body.licenseId) || null;
         if(licenseId){
-          cacheSet(licenseId, body.data || body, (15 + randInt(0,30)) * 1000);
+          setLicenseInCache(licenseId, body.data || body, (15 + randInt(0,30)) * 1000);
           log(`🟢 POST /license/create → ${res.status} (${dur} ms) • licenseId: ${licenseId}`);
         } else {
           log(`🟢 POST /license/create → ${res.status} (${dur} ms)`);
@@ -353,7 +382,7 @@ export default function(){
         errorRate.add(1);
       }
 
-      sleep(randInt(2,4));
+      sleep(randInt(3,5));  //Increased sleep between requests
     });
     return;
   }
@@ -363,12 +392,13 @@ export default function(){
     const startCount = nowMs();
     let countRes = null;
     try {
-      countRes = http.get(`${BASE_URL}/license/count/`, { timeout: '60s' });
+        //Increased timeout to 90s
+        countRes = http.get(`${BASE_URL}/license/count/`, { timeout: '90s' });
     } catch (e) {
-      errorRate.add(1);
-      log(`❌ GET /license/count request error: ${e.message}`);
-      sleep(1);
-      return;
+        errorRate.add(1);
+        log(`❌ GET /license/count request error: ${e.message}`);
+        sleep(2);  // Increased sleep on error
+        return;
     }
 
     const countDur = nowMs() - startCount;
@@ -378,250 +408,376 @@ export default function(){
     check(countRes, { 'License count retrieved': (r) => r.status === 200 });
     
     if (countRes.status !== 200) {
-      log(`❌ License count failed: ${countRes.status}`);
-      sleep(1);
-      return;
+        log(`❌ License count failed: ${countRes.status}`);
+        sleep(2);  //  Increased sleep
+        return;
     }
     
     const countJson = safeJson(countRes);
     
-   
     const total = Number(
-      countJson?.data?.total_licenses ||
-      countJson?.total_licenses ||
-      countJson?.count ||  // Try this as fallback
-      0
+        countJson?.data?.total_licenses ||
+        countJson?.total_licenses ||
+        countJson?.count || 
+        0
     );
 
     if (!total || total < 1) {
-      log("⚠️ No licenses exist");
-      sleep(1);
-      return;
+        log("⚠️ No licenses exist");
+        sleep(2);  // Increased sleep
+        return;
     }
 
     let licenseId = randInt(1, total);
 
+    // Try to get from cache first
     const cachedKeys = Object.keys(cacheStore);
     if(cachedKeys.length > 0 && Math.random() < 0.7){
-      const k = randItem(cachedKeys); // format license:<id>
-      const parts = k.split(':');
-      const parsedId = Number(parts[1]);
-      if (!isNaN(parsedId) && parsedId > 0 && parsedId <= total) {
-        licenseId = parsedId;
-      }
-    }
-
-    // Ensure licenseId is a valid number
-    if (!Number.isInteger(licenseId) || licenseId < 1 || licenseId > total) {
-      log(`⚠️ Invalid licenseId generated: ${licenseId}, using random`);
-      licenseId = randInt(1, total);
-    }
-
-    // Try from in-memory cache first
-    let licenseData = cacheGet(licenseId);
-    if(licenseData){
-      log(`INFO Cache hit for license ${licenseId}`);
-    } else {
-      // fetch details and set cache
-      const startDetails = nowMs();
-      let detailsRes = null;
-      try {
-        detailsRes = http.get(`${BASE_URL}/license/info/${licenseId}/`, { timeout: '60s' });
-      } catch (e) {
-        errorRate.add(1);
-        log(`❌ GET /license/info/${licenseId} request error: ${e.message}`);
-        sleep(0.5);
-        return;
-      }
-      const dDur = nowMs() - startDetails;
-      detailsTrend.add(dDur);
-      requestCounter.add(1);
-      
-      check(detailsRes, { 'License details retrieved': (r) => r.status === 200 });
-      
-      if(detailsRes.status !== 200){
-        // If Not Found - just skip
-        if(detailsRes.status === 404){
-          log(`WARNING Not Found: /license/info/${licenseId}/`);
-        } else {
-          errorRate.add(1);
-          log(`❌ GET /license/info/${licenseId}/ -> ${detailsRes.status}`);
+        const k = randItem(cachedKeys);
+        const parts = k.split(':');
+        const parsedId = Number(parts[1]);
+        if (!isNaN(parsedId) && parsedId > 0 && parsedId <= total) {
+            licenseId = parsedId;
         }
-        sleep(0.5);
-        return;
-      }
+    }
 
-      const detailsBody = safeJson(detailsRes);
-      licenseData = detailsBody.data || detailsBody;
-      
-      // Only cache if we have valid data
-      if (licenseData && licenseData.status) {
-        cacheSet(licenseId, licenseData, (30 + randInt(0, 90)) * 1000);
-        log(`INFO Cache miss for license ${licenseId}, reading from backend and set TTL`);
-      }
+    if (!Number.isInteger(licenseId) || licenseId < 1 || licenseId > total) {
+        log(`⚠️ Invalid licenseId generated: ${licenseId}, using random`);
+        licenseId = randInt(1, total);
+    }
+
+    // Try from cache first
+    let licenseData = getLicenseFromCache(licenseId);
+    if(licenseData){
+        log(`INFO Cache hit for license ${licenseId}`);
+    } else {
+        const startDetails = nowMs();
+        let detailsRes = null;
+        try {
+            // Increased timeout to 90s
+            detailsRes = http.get(`${BASE_URL}/license/info/${licenseId}/`, { timeout: '90s' });
+        } catch (e) {
+            errorRate.add(1);
+            log(`❌ GET /license/info/${licenseId} request error: ${e.message}`);
+            sleep(1);
+            return;
+        }
+        const dDur = nowMs() - startDetails;
+        detailsTrend.add(dDur);
+        requestCounter.add(1);
+        
+        check(detailsRes, { 'License details retrieved': (r) => r.status === 200 });
+        
+        if(detailsRes.status !== 200){
+            if(detailsRes.status === 404){
+                log(`WARNING Not Found: /license/info/${licenseId}/`);
+            } else {
+                errorRate.add(1);
+                log(`❌ GET /license/info/${licenseId}/ -> ${detailsRes.status}`);
+            }
+            sleep(1);
+            return;
+        }
+
+        const detailsBody = safeJson(detailsRes);
+        licenseData = detailsBody.data || detailsBody;
+        
+        if (licenseData && licenseData.status) {
+            setLicenseInCache(licenseId, licenseData, (30 + randInt(0, 90)) * 1000);
+            log(`INFO Cache miss for license ${licenseId}, reading from backend and set TTL`);
+        }
     }
 
     if(!licenseData || !licenseData.status){
-      log(`⚠️ Invalid license data for ID ${licenseId}`);
-      sleep(0.5);
-      return;
+        log(`⚠️ Invalid license data for ID ${licenseId}`);
+        sleep(1);
+        return;
     }
 
-    if(['APPROVED','REJECTED','REVOKED','EXPIRED'].includes(licenseData.status)){
-      log(`⏭️ Skipping license ${licenseId} in final state: ${licenseData.status}`);
-      sleep(0.2);
-      return;
+    const currentStatus = licenseData.status;
+    
+    // ========== SCENARIO 1: License is already APPROVED ==========
+    if(currentStatus === 'APPROVED'){
+        log(`🎯 License ${licenseId} is already APPROVED. Performing QR fetch and verification...`);
+        
+        let qrData = getQRFromCache(licenseId);
+        let qrRes = null;
+        
+        if(qrData){
+            log(`INFO QR cache hit for approved license ${licenseId}`);
+            qr_ok.add(1);
+        } else {
+            const startQr = nowMs();
+            try {
+                //Increased timeout to 90s
+                qrRes = http.get(`${BASE_URL}/license/qr/${licenseId}/`, { timeout: '90s' });
+            } catch (e) {
+                errorRate.add(1);
+                log(`❌ GET /license/qr/${licenseId} error: ${e.message}`);
+                sleep(1);
+                return;
+            }
+            const qrDur = nowMs() - startQr;
+            qrTrend.add(qrDur);
+            requestCounter.add(1);
+
+            const okQr = check(qrRes, { 
+                'QR data retrieved for approved license': (r) => {
+                    const isValid = [200, 202].includes(r.status);
+                    if(!isValid) {
+                        log(`❌ QR fetch returned status ${r.status} for approved license ${licenseId}`);
+                    }
+                    return isValid;
+                }
+            });
+            
+            if(!okQr){
+                qr_fail.add(1);
+                log(`❌ QR fetch failed for approved license ${licenseId}: ${qrRes ? qrRes.status : 'No response'}`);
+                sleep(randInt(1,3));
+                return;
+            } else {
+                qr_ok.add(1);
+                qrData = safeJson(qrRes).data || safeJson(qrRes);
+                if(qrData) {
+                    setQRInCache(licenseId, qrData);
+                    log(`📦 QR data retrieved and cached for approved license ${licenseId}`);
+                } else {
+                    log(`⚠️ No QR data in response for approved license ${licenseId}`);
+                    sleep(randInt(1,3));
+                    return;
+                }
+            }
+        }
+        
+        // VERIFICATION
+        if(qrData && qrData.licenseNumber && qrData.verificationHash){
+            const verifyPayload = {
+                licenseNumber: qrData.licenseNumber,
+                expectedHash: qrData.verificationHash,
+            };
+            const vStart = nowMs();
+            let verifyRes = null;
+            try {
+                // Increased timeout to 90s
+                verifyRes = http.post(`${BASE_URL}/license/verify/`, JSON.stringify(verifyPayload), JSON_HEADERS, { timeout: '90s' });
+            } catch (e) {
+                errorRate.add(1);
+                log(`❌ POST /license/verify error: ${e.message}`);
+                sleep(1);
+                return;
+            }
+            const vDur = nowMs() - vStart;
+            verifyTrend.add(vDur);
+            requestCounter.add(1);
+
+            const okVerify = check(verifyRes, { 
+                'Approved license verified successfully': (r) => {
+                    const isValid = [200, 202].includes(r.status);
+                    if(!isValid) {
+                        log(`❌ Verification returned status ${r.status} for approved license ${licenseId}`);
+                    }
+                    return isValid;
+                }
+            });
+            
+            if(okVerify) {
+                verify_ok.add(1); 
+                log(`✅ Approved license ${licenseId} verified successfully`);
+            } else {
+                errorRate.add(1);
+                verify_fail.add(1);
+                log(`❌ Verification failed for approved license ${licenseId}: ${verifyRes ? verifyRes.status : 'No response'}`);
+            }
+        } else {
+            log(`⚠️ Approved license ${licenseId} has incomplete QR data`);
+        }
+        
+        sleep(randInt(2,4));  // Increased sleep
+        return;
     }
-   
-    const currentIdx = statusFlow.findIndex(s => s.status === licenseData.status);
+    
+    // ========== SCENARIO 2: Final states ==========
+    if(['REJECTED','REVOKED','EXPIRED'].includes(currentStatus)){
+        log(`⏭️ Skipping license ${licenseId} in final state: ${currentStatus}`);
+        sleep(0.5);  // Increased sleep
+        return;
+    }
+    
+    // ========== SCENARIO 3: Status update ==========
+    const currentIdx = statusFlow.findIndex(s => s.status === currentStatus);
     if(currentIdx === -1 || currentIdx >= statusFlow.length - 1){
-      log(`⚠️ No valid next status for ${licenseData.status} (id ${licenseId})`);
-      sleep(0.2);
-      return;
+        log(`⚠️ No valid next status for ${currentStatus} (id ${licenseId})`);
+        sleep(0.5);
+        return;
     }
-    const nextStatus = statusFlow[currentIdx + 1];
+    
     const nextStatusObj = statusFlow[currentIdx + 1];
     const nextStatusString = nextStatusObj.status;  
     const nextRemarksText = nextStatusObj.remarks;  
     const officer = randItem(officerData);
     const payload = {
-      licenseId,
-      status: nextStatusString,  
-      officerName: officer.name,
-      role: officer.role,
-      remarks: `${nextRemarksText} by ${officer.name} at ${new Date().toISOString()}`,
+        licenseId,
+        status: nextStatusString,  
+        officerName: officer.name,
+        role: officer.role,
+        remarks: `${nextRemarksText} by ${officer.name} at ${new Date().toISOString()}`,
     };
     if(nextStatusString === 'APPROVED') payload.renewalPeriodDays = 365;
 
-    log(`📋 License ${licenseId}: ${licenseData.status} → ${nextStatusString} (by ${officer.name})`);
-    if(__ITER % 250 === 0) log(`DEBUG Payload: ${JSON.stringify(payload)}`);
-
-    // choose account and log occasionally
+    log(`📋 License ${licenseId}: ${currentStatus} → ${nextStatusString} (by ${officer.name})`);
+    
     const acct = selectAccount();
     if(__ITER % 250 === 0) log(`INFO 🎲 Using random account from pool: ${acct}`);
 
-    // update with bounded retries
     let updateRes = null;
+    let updateSuccess = false;
+    let retryDelay = 0;
+    
     for(let attempt = 0; attempt < 3; attempt++){
-      const startUpdate = nowMs();
-      try {
-        updateRes = http.post(`${BASE_URL}/license/update-status/`, JSON.stringify(payload), JSON_HEADERS, { timeout: '120s' });
-      } catch (e) {
-        errorRate.add(1);
-        log(`❌ POST /license/update-status request error: ${e.message}`);
-        // exponential backoff
-        sleep(Math.pow(2, attempt) * randInt(1,3));
-        continue;
-      }
-      const updDur = nowMs() - startUpdate;
-      statusTrend.add(updDur);
-      requestCounter.add(1);
-      check(updateRes, { 'Status updated successfully': (r) => [200, 202].includes(r.status) });
-      // success path
-      if([200,202].includes(updateRes.status)){
-        log(`✅ Status update success for ${licenseId}: ${licenseData.status} → ${nextStatusString} (http ${updateRes.status})`);
-
-        // invalidate cache
-        cacheInvalidate(licenseId);
-        break;
-      }
-      if (updateRes.status === 200 || updateRes.status === 202) {
-          stats.status_ok++; 
-      } else {
-          stats.status_fail++;
-      }
-      sleep(1);
-      const bodyStr = String(updateRes.body || '').toLowerCase();
-      // business logic / bad request -> don't retry
-      if(updateRes.status === 400 || bodyStr.includes('already in status') || bodyStr.includes('invalid transition')){
-        log(`ℹ️ Business logic prevented update: ${String(updateRes.body).slice(0,200)}`);
-        break;
-      }
-
-      // transient errors like gas/nonce/429 -> retry
-      if(bodyStr.includes('gas') || bodyStr.includes('nonce') || updateRes.status === 429){
-        const delay = Math.pow(2, attempt) * randInt(1,4);
-        log(`⚠️ Blockchain error for ${licenseId} (attempt ${attempt+1}) - retrying in ${delay}s. status=${updateRes.status}`);
-        sleep(delay);
-        continue;
-      }
-
-      errorRate.add(1);
-      log(`❌ Update failed for ${licenseId}: ${updateRes.status} • ${String(updateRes.body).slice(0,200)}`);
-      break;
-    }
-
-    // If approved, fetch QR & verify
-    if(payload.status === 'APPROVED' && updateRes && [200,202].includes(updateRes.status)){
-      const startQr = nowMs();
-      let qrRes = null;
-      try {
-        qrRes = http.get(`${BASE_URL}/license/qr/${licenseId}/`, { timeout: '60s' });
-      } catch (e) {
-        errorRate.add(1);
-        log(`❌ GET /license/qr/${licenseId} error: ${e.message}`);
-        sleep(0.5);
-        return;
-      }
-      const qrDur = nowMs() - startQr;
-      qrTrend.add(qrDur);
-      requestCounter.add(1);
-
-      const okQr =  check(qrRes, { 'QR data retrieved': (r) => [200, 202].includes(r.status) });
-      if(!okQr){
-        stats.qr_fail++;
-        log(`❌ QR fetch failed for ${licenseId}: ${qrRes.status}`);
-      } else {
-        const qrJson = safeJson(qrRes).data || safeJson(qrRes);
-        log(`📦 QR data for ${licenseId}: ${JSON.stringify(qrJson).slice(0,200)}`);
-        stats.qr_ok++;
-        if(qrJson && qrJson.licenseNumber && qrJson.verificationHash){
-          const verifyPayload = {
-            licenseNumber: qrJson.licenseNumber,
-            expectedHash: qrJson.verificationHash,
-          };
-          const vStart = nowMs();
-          let verifyRes = null;
-          try {
-            verifyRes = http.post(`${BASE_URL}/license/verify/`, JSON.stringify(verifyPayload), JSON_HEADERS, { timeout: '60s' });
-          } catch (e) {
+        const startUpdate = nowMs();
+        try {
+            // Increased timeout to 180s for status updates (blockchain operations)
+            updateRes = http.post(`${BASE_URL}/license/update-status/`, JSON.stringify(payload), JSON_HEADERS, { timeout: '180s' });
+        } catch (e) {
             errorRate.add(1);
-            log(`❌ POST /license/verify error: ${e.message}`);
-            sleep(0.5);
-            return;
-          }
-          const vDur = nowMs() - vStart;
-          verifyTrend.add(vDur);
-          requestCounter.add(1);
-
-          const okVerify =  check(verifyRes, { 'License verified successfully': (r) => [200, 202].includes(r.status) });
-          if(okVerify) {stats.verify_ok++; log(`✅ License ${licenseId} verified successfully`); }
-          else {
-            errorRate.add(1);
-            stats.verify_fail++;
-            log(`❌ Verification failed for ${licenseId}: ${verifyRes.status} • ${String(verifyRes.body).slice(0,200)}`);
-          }
-        } else {
-          log(`⚠️ Missing licenseNumber or verificationHash for ${licenseId}`);
+            log(`❌ POST /license/update-status request error: ${e.message}`);
+            retryDelay = Math.pow(2, attempt) * randInt(2,4);  //Increased retry delay
+            sleep(retryDelay);
+            continue;
         }
-      }
+        const updDur = nowMs() - startUpdate;
+        statusTrend.add(updDur);
+        requestCounter.add(1);
+        
+        check(updateRes, { 'Status updated successfully': (r) => [200, 202].includes(r.status) });
+        
+        if([200, 202].includes(updateRes.status)) {
+            status_ok.add(1);
+            updateSuccess = true;
+            log(`✅ Status update success for ${licenseId}: ${currentStatus} → ${nextStatusString} (http ${updateRes.status})`);
+            break;
+        } else {
+            status_fail.add(1);
+        }
+        
+        const bodyStr = String(updateRes.body || '').toLowerCase();
+        
+        if(updateRes.status === 400 || bodyStr.includes('already in status') || bodyStr.includes('invalid transition')){
+            log(`ℹ️ Business logic prevented update: ${String(updateRes.body).slice(0,200)}`);
+            break;
+        }
+
+        if(bodyStr.includes('gas') || bodyStr.includes('nonce') || updateRes.status === 429){
+            retryDelay = Math.pow(2, attempt) * randInt(2,5);  // Increased retry delay
+            log(`⚠️ Blockchain error for ${licenseId} (attempt ${attempt+1}) - retrying in ${retryDelay}s. status=${updateRes.status}`);
+            sleep(retryDelay);
+            continue;
+        }
+
+        errorRate.add(1);
+        log(`❌ Update failed for ${licenseId}: ${updateRes.status} • ${String(updateRes.body).slice(0,200)}`);
+        break;
     }
 
-    // occasionally refresh RPC stats
-    if(__ITER % 3 === 0) simulatedRpcPing();
+    // ========== SCENARIO 4: Newly approved license ==========
+    if(nextStatusString === 'APPROVED' && updateSuccess){
+        log(`🎉🎉🎉 License ${licenseId} JUST APPROVED! Fetching QR and verifying...`);
+        
+        invalidateLicenseCache(licenseId);
+        
+        // sleep(2);  Increased delay for backend processing
+        
+        const startQr = nowMs();
+        let qrRes = null;
+        try {
+            // Increased timeout
+            qrRes = http.get(`${BASE_URL}/license/qr/${licenseId}/`, { timeout: '90s' });
+        } catch (e) {
+            errorRate.add(1);
+            log(`❌ GET /license/qr/${licenseId} error: ${e.message}`);
+            sleep(1);
+            return;
+        }
+        const qrDur = nowMs() - startQr;
+        qrTrend.add(qrDur);
+        requestCounter.add(1);
 
-    sleep(randInt(1,3));
+        const okQr = check(qrRes, { 
+            'QR data retrieved for newly approved license': (r) => {
+                const isValid = [200, 202].includes(r.status);
+                if(!isValid) {
+                    log(`❌ QR fetch returned status ${r.status} for newly approved license ${licenseId}`);
+                }
+                return isValid;
+            }
+        });
+        
+        if(!okQr){
+            qr_fail.add(1);
+            log(`❌ QR fetch failed for newly approved license ${licenseId}: ${qrRes ? qrRes.status : 'No response'}`);
+            return;
+        } else {
+            qr_ok.add(1);
+            const qrData = safeJson(qrRes).data || safeJson(qrRes);
+            
+            if(qrData) {
+                setQRInCache(licenseId, qrData);
+                log(`📦 QR data retrieved and cached for newly approved license ${licenseId}`);
+                
+                if(qrData.licenseNumber && qrData.verificationHash){
+                    const verifyPayload = {
+                        licenseNumber: qrData.licenseNumber,
+                        expectedHash: qrData.verificationHash,
+                    };
+                    const vStart = nowMs();
+                    let verifyRes = null;
+                    try {
+                        verifyRes = http.post(`${BASE_URL}/license/verify/`, JSON.stringify(verifyPayload), JSON_HEADERS, { timeout: '90s' });
+                    } catch (e) {
+                        errorRate.add(1);
+                        log(`❌ POST /license/verify error: ${e.message}`);
+                        sleep(1);
+                        return;
+                    }
+                    const vDur = nowMs() - vStart;
+                    verifyTrend.add(vDur);
+                    requestCounter.add(1);
+
+                    const okVerify = check(verifyRes, { 
+                        'Newly approved license verified successfully': (r) => {
+                            const isValid = [200, 202].includes(r.status);
+                            if(!isValid) {
+                                log(`❌ Verification returned status ${r.status} for newly approved license ${licenseId}`);
+                            }
+                            return isValid;
+                        }
+                    });
+                    
+                    if(okVerify) {
+                        verify_ok.add(1); 
+                        log(`✅✅✅ Newly approved license ${licenseId} verified successfully!`);
+                    } else {
+                        errorRate.add(1);
+                        verify_fail.add(1);
+                        log(`❌ Verification failed for newly approved license ${licenseId}: ${verifyRes ? verifyRes.status : 'No response'}`);
+                    }
+                } else {
+                    log(`⚠️ Newly approved license ${licenseId} has incomplete QR data`);
+                }
+            } else {
+                log(`⚠️ No QR data in response for newly approved license ${licenseId}`);
+            }
+        }
+    } else if (updateSuccess) {
+        invalidateLicenseCache(licenseId);
+    }
+    
+    // Reduce health check frequency
+    if(__ITER % 10 === 0) simulatedRpcPing();
+
+    sleep(randInt(2,4));  // Increased sleep
   });
-}
-
-// ---------------- TEARDOWN & SUMMARY ----------------
-export function teardown(data){
-  console.log('\n📊 ======= TEST COMPLETE =======');
-  console.log(`✅ License Creation: ${stats.create_ok} successful, ${stats.create_fail} failed`);
-  console.log(`✅ Status Updates: ${stats.status_ok} successful, ${stats.status_fail} failed`);
-  console.log(`✅ QR Fetches: ${stats.qr_ok} successful, ${stats.qr_fail} failed`);
-  console.log(`✅ Verifications: ${stats.verify_ok} successful, ${stats.verify_fail} failed`);
-
 }
 
 // ---------------- SUMMARY REPORT ----------------
@@ -632,6 +788,19 @@ export function handleSummary(data) {
   const avg = data.metrics.http_req_duration?.values?.avg / 1000 || 0;
   const p95 = data.metrics.http_req_duration?.values['p(95)'] / 1000 || 0;
 
+  const createOk = data.metrics.create_ok?.values?.count || 0;
+  const createFail = data.metrics.create_fail?.values?.count || 0;
+  const statusOk = data.metrics.status_ok?.values?.count || 0;
+  const statusFail = data.metrics.status_fail?.values?.count || 0;
+  const qrOk = data.metrics.qr_ok?.values?.count || 0;
+  const qrFail = data.metrics.qr_fail?.values?.count || 0;
+  const verifyOk = data.metrics.verify_ok?.values?.count || 0;
+  const verifyFail = data.metrics.verify_fail?.values?.count || 0;
+  
+  const cacheHits = data.metrics.cache_hits?.values?.count || 0;
+  const cacheMisses = data.metrics.cache_misses?.values?.count || 0;
+  const rpcFails = data.metrics.rpc_failures?.values?.count || 0;
+
   console.log(`
   📊 ======= STRESS TEST SUMMARY =======
   🌐 RPC Nodes: ${RPC_URLS.length}
@@ -639,10 +808,30 @@ export function handleSummary(data) {
   ⚙️  Test Duration: ${duration.toFixed(1)}s
   🚀 TPS: ${tps.toFixed(2)}
   ⏱️  Avg: ${avg.toFixed(2)}s | P95: ${p95.toFixed(2)}s
+  
+  📈 Business Metrics:
+  • License Creation: ${createOk} OK / ${createFail} FAIL
+  • Status Updates:  ${statusOk} OK / ${statusFail} FAIL
+  • QR Fetch:        ${qrOk} OK / ${qrFail} FAIL
+  • Verifications:   ${verifyOk} OK / ${verifyFail} FAIL
+  
+  💾 Cache Statistics:
+  • Cache Hits:      ${cacheHits}
+  • Cache Misses:    ${cacheMisses}
+  • Hit Rate:        ${cacheMisses > 0 ? ((cacheHits / (cacheHits + cacheMisses)) * 100).toFixed(2) : 0}%
+  
+  🔗 RPC Statistics:
+  • RPC Failures:    ${rpcFails}
   `);
 
+  const now = new Date();
+  const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const reportPath = `stress_test/reports/k6_${timestamp}.html`;
+
+  console.log(`📝 Saving K6 report to: ${reportPath}`);
+
   return {
-    'stress_test/reports/stress_report.html': htmlReport(data, {
+    [reportPath]: htmlReport(data, {
       title: '🌾 Rajasthan Seed Licensing System - Multi-RPC Stress Test',
       theme: 'default',
     }),
