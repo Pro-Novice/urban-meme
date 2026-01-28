@@ -6,6 +6,12 @@
     "_exporter_id": "43756014",
     "_collection_link": "https://go.postman.co/collection/43756014-3fc5f273-7a3e-4900-aac9-ab2c4791d3a1?source=collection_link"
   },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api/blockchain"
+    }
+  ],
   "item": [
     {
       "name": "Rajasthan-Fertilizer-Licensing",
