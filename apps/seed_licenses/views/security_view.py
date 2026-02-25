@@ -6,10 +6,11 @@ from utils.api_response import ApiResponse
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
-
+from apps.seed_licenses.views.schemas import (public_key_schema, security_health_schema)   
 logger = logging.getLogger(__name__)
 
 # ✅ 1️ Public Key Endpoint
+@public_key_schema()
 @api_view(["GET"])
 def get_public_key(request):
     """Return the public key for client-side encryption."""
@@ -24,6 +25,7 @@ def get_public_key(request):
 
 
 # ✅ 2️ Security Health Check Endpoint
+@security_health_schema()
 @api_view(["GET"])
 def security_health_check(request):
     """Check presence and validity of private/public keypair."""

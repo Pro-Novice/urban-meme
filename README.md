@@ -146,6 +146,41 @@ python -m pytest apps/seed_licenses/Tests/
 
 ```
 
+## 📖 API Documentation (Swagger / OpenAPI 3.0)
+
+### Overview
+
+This project uses [`drf-spectacular`](https://github.com/tfranzel/drf-spectacular) to auto-generate an OpenAPI 3.0 schema directly from Django REST Framework views and serializers. The schema is served as an interactive Swagger UI and ReDoc page.
+
+### Accessing the Docs
+
+| Interface | URL |
+|---|---|
+| Swagger UI | http://localhost:8000/docs/ |
+| ReDoc | http://localhost:8000/redoc/ |
+| Raw OpenAPI YAML | http://localhost:8000/schema/ |
+
+### Installation
+
+`drf-spectacular` is listed in `requirements.txt`. If rebuilding a Docker image from scratch:
+```bash
+docker compose down
+docker compose build --no-cache
+docker compose up
+```
+
+For local development:
+```bash
+pip install drf-spectacular==0.27.2
+```
+
+#### Swagger / Schema Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/docs/` | Swagger UI — interactive API explorer |
+| GET | `/redoc/` | ReDoc — clean API reference |
+| GET | `/schema/` | Raw OpenAPI 3.0 YAML/JSON |
 
 ## 📜 Deployment
 
@@ -176,3 +211,4 @@ The script will:
 * Static and media files are stored in **Docker volumes**: `static_volume`, `media_volume`.
 * Logs are mounted to `./logs` for easier debugging.
 * Entrypoint ensures **migrations and collectstatic** run automatically before starting Gunicorn.
+

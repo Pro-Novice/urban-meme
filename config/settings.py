@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'apps.seed_licenses',
+    'drf_spectacular',
 ]
 
 REST_FRAMEWORK = {
@@ -49,6 +50,22 @@ REST_FRAMEWORK = {
     'DEFAULT_PARSER_CLASSES': (
         'djangorestframework_camel_case.parser.CamelCaseJSONParser',
     ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+# ================== SPECTACULAR (API DOCS) ================== #
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Rajasthan Agriculture License System API',
+    'DESCRIPTION': 'Blockchain-backed license management',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'CAMELIZE_NAMES': True,  
+    'POSTPROCESSING_HOOKS': [
+        'drf_spectacular.hooks.postprocess_schema_enums',
+    ],
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': r'/api/',
+    'ENUM_GENERATE_CHOICE_DESCRIPTION': True,
 }
 
 # ================== MIDDLEWARE ================== #
