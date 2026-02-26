@@ -11,7 +11,9 @@ under clear logical separation:
 from .license_view import (
     submit_license_application,
     get_license_basic_info,
+    get_license_basic_info_by_number,
     get_license_action_history,
+    get_license_action_history_by_number,
     get_license_qr_data,
     update_license_status_view,
     update_license_details,
@@ -42,7 +44,9 @@ __all__ = [
     # License endpoints
     "submit_license_application",
     "get_license_basic_info",
+    "get_license_basic_info_by_number",
     "get_license_action_history",
+    "get_license_action_history_by_number",
     "get_license_qr_data",
     "update_license_status_view",
     "update_license_details",

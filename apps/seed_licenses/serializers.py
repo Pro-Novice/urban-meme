@@ -11,6 +11,7 @@ from .enums import (
     LICENSE_CATEGORY_MAP,
     LEVEL_MAP,
 )
+from .models import LicenseSubmission
 
 
 # ============================================================
@@ -21,6 +22,7 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
     license_level = serializers.CharField()
     registering_authority = serializers.CharField()
     registering_office_name = serializers.CharField()
+    license_number = serializers.CharField()
     applicant_name = serializers.CharField()
     aadhaar_number = serializers.CharField()
     applicant_permanent_address = serializers.CharField()
@@ -47,6 +49,14 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
         if enum_value is None:
             raise serializers.ValidationError("Invalid license level.")
         return enum_value
+
+    def validate_license_number(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("License number cannot be empty.")
+        value = value.strip()
+        if LicenseSubmission.objects.filter(license_number=value).exists():
+            raise serializers.ValidationError("License number already exists.")
+        return value
     
     def to_internal_value(self, data):
         ret = super().to_internal_value(data)
