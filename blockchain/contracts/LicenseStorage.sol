@@ -6,9 +6,6 @@ pragma solidity ^0.8.0;
  * @dev Separates storage from logic for upgradeability
  */
 contract LicenseStorage {
-    // Storage slot positions as constants to avoid collisions
-    bytes32 private constant LICENSE_COUNTER_SLOT = keccak256("license.storage.licenseCounter");
-
     // Enums
     enum LicenseCategory {
         SEED,
@@ -46,28 +43,23 @@ contract LicenseStorage {
     // Core License Structure
     struct License {
         // Unique identifier
-        uint256 licenseId;
         string licenseNumber;
         LicenseCategory category;
         LicenseStatus status;
         LicenseLevel level;
-
         // Registering authority details---
         string registeringAuthority;
         string registeringOfficeName;
-        
         // Applicant details
         string applicantName;
         string aadhaarNumber;
         string applicantPermanentAddress;
-
         // Firm details
         string firmName;
         string firmType; // Private Ltd, Public Ltd, Partnership Firm, Proprietor Firm, etc.
         string firmAddress;
         string salePointAddress;
         string saleStorageAddress;
-
         // Crop details
         bool isSeedSelfProduced;
         string productionCompany;
@@ -75,7 +67,6 @@ contract LicenseStorage {
         string cropVariety;
         mapping(string => string) customFields;
         string[] customFieldKeys;
-
         // Payment paymentDetails;
         uint256 applicationDate;
         uint256 lastModifiedDate;
@@ -111,7 +102,6 @@ contract LicenseStorage {
 
     // Simplified structs for API responses
     struct LicenseBasicInfo {
-        uint256 licenseId;
         string licenseNumber;
         string applicantName;
         LicenseCategory category;
@@ -147,7 +137,6 @@ contract LicenseStorage {
         bool isExpired;
         bool isRevoked;
         string licenseNumber;
-        uint256 licenseId;
         uint256 approvalDate;
         uint256 expiryDate;
         uint256 revokedDate;
@@ -158,6 +147,7 @@ contract LicenseStorage {
     struct LicenseApplicationInput {
         LicenseCategory category;
         LicenseLevel level;
+        string licenseNumber;
         string registeringAuthority;
         string registeringOfficeName;
         string applicantName;
@@ -176,32 +166,15 @@ contract LicenseStorage {
     }
 
     // Main storage mappings
-    mapping(uint256 => License) internal licenses;
-    mapping(string => uint256) internal licenseNumberToId;
+    mapping(string => License) internal licenses;
     mapping(address => bool) internal authorizedApiCallers;
 
     // Tracking arrays
-    uint256[] internal allLicenseIds;
-    mapping(LicenseStatus => uint256[]) internal licensesByStatus;
-    mapping(LicenseCategory => uint256[]) internal licensesByCategory;
-    mapping(LicenseLevel => uint256[]) internal licensesByLevel;
+    string[] internal allLicenseNumbers;
+    mapping(LicenseStatus => string[]) internal licensesByStatus;
+    mapping(LicenseCategory => string[]) internal licensesByCategory;
+    mapping(LicenseLevel => string[]) internal licensesByLevel;
 
     // Gap for future storage variables
     uint256[50] private __gap;
-
-    // License counter getter/setter
-    function licenseIdCounter() public view returns (uint256 _counter) {
-        bytes32 slot = LICENSE_COUNTER_SLOT;
-        assembly {
-            _counter := sload(slot)
-        }
-    }
-
-    function _incrementLicenseCounter() internal returns (uint256 _newValue) {
-        bytes32 slot = LICENSE_COUNTER_SLOT;
-        assembly {
-            _newValue := add(sload(slot), 1)
-            sstore(slot, _newValue)
-        }
-    }
 }

@@ -41,9 +41,7 @@ async function main() {
     console.log("Testing V1 functionality...");
     try {
         const owner = await proxy.owner();
-        const counter = await proxy.licenseIdCounter();
         console.log(`V1 Contract owner: ${owner}`);
-        console.log(`V1 Initial counter: ${counter}`);
     } catch (error) {
         console.error("V1 Testing failed:", error);
         throw error;
@@ -63,9 +61,7 @@ async function main() {
     console.log("Testing V2 functionality...");
     try {
         const owner = await upgraded.owner();
-        const counter = await upgraded.licenseIdCounter();
         console.log(`V2 Contract owner: ${owner}`);
-        console.log(`V2 Counter (preserved): ${counter}`);
     } catch (error) {
         console.error("V2 Testing failed:", error);
         throw error;

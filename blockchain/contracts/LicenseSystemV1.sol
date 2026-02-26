@@ -11,35 +11,83 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  * @title LicenseSystemV1
  * @dev Implementation contract optimized for API integration
  */
-contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, OwnableUpgradeable {
+contract LicenseSystemV1 is
+    LicenseStorage,
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable
+{
     // Events
-    event LicenseApplicationSubmitted(uint256 indexed licenseId, string licenseNumber, LicenseCategory category, uint256 applicationDate, int256 latitude, int256 longitude);
-    event LicenseApproved(uint256 indexed licenseId, string changedBy, userRole changedByRole, uint256 approvalDate, uint256 expiryDate);
-    event LicenseRevoked(uint256 indexed licenseId, string changedBy, userRole changedByRole, string reason, uint256 revokedDate);
-    event LicenseRejected(uint256 indexed licenseId, string changedBy, userRole changedByRole, string reason, uint256 rejectionDate);
-    event LicenseRenewed(uint256 indexed licenseId, string changedBy, userRole changedByRole, uint256 renewalDate, uint256 expiryDate);
+    event LicenseApplicationSubmitted(
+        string licenseNumber,
+        LicenseCategory category,
+        uint256 applicationDate,
+        int256 latitude,
+        int256 longitude
+    );
+    event LicenseApproved(
+        string licenseNumber,
+        string changedBy,
+        userRole changedByRole,
+        uint256 approvalDate,
+        uint256 expiryDate
+    );
+    event LicenseRevoked(
+        string licenseNumber,
+        string changedBy,
+        userRole changedByRole,
+        string reason,
+        uint256 revokedDate
+    );
+    event LicenseRejected(
+        string licenseNumber,
+        string changedBy,
+        userRole changedByRole,
+        string reason,
+        uint256 rejectionDate
+    );
+    event LicenseRenewed(
+        string licenseNumber,
+        string changedBy,
+        userRole changedByRole,
+        uint256 renewalDate,
+        uint256 expiryDate
+    );
     event StatusChanged(
-        uint256 indexed licenseId,
+        string licenseNumber,
         LicenseStatus oldStatus,
         LicenseStatus newStatus,
         string changedBy,
         userRole changedByRole,
         uint256 lastModifiedDate
     );
-    event LicenseVerificationStatus(uint256 indexed licenseId, string licenseNumber, string statusMessage, uint256 verifiedDate);
-    event TamperAttemptDetected(uint256 indexed licenseId, string licenseNumber, string statusMessage, uint256 detectedDate);
+    event LicenseVerificationStatus(
+        string licenseNumber,
+        string statusMessage,
+        uint256 verifiedDate
+    );
+    event TamperAttemptDetected(
+        string licenseNumber,
+        string statusMessage,
+        uint256 detectedDate
+    );
     event ApiCallerAuthorized(address indexed caller);
     event ApiCallerRevoked(address indexed caller);
 
     // Modifiers
     modifier onlyAuthorizedCallers() {
-        require(msg.sender == owner() || authorizedApiCallers[msg.sender], "Only authorized addresses can perform this action");
+        require(
+            msg.sender == owner() || authorizedApiCallers[msg.sender],
+            "Only authorized addresses can perform this action"
+        );
         _;
     }
 
-    modifier licenseExists(uint256 _licenseId) {
-        string memory errorMessage = string(abi.encodePacked("License not found: ", Strings.toString(_licenseId)));
-        require(_licenseIdExists(_licenseId), errorMessage);
+    modifier licenseExists(string memory _licenseNumber) {
+        string memory errorMessage = string(
+            abi.encodePacked("License not found: ", _licenseNumber)
+        );
+        require(_licenseIdExists(_licenseNumber), errorMessage);
         _;
     }
 
@@ -54,9 +102,14 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         authorizedApiCallers[msg.sender] = true; // Add to admin mapping
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 
-    function manageAuthorizedApiCallers(address admin, bool add) public onlyOwner {
+    function manageAuthorizedApiCallers(
+        address admin,
+        bool add
+    ) public onlyOwner {
         require(admin != address(0), "Invalid address");
         if (add) {
             authorizedApiCallers[admin] = true;
@@ -65,23 +118,22 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             require(admin != owner(), "Cannot remove owner");
             authorizedApiCallers[admin] = false;
             emit ApiCallerRevoked(admin);
-        }   
+        }
     }
 
     // 1. Submit License Application - To be used by citizens
-    function submitLicenseApplication(LicenseApplicationInput memory input) public virtual onlyAuthorizedCallers {
-        _incrementLicenseCounter();
-        uint256 newLicenseId = licenseIdCounter();
-
-        License storage newLicense = licenses[newLicenseId];
-        newLicense.licenseId = newLicenseId;
+    function submitLicenseApplication(
+        LicenseApplicationInput memory input
+    ) public virtual onlyAuthorizedCallers {
+        License storage newLicense = licenses[input.licenseNumber];
+        newLicense.licenseNumber = input.licenseNumber;
         newLicense.category = input.category;
         newLicense.level = input.level;
         newLicense.status = LicenseStatus.SUBMITTED;
         newLicense.registeringAuthority = input.registeringAuthority;
         newLicense.registeringOfficeName = input.registeringOfficeName;
         newLicense.applicantName = input.applicantName;
-        newLicense.aadhaarNumber = input.aadhaarNumber; // Aadhar is already encrypted 
+        newLicense.aadhaarNumber = input.aadhaarNumber; // Aadhar is already encrypted
         newLicense.applicantPermanentAddress = input.applicantPermanentAddress;
         newLicense.firmName = input.firmName;
         newLicense.firmType = input.firmType;
@@ -94,16 +146,22 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         newLicense.applicationDate = block.timestamp;
         newLicense.lastModifiedDate = block.timestamp;
         newLicense.isActive = false;
-       
-       if (
+
+        if (
             input.category == LicenseCategory.FERTILIZER ||
             input.category == LicenseCategory.PESTICIDE
         ) {
-            require(input.latitude != 0 && input.longitude != 0, "Geo required");
+            require(
+                input.latitude != 0 && input.longitude != 0,
+                "Geo required"
+            );
             newLicense.latitude = input.latitude;
             newLicense.longitude = input.longitude;
         } else {
-            require(input.latitude == 0 && input.longitude == 0, "Geo not allowed");
+            require(
+                input.latitude == 0 && input.longitude == 0,
+                "Geo not allowed"
+            );
             newLicense.latitude = 0;
             newLicense.longitude = 0;
         }
@@ -114,25 +172,43 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                 actorName: input.applicantName,
                 actorRole: userRole.CITIZEN,
                 remarks: "License Application Successfully Submitted",
-                dataHash: _toHexString(keccak256(abi.encodePacked(input.applicantName, input.firmName, block.timestamp)))
+                dataHash: _toHexString(
+                    keccak256(
+                        abi.encodePacked(
+                            input.applicantName,
+                            input.firmName,
+                            block.timestamp
+                        )
+                    )
+                )
             })
         );
 
-        newLicense.licenseNumber = _generateLicenseNumber(input.category, input.level, newLicenseId);
-
         // Update tracking
-        allLicenseIds.push(newLicenseId);
-        licensesByStatus[LicenseStatus.SUBMITTED].push(newLicenseId);
-        licensesByCategory[input.category].push(newLicenseId);
-        licensesByLevel[input.level].push(newLicenseId);
-        licenseNumberToId[newLicense.licenseNumber] = newLicenseId;
+        allLicenseNumbers.push(input.licenseNumber);
+        licensesByStatus[LicenseStatus.SUBMITTED].push(input.licenseNumber);
+        licensesByCategory[input.category].push(input.licenseNumber);
+        licensesByLevel[input.level].push(input.licenseNumber);
 
-        emit LicenseApplicationSubmitted(newLicenseId, newLicense.licenseNumber, input.category, newLicense.applicationDate, newLicense.latitude, newLicense.longitude);
+        emit LicenseApplicationSubmitted(
+            newLicense.licenseNumber,
+            input.category,
+            newLicense.applicationDate,
+            newLicense.latitude,
+            newLicense.longitude
+        );
     }
 
     // 2. Get License Basic Info - to be performed by citizens/officers
-    function getLicenseBasicInfo(uint256 _licenseId) public view licenseExists(_licenseId) returns (LicenseBasicInfo memory) {
-        License storage license = licenses[_licenseId];
+    function getLicenseBasicInfo(
+        string memory _licenseNumber
+    )
+        public
+        view
+        licenseExists(_licenseNumber)
+        returns (LicenseBasicInfo memory)
+    {
+        License storage license = licenses[_licenseNumber];
         int256 lat = 0;
         int256 lng = 0;
 
@@ -142,10 +218,9 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         ) {
             lat = license.latitude;
             lng = license.longitude;
-        } 
+        }
         return
             LicenseBasicInfo({
-                licenseId: license.licenseId,
                 licenseNumber: license.licenseNumber,
                 applicantName: license.applicantName,
                 category: license.category,
@@ -177,34 +252,47 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     }
 
     // 3. Get License Action History
-    function getLicenseActionHistory(uint256 _licenseId) public view licenseExists(_licenseId) returns (Action[] memory) {
-        return licenses[_licenseId].actionHistory;
+    function getLicenseActionHistory(
+        string memory _licenseNumber
+    ) public view licenseExists(_licenseNumber) returns (Action[] memory) {
+        return licenses[_licenseNumber].actionHistory;
     }
 
     // 4. Update Status for submitted License Applications - to be performed by officers
     function updateLicenseStatus(
-        uint256 _licenseId,
+        string memory _licenseNumber,
         LicenseStatus _newStatus,
         string memory _officerName,
         userRole _role,
         string memory _remarks,
         uint256 _renewalPeriodDays // Optional parameter for renewals and approvals
-    ) public onlyAuthorizedCallers licenseExists(_licenseId) {
-        License storage license = licenses[_licenseId];
+    ) public onlyAuthorizedCallers licenseExists(_licenseNumber) {
+        License storage license = licenses[_licenseNumber];
         LicenseStatus oldStatus = license.status;
 
-        require(oldStatus != _newStatus, "License status already set to requested status");
+        require(
+            oldStatus != _newStatus,
+            "License status already set to requested status"
+        );
 
         // Update common fields
         license.status = _newStatus;
         license.lastModifiedDate = block.timestamp;
 
         // Handle specific status updates
-        if (_newStatus == LicenseStatus.APPROVED || _newStatus == LicenseStatus.RENEWED) {
+        if (
+            _newStatus == LicenseStatus.APPROVED ||
+            _newStatus == LicenseStatus.RENEWED
+        ) {
             // For approvals (new or renewals)
-            require(_renewalPeriodDays > 0, "Renewal period must be greater than 0");
+            require(
+                _renewalPeriodDays > 0,
+                "Renewal period must be greater than 0"
+            );
             license.approvalDate = block.timestamp;
-            license.expiryDate = block.timestamp + (_renewalPeriodDays * 1 days);
+            license.expiryDate =
+                block.timestamp +
+                (_renewalPeriodDays * 1 days);
             license.isActive = true;
 
             // If this was a renewal (from EXPIRED status)
@@ -213,7 +301,10 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             }
         } else if (_newStatus == LicenseStatus.REVOKED) {
             // For revocations
-            require(oldStatus == LicenseStatus.APPROVED, "Only approved licenses can be revoked");
+            require(
+                oldStatus == LicenseStatus.APPROVED,
+                "Only approved licenses can be revoked"
+            );
             license.revokedDate = block.timestamp;
             license.isActive = false;
         } else if (_newStatus == LicenseStatus.EXPIRED) {
@@ -229,24 +320,49 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         }
 
         // Update tracking arrays
-        _removeFromStatusArray(oldStatus, _licenseId);
-        licensesByStatus[_newStatus].push(_licenseId);
+        _removeFromStatusArray(oldStatus, _licenseNumber);
+        licensesByStatus[_newStatus].push(_licenseNumber);
 
         // Record action with appropriate action type
-        LicenseStatus actionType = _getActionTypeForStatus(_newStatus, oldStatus);
-        string memory actionDescription = _buildActionDescription(oldStatus, _newStatus, _remarks);
+        LicenseStatus actionType = _getActionTypeForStatus(
+            _newStatus,
+            oldStatus
+        );
+        string memory actionDescription = _buildActionDescription(
+            oldStatus,
+            _newStatus,
+            _remarks
+        );
 
-        _recordAction(_licenseId, actionType, _role, actionDescription, _officerName);
+        _recordAction(
+            _licenseNumber,
+            actionType,
+            _role,
+            actionDescription,
+            _officerName
+        );
 
         // Emit appropriate events
-        _emitStatusEvent(_licenseId, oldStatus, _newStatus, _officerName, _role, _remarks);
+        _emitStatusEvent(
+            _licenseNumber,
+            oldStatus,
+            _newStatus,
+            _officerName,
+            _role,
+            _remarks
+        );
     }
 
     // 5. Get QR Code data for License
     function getLicenseQRData(
-        uint256 _licenseId
-    ) public view licenseExists(_licenseId) returns (string memory verificationHash, string memory licenseNumber) {
-        License storage license = licenses[_licenseId];
+        string memory _licenseNumber
+    )
+        public
+        view
+        licenseExists(_licenseNumber)
+        returns (string memory verificationHash, string memory licenseNumber)
+    {
+        License storage license = licenses[_licenseNumber];
         require(license.isActive, "License must be active to generate QR data");
 
         verificationHash = _generateVerificationHash(license);
@@ -254,8 +370,13 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     }
 
     // 6. Verify License Integrity and Validity
-    function verifyLicenseWithHash(string memory _licenseNumber, string memory _expectedHash) public {
-        LicenseVerificationData memory data = verifyLicenseByNumber(_licenseNumber);
+    function verifyLicenseWithHash(
+        string memory _licenseNumber,
+        string memory _expectedHash
+    ) public {
+        LicenseVerificationData memory data = _verifyLicenseByNumber(
+            _licenseNumber
+        );
 
         require(data.isValid, data.statusMessage);
 
@@ -264,14 +385,18 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             "WARNING: Potential tampering detected!"
         );
 
-        emit LicenseVerificationStatus(data.licenseId, _licenseNumber, data.statusMessage, block.timestamp);
+        emit LicenseVerificationStatus(
+            _licenseNumber,
+            data.statusMessage,
+            block.timestamp
+        );
     }
 
     // 7. Verify License by Number - Private function to be used internally
-    function verifyLicenseByNumber(string memory _licenseNumber) private view returns (LicenseVerificationData memory) {
-        uint256 licenseId = licenseNumberToId[_licenseNumber];
-
-        if (!_licenseIdExists(licenseId)) {
+    function _verifyLicenseByNumber(
+        string memory _licenseNumber
+    ) private view returns (LicenseVerificationData memory) {
+        if (!_licenseIdExists(_licenseNumber)) {
             return
                 LicenseVerificationData({
                     isValid: false,
@@ -279,7 +404,6 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                     isExpired: false,
                     isRevoked: false,
                     licenseNumber: _licenseNumber,
-                    licenseId: 0,
                     approvalDate: 0,
                     expiryDate: 0,
                     revokedDate: 0,
@@ -288,23 +412,21 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                 });
         }
 
-        License storage license = licenses[licenseId];
+        License storage license = licenses[_licenseNumber];
 
-        // Generate verification hash for tamper detection
         string memory verificationHash = _generateVerificationHash(license);
-
-        // Check expiry
-        bool isExpired = (license.expiryDate > 0 && block.timestamp > license.expiryDate);
-
-        // Check if revoked
+        bool isExpired = (license.expiryDate > 0 &&
+            block.timestamp > license.expiryDate);
         bool isRevoked = (license.status == LicenseStatus.REVOKED);
-
-        // Determine if license is valid and active
-        bool isValid = (license.status == LicenseStatus.APPROVED && !isExpired && !isRevoked);
+        bool isValid = (license.status == LicenseStatus.APPROVED &&
+            !isExpired &&
+            !isRevoked);
         bool isActive = license.isActive && isValid;
-
-        // Generate status message
-        string memory statusMessage = _generateStatusMessage(license.status, isExpired, isRevoked);
+        string memory statusMessage = _generateStatusMessage(
+            license.status,
+            isExpired,
+            isRevoked
+        );
 
         return
             LicenseVerificationData({
@@ -313,7 +435,6 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                 isExpired: isExpired,
                 isRevoked: isRevoked,
                 licenseNumber: license.licenseNumber,
-                licenseId: license.licenseId,
                 approvalDate: license.approvalDate,
                 expiryDate: license.expiryDate,
                 revokedDate: license.revokedDate,
@@ -323,11 +444,16 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     }
 
     // Helper functions
-    function _licenseIdExists(uint256 _licenseId) internal view returns (bool) {
-        return bytes(licenses[_licenseId].licenseNumber).length > 0;
+    function _licenseIdExists(
+        string memory _licenseNumber
+    ) internal view returns (bool) {
+        return bytes(licenses[_licenseNumber].licenseNumber).length > 0;
     }
 
-    function _compareStrings(string memory a, string memory b) internal pure returns (bool) {
+    function _compareStrings(
+        string memory a,
+        string memory b
+    ) internal pure returns (bool) {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 
@@ -342,13 +468,13 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
     }
 
     function _recordAction(
-        uint256 _licenseId,
+        string memory _licenseNumber,
         LicenseStatus _actionType,
         userRole _userRole,
         string memory _remarks,
         string memory _officerName
     ) internal {
-        License storage license = licenses[_licenseId];
+        License storage license = licenses[_licenseNumber];
 
         license.actionHistory.push(
             Action({
@@ -357,30 +483,23 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                 actorName: _officerName,
                 actorRole: _userRole,
                 remarks: _remarks,
-                dataHash: _toHexString(keccak256(abi.encodePacked(_remarks, block.timestamp)))
+                dataHash: _toHexString(
+                    keccak256(abi.encodePacked(_remarks, block.timestamp))
+                )
             })
         );
     }
 
-    function _generateLicenseNumber(LicenseCategory _category, LicenseLevel _level, uint256 _licenseId) internal pure returns (string memory) {
-        string memory categoryCode = _category == LicenseCategory.SEED
-            ? "SD"
-            : _category == LicenseCategory.FERTILIZER
-                ? "FT"
-                : "PS";
-        string memory levelCode = _level == LicenseLevel.STATE
-            ? "ST"
-            : _level == LicenseLevel.DIVISION
-                ? "DV"
-                : "DT"; 
-
-        return string(abi.encodePacked("RJ", categoryCode, levelCode, Strings.toString(_licenseId)));
-    }
-
-    function _removeFromStatusArray(LicenseStatus _status, uint256 _licenseId) internal {
-        uint256[] storage statusArray = licensesByStatus[_status];
+    function _removeFromStatusArray(
+        LicenseStatus _status,
+        string memory _licenseNumber
+    ) internal {
+        string[] storage statusArray = licensesByStatus[_status];
         for (uint256 i = 0; i < statusArray.length; i++) {
-            if (statusArray[i] == _licenseId) {
+            if (
+                keccak256(bytes(statusArray[i])) ==
+                keccak256(bytes(_licenseNumber))
+            ) {
                 statusArray[i] = statusArray[statusArray.length - 1];
                 statusArray.pop();
                 break;
@@ -388,8 +507,14 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         }
     }
 
-    function _getActionTypeForStatus(LicenseStatus _newStatus, LicenseStatus _oldStatus) private pure returns (LicenseStatus) {
-        if (_newStatus == LicenseStatus.APPROVED || _newStatus == LicenseStatus.RENEWED) {
+    function _getActionTypeForStatus(
+        LicenseStatus _newStatus,
+        LicenseStatus _oldStatus
+    ) private pure returns (LicenseStatus) {
+        if (
+            _newStatus == LicenseStatus.APPROVED ||
+            _newStatus == LicenseStatus.RENEWED
+        ) {
             if (_oldStatus == LicenseStatus.EXPIRED) {
                 return LicenseStatus.RENEWED;
             } else {
@@ -447,34 +572,72 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         return baseMessage;
     }
 
-
     function _emitStatusEvent(
-        uint256 _licenseId,
+        string memory _licenseNumber,
         LicenseStatus _oldStatus,
         LicenseStatus _newStatus,
         string memory _officerName,
         userRole _role,
         string memory _remarks
     ) private {
-        if (_newStatus == LicenseStatus.RENEWED && _oldStatus == LicenseStatus.EXPIRED) {
-            emit LicenseRenewed(_licenseId, _officerName, _role, licenses[_licenseId].renewalDate, licenses[_licenseId].expiryDate);
+        if (
+            _newStatus == LicenseStatus.RENEWED &&
+            _oldStatus == LicenseStatus.EXPIRED
+        ) {
+            emit LicenseRenewed(
+                _licenseNumber,
+                _officerName,
+                _role,
+                licenses[_licenseNumber].renewalDate,
+                licenses[_licenseNumber].expiryDate
+            );
         } else if (_newStatus == LicenseStatus.REVOKED) {
-            emit LicenseRevoked(_licenseId, _officerName, _role, _remarks, licenses[_licenseId].revokedDate);
+            emit LicenseRevoked(
+                _licenseNumber,
+                _officerName,
+                _role,
+                _remarks,
+                licenses[_licenseNumber].revokedDate
+            );
         } else if (_newStatus == LicenseStatus.APPROVED) {
-            emit LicenseApproved(_licenseId, _officerName, _role, licenses[_licenseId].approvalDate, licenses[_licenseId].expiryDate);
+            emit LicenseApproved(
+                _licenseNumber,
+                _officerName,
+                _role,
+                licenses[_licenseNumber].approvalDate,
+                licenses[_licenseNumber].expiryDate
+            );
         } else if (_newStatus == LicenseStatus.REJECTED) {
-            emit LicenseRejected(_licenseId, _officerName, _role, _remarks, licenses[_licenseId].rejectionDate);
+            emit LicenseRejected(
+                _licenseNumber,
+                _officerName,
+                _role,
+                _remarks,
+                licenses[_licenseNumber].rejectionDate
+            );
         } else {
-            emit StatusChanged(_licenseId, _oldStatus, _newStatus, _officerName, _role, block.timestamp);
+            emit StatusChanged(
+                _licenseNumber,
+                _oldStatus,
+                _newStatus,
+                _officerName,
+                _role,
+                block.timestamp
+            );
         }
     }
 
-    function _licenseStatusToString(LicenseStatus status) internal pure returns (string memory) {
+    function _licenseStatusToString(
+        LicenseStatus status
+    ) internal pure returns (string memory) {
         if (status == LicenseStatus.SUBMITTED) return "SUBMITTED";
         if (status == LicenseStatus.UNDER_REVIEW) return "UNDER_REVIEW";
-        if (status == LicenseStatus.DOCUMENTS_VERIFIED) return "DOCUMENTS_VERIFIED";
-        if (status == LicenseStatus.INSPECTION_SCHEDULED) return "INSPECTION_SCHEDULED";
-        if (status == LicenseStatus.INSPECTION_COMPLETED) return "INSPECTION_COMPLETED";
+        if (status == LicenseStatus.DOCUMENTS_VERIFIED)
+            return "DOCUMENTS_VERIFIED";
+        if (status == LicenseStatus.INSPECTION_SCHEDULED)
+            return "INSPECTION_SCHEDULED";
+        if (status == LicenseStatus.INSPECTION_COMPLETED)
+            return "INSPECTION_COMPLETED";
         if (status == LicenseStatus.APPROVED) return "APPROVED";
         if (status == LicenseStatus.REJECTED) return "REJECTED";
         if (status == LicenseStatus.REVOKED) return "REVOKED";
@@ -483,7 +646,9 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         return "UNKNOWN";
     }
 
-    function _generateVerificationHash(License storage license) internal view returns (string memory) {
+    function _generateVerificationHash(
+        License storage license
+    ) internal view returns (string memory) {
         return
             _toHexString(
                 keccak256(
@@ -498,7 +663,11 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             );
     }
 
-    function _generateStatusMessage(LicenseStatus status, bool isExpired, bool isRevoked) internal pure returns (string memory) {
+    function _generateStatusMessage(
+        LicenseStatus status,
+        bool isExpired,
+        bool isRevoked
+    ) internal pure returns (string memory) {
         if (isRevoked) {
             return "License has been revoked and is no longer valid";
         }
@@ -513,7 +682,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             return "License application is under review";
         } else if (status == LicenseStatus.REJECTED) {
             return "License application has been rejected";
-        } 
+        }
 
         return "License application is not active";
     }

@@ -9,11 +9,11 @@ import "./LicenseSystemV1.sol";
  */
 contract LicenseSystemV2 is LicenseSystemV1 {
     // New events for V2
-    event LicenseDetailsUpdated(uint256 indexed licenseId, uint256 lastModifiedDate);
+    event LicenseDetailsUpdated(string licenseNumber, uint256 lastModifiedDate);
 
     // New function in V2
     function updateLicenseDetails(
-        uint256 _licenseId,
+        string memory _licenseNumber,
         string memory _firmName,
         string memory _firmType,
         string memory _firmAddress,
@@ -24,8 +24,8 @@ contract LicenseSystemV2 is LicenseSystemV1 {
         string memory _cropVariety,
         userRole _role
     ) public virtual onlyAuthorizedCallers {
-        License storage license = licenses[_licenseId];
-        require(license.licenseId != 0, "License does not exist");
+        License storage license = licenses[_licenseNumber];
+        require(_licenseIdExists(_licenseNumber), "License does not exist");
         require(license.status == LicenseStatus.APPROVED, "Only approved licenses can be edited");
 
         // Only update if non-empty
@@ -48,11 +48,11 @@ contract LicenseSystemV2 is LicenseSystemV1 {
                 actorName: license.registeringAuthority,
                 actorRole: _role,
                 remarks: "License details updated",
-                dataHash: _toHexString(keccak256(abi.encodePacked(_licenseId, block.timestamp)))
+                dataHash: _toHexString(keccak256(abi.encodePacked(_licenseNumber, block.timestamp)))
             })
         );
 
-        emit LicenseDetailsUpdated(_licenseId, block.timestamp);
+        emit LicenseDetailsUpdated(_licenseNumber, block.timestamp);
     }
 
     // Override existing function with new logic
