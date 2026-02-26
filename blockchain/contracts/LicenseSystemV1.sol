@@ -444,18 +444,29 @@ contract LicenseSystemV1 is
     }
 
     // 8. Get total license counts
-    function getTotalLicenseCount() public view returns (uint256) {
-        return allLicenseNumbers.length;
+    function getDashboardCounts()
+        public
+        view
+        returns (
+            uint256 total,
+            uint256 submitted,
+            uint256 approved,
+            uint256 rejected,
+            uint256 revoked,
+            uint256 expired
+        )
+    {
+        return (
+            allLicenseNumbers.length,
+            licensesByStatus[LicenseStatus.SUBMITTED].length,
+            licensesByStatus[LicenseStatus.APPROVED].length,
+            licensesByStatus[LicenseStatus.REJECTED].length,
+            licensesByStatus[LicenseStatus.REVOKED].length,
+            licensesByStatus[LicenseStatus.EXPIRED].length
+        );
     }
 
-    // 9. Get license counts by status
-    function getLicenseCountByStatus(
-        LicenseStatus _status
-    ) public view returns (uint256) {
-        return licensesByStatus[_status].length;
-    }
-
-    // 10. Get license count by category and level
+    // 9. Get license count by category and level
     function getLicenseCountByCategory(
         LicenseCategory _category
     ) public view returns (uint256) {
