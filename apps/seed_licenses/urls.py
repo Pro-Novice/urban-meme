@@ -12,9 +12,9 @@ urlpatterns = [
     # ===============================================================
     path("license/create/", views.submit_license_application, name="submit-license-application"),
     path("license/count/", views.check_total_license_count, name="license-count"),
-    path("license/info/<int:license_id>/", views.get_license_basic_info, name="license-basic-info"),
-    path("license/history/<int:license_id>/", views.get_license_action_history, name="license-action-history"),
-    path("license/qr/<int:license_id>/", views.get_license_qr_data, name="license-qr-data"),
+    path("license/info/<str:license_number>/", views.get_license_basic_info, name="license-basic-info"),
+    path("license/history/<str:license_number>/", views.get_license_action_history, name="license-action-history"),
+    path("license/qr/<str:license_number>/", views.get_license_qr_data, name="license-qr-data"),
 
     # License actions
     path("license/update-status/", views.update_license_status_view, name="update-license-status"),

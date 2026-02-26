@@ -40,15 +40,15 @@ class EventParser:
         }
 
     # ---------------- Decode and Persist ---------------- #
-    async def parse_and_store(self, receipt: Any) -> Tuple[int, List[Dict]]:
+    async def parse_and_store(self, receipt: Any) -> Tuple[str, List[Dict]]:
         """
         Decode all matching events from a transaction receipt and store them in DB.
-        Returns: (license_id, decoded_events)
+        Returns: (license_number, decoded_events)
         """
         from types import SimpleNamespace
 
-        license_id = None
-        decoded_events = []
+        license_number  = None
+        decoded_events  = []
 
         try:
             # Normalize receipt
@@ -63,7 +63,6 @@ class EventParser:
             logger.info(f"[EVENT PARSER] Starting event decoding for tx={tx_hash}")
             logger.debug(f"[EVENT DEBUG] Raw receipt keys: {list(receipt.keys())}")
             logs = receipt.get("logs", [])
-            logger.debug(f"[EVENT DEBUG] Logs count: {len(logs)}")
 
             if not logs:
                 logger.warning(f"[EVENT PARSER] No logs found in receipt for tx={tx_hash}")
@@ -147,14 +146,15 @@ class EventParser:
                                 if field in event_args:
                                     event_args[field] = mapping.get(event_args[field], event_args[field])
 
-                            if "licenseId" in event_args:
-                                license_id = event_args["licenseId"]
+                            if "licenseNumber" in event_args:
+                                license_id = event_args["licenseNumber"]
 
                             decoded_events.append({"event": event_name, **event_args})
                             await self._persist_event_async(receipt, event_name, event_args)
 
-                            logger.info(f"[EVENT DECODED] ✅ {event_name} | license_id={license_id} | args={event_args}")
+                            logger.info(f"[EVENT DECODED] ✅ {event_name} | license_number={license_number} | args={event_args}")
                             break
+
                         except Exception as e:
                             logger.debug(f"[EVENT FAIL] Failed to decode {abi_event.get('name')} event: {e}")
                             continue
@@ -165,10 +165,11 @@ class EventParser:
         except Exception as e:
             logger.warning(f"[EVENT PARSER ERROR] {e}")
 
-        logger.info(f"[EVENT PARSER COMPLETE] Parsed {len(decoded_events)} events for license_id={license_id}")
-        return license_id, decoded_events
-
-
+        logger.info(
+            "[EVENT PARSER COMPLETE] Parsed %d events for licenseNumber=%s",
+            len(decoded_events), license_number,
+        )
+        return license_number, decoded_events
 
     # ---------------- Internal Helpers ---------------- #
     def _matches_event(self, log, abi_event: Dict) -> bool:
@@ -232,24 +233,27 @@ class EventParser:
             if isinstance(receipt, dict):
                 block_number = receipt.get("blockNumber", block_number)
 
-            # ---------------- Extract license_id ---------------- #
-            license_id = event_args.get("licenseId") or 0
+            # --- Extract licenseNumber (sole license identifier) ---
+            license_number = event_args.get("licenseNumber") or ""
 
             logger.info(
-                f"[DB] Async saving event '{event_name}' "
-                f"(license_id={license_id}, tx={tx_hash}, block={block_number})"
+                "[DB] Async saving event '%s' "
+                "(licenseNumber=%s, tx=%s, block=%s)",
+                event_name, license_number, tx_hash, block_number,
             )
 
-            # ---------------- Async ORM persistence ---------------- #
             await sync_to_async(EventLog.objects.create)(
-                event_name=event_name,
-                license_id=license_id,
-                block_number=block_number,
-                transaction_hash=tx_hash,
-                event_data=event_args,
+                event_name       = event_name,
+                license_number   = license_number,   
+                block_number     = block_number,
+                transaction_hash = tx_hash,
+                event_data       = event_args,
             )
 
-            logger.info(f"[DB] ✅ Persisted event '{event_name}' (license_id={license_id})")
+            logger.info(
+                "[DB] ✅ Persisted event '%s' (licenseNumber=%s)",
+                event_name, license_number,
+            )
 
         except Exception as e:
             logger.error(f"[DB ERROR] ❌ Failed to persist {event_name}: {e}", exc_info=True)

@@ -15,15 +15,15 @@ class Migration(migrations.Migration):
             name='EventLog',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('transaction_hash', models.CharField(db_index=True, max_length=66, unique=True)),
+                ('transaction_hash', models.CharField(db_index=True, max_length=66)),
                 ('block_number', models.IntegerField(db_index=True)),
                 ('event_name', models.CharField(db_index=True, max_length=255)),
                 ('event_data', models.JSONField()),
                 ('timestamp', models.DateTimeField(auto_now_add=True)),
-                ('license_id', models.IntegerField(db_index=True)),
+                ('license_number', models.CharField(db_index=True, max_length=100)),
             ],
             options={
-                'ordering': ['-block_number', '-license_id'],
+                'ordering': ['-timestamp', '-block_number', 'license_number'],
             },
         ),
     ]

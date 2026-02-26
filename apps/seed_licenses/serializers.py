@@ -17,6 +17,8 @@ from .enums import (
 # 1️⃣ Submit License Application Serializer
 # ============================================================
 class SubmitLicenseApplicationSerializer(serializers.Serializer):
+   
+    license_number = serializers.CharField()
     license_category = serializers.CharField()
     license_level = serializers.CharField()
     registering_authority = serializers.CharField()
@@ -35,22 +37,30 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
     latitude = serializers.FloatField(required=False)
     longitude = serializers.FloatField(required=False)
 
+    def validate_license_number(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("License number cannot be empty.")
+        return value.strip()
 
     def validate_license_category(self, value):
         enum_value = LICENSE_CATEGORY_MAP.get(value.upper())
         if enum_value is None:
-            raise serializers.ValidationError("Invalid license category.")
+            raise serializers.ValidationError(
+                f"Invalid license category. Must be one of: {', '.join(LICENSE_CATEGORY_MAP.keys())}."
+            )
         return enum_value
 
     def validate_license_level(self, value):
         enum_value = LEVEL_MAP.get(value.upper())
         if enum_value is None:
-            raise serializers.ValidationError("Invalid license level.")
+            raise serializers.ValidationError(
+                f"Invalid license level. Must be one of: {', '.join(LEVEL_MAP.keys())}."
+            )
         return enum_value
-    
+
     def to_internal_value(self, data):
         ret = super().to_internal_value(data)
-        # Scale latitude/longitude to integers
+        # Scale lat/lng to integer micro-degrees for on-chain storage
         for field in ["latitude", "longitude"]:
             if field in ret and ret[field] is not None:
                 ret[field] = int(ret[field] * 1_000_000)
@@ -66,13 +76,12 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
         if category in {LICENSE_CATEGORY_MAP["FERTILIZER"], LICENSE_CATEGORY_MAP["PESTICIDE"]}:
             if attrs.get("latitude") is None or attrs.get("longitude") is None:
                 raise serializers.ValidationError(
-                    "Latitude and longitude are required for this category"
+                    "latitude and longitude are required for FERTILIZER and PESTICIDE licenses."
                 )
         else:
             # SEED
             attrs.pop("latitude", None)
             attrs.pop("longitude", None)
-
         return attrs
 
     def validate_aadhaar_number(self, value):
@@ -112,16 +121,22 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
 # 2️⃣ Update License Status Serializer
 # ============================================================
 class UpdateLicenseStatusSerializer(serializers.Serializer):
-    license_id = serializers.IntegerField(min_value=1)
+   
+    license_number = serializers.CharField()
     status = serializers.CharField()
     remarks = serializers.CharField()
     officer_name = serializers.CharField()
     role = serializers.CharField()
     renewal_period_days = serializers.IntegerField(min_value=1, required=False)
 
+    def validate_license_number(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("License number cannot be empty.")
+        return value.strip()
+
     def validate_status(self, value):
         try:
-            return LicenseStatusEnum.from_string(value)  # returns int
+            return LicenseStatusEnum.from_string(value)
         except ValueError as e:
             raise serializers.ValidationError(str(e))
 
@@ -173,26 +188,20 @@ class VerifyLicenseSerializer(serializers.Serializer):
     def validate_license_number(self, value):
         if not value.strip():
             raise serializers.ValidationError("License number cannot be empty.")
-        return value
+        return value.strip()
 
     def validate_expected_hash(self, value):
         if not value.strip():
             raise serializers.ValidationError("Expected hash cannot be empty.")
-        return value
-
-    def validate(self, data):
-        if not data.get("license_number") or not data.get("expected_hash"):
-            raise serializers.ValidationError(
-                "Both license number and expected hash are required."
-            )
-        return data
+        return value.strip()
 
 
 # ============================================================
 # 4️⃣ Update License Details Serializer
 # ============================================================
 class UpdateLicenseDetailsSerializer(serializers.Serializer):
-    license_id = serializers.IntegerField(min_value=1)
+
+    license_number = serializers.CharField()
     firm_name = serializers.CharField(required=False, allow_blank=True)
     firm_type = serializers.CharField(required=False, allow_blank=True)
     firm_address = serializers.CharField(required=False, allow_blank=True)
@@ -203,24 +212,18 @@ class UpdateLicenseDetailsSerializer(serializers.Serializer):
     crop_variety = serializers.CharField(required=False, allow_blank=True)
     role = serializers.CharField()
 
-    def validate_license_id(self, value):
-        if value <= 0:
-            raise serializers.ValidationError(
-                "License ID must be a positive integer."
-            )
-        return value
+    def validate_license_number(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("License number cannot be empty.")
+        return value.strip()
 
     def validate_role(self, value):
         try:
-            return OfficerRole.from_string(value)  # returns int
+            return OfficerRole.from_string(value)
         except ValueError as e:
             raise serializers.ValidationError(str(e))
 
     def validate(self, data):
-        if not data.get("license_id"):
-            raise serializers.ValidationError("License ID is required.")
-
-        # Ensure at least one updatable field is provided
         update_fields = [
             "firm_name",
             "firm_type",

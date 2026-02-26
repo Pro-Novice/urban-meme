@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AlterModelOptions(
             name='eventlog',
-            options={'ordering': ['-timestamp', '-block_number', '-license_id']},
+            options={'ordering': ['-timestamp', '-block_number', 'license_number']},
         ),
         migrations.AlterField(
             model_name='eventlog',

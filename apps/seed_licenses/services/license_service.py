@@ -11,12 +11,13 @@ class ILicenseService:
     """Abstract service interface (for Dependency Inversion)."""
 
     def submit_application(self, payload: Dict[str, Any]) -> Dict[str, Any]: ...
-    def get_basic_info(self, license_id: int) -> Dict[str, Any]: ...
+    def get_total_count(self) -> int: ...
+    def get_basic_info(self, license_number: str) -> Dict[str, Any]: ...
     def update_status(self, payload: Dict[str, Any]) -> Dict[str, Any]: ...
-    def get_action_history(self, license_id: int) -> List[Dict[str, Any]]: ...
+    def get_action_history(self, license_number: str) -> List[Dict[str, Any]]: ...
     def verify_document(self, payload: Dict[str, Any]) -> Dict[str, Any]: ...
     def update_details(self, payload: Dict[str, Any]) -> Dict[str, Any]: ...
-    def get_qr_data(self, license_id: int) -> Dict[str, Any]: ...
+    def get_qr_data(self, license_number: str) -> Dict[str, Any]: ...
     def add_officer(self, payload: Dict[str, Any]) -> Dict[str, Any]: ...
 
 class LicenseService(ILicenseService):
@@ -27,7 +28,6 @@ class LicenseService(ILicenseService):
 
     # ---------- SUBMIT APPLICATION ---------- #
     def submit_application(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        category = data["license_category"]
 
         lat = data.get("latitude", 0)
         lng = data.get("longitude", 0)
@@ -35,6 +35,7 @@ class LicenseService(ILicenseService):
         struct_input = {
             "category": data["license_category"],
             "level": data["license_level"],
+            "licenseNumber": data["license_number"],
             "registeringAuthority": data["registering_authority"],
             "registeringOfficeName": data["registering_office_name"],
             "applicantName": data["applicant_name"],
@@ -53,15 +54,33 @@ class LicenseService(ILicenseService):
         }
         return self.tx.write("submitLicenseApplication", [struct_input])
 
-    # ---------- GET BASIC INFO ---------- #
-    def get_basic_info(self, license_id: int) -> Dict[str, Any]:
-        return self.tx.read("getLicenseBasicInfo", [license_id])
+    # ------------------------------------------------------------------ 
+    # GET TOTAL COUNT                                                       
+    # ------------------------------------------------------------------ 
+    def get_total_count(self) -> int:
+        """
+        Returns total number of licenses ever submitted.
+        """
+        result = self.tx.read("getDashboardCounts", [])
+        # web3.py returns a named AttributeDict or plain tuple depending on ABI
+        if isinstance(result, (list, tuple)):
+            return int(result[0])
+        return int(result.get("total", 0))
+
+    # ------------------------------------------------------------------ 
+    # GET BASIC INFO                                                        
+    # ------------------------------------------------------------------ 
+    def get_basic_info(self, license_number: str) -> Dict[str, Any]:
+        
+        return self.tx.read("getLicenseBasicInfo", [license_number])
 
     # ---------- UPDATE STATUS ---------- #
     def update_status(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        license_id = data["license_id"]
+        
+        license_number = data["license_number"]
 
-        current = self.tx.read("getLicenseBasicInfo", [license_id])
+        # Read current state for transition validation
+        current = self.tx.read("getLicenseBasicInfo", [license_number])
         current_enum = LicenseStatusEnum.from_string(current["status"])
         new_status = data["status"]
 
@@ -69,11 +88,11 @@ class LicenseService(ILicenseService):
         if new_status == current_enum:
             logger.info(
                 "No-op: License %s already in status %s",
-                license_id,
+                license_number,
                 LICENSE_STATUS_REVERSE[current_enum],
             )
             return {
-                "license_id": license_id,
+                "license_number": license_number,
                 "status": LICENSE_STATUS_REVERSE[current_enum],
                 "changed": False,
                 "message": f"License already in status {LICENSE_STATUS_REVERSE[current_enum]}",
@@ -86,13 +105,13 @@ class LicenseService(ILicenseService):
                 f"Invalid transition {LICENSE_STATUS_REVERSE[current_enum]} → "
                 f"{LICENSE_STATUS_REVERSE[new_status]}"
             )
-            logger.warning("License %s: %s", license_id, err_msg)
+            logger.warning("License %s: %s", license_number, err_msg)
             raise ValueError(err_msg)
 
         # 3️ Apply status update via blockchain transaction
         logger.info(
-            "Updating license %s: %s → %s by %s (%s)",
-            license_id,
+            "License %s: %s → %s  by %s (%s)",
+            license_number,
             LICENSE_STATUS_REVERSE[current_enum],
             LICENSE_STATUS_REVERSE[new_status],
             data["officer_name"],
@@ -102,7 +121,7 @@ class LicenseService(ILicenseService):
         return self.tx.write(
             "updateLicenseStatus",
             [
-                license_id,
+                license_number,
                 new_status,
                 data["officer_name"],
                 data["role"],
@@ -112,17 +131,17 @@ class LicenseService(ILicenseService):
         )
 
     # ---------- HISTORY (ENRICHED) ---------- #
-    def get_action_history(self, license_id: int) -> List[Dict[str, Any]]:
+    def get_action_history(self, license_number: str) -> List[Dict[str, Any]]:
         """Fetch license action history and enrich with transaction hashes from EventLog."""
         try:
             # Read blockchain-stored action history
-            actions = self.tx.read("getLicenseActionHistory", [license_id])
+            actions = self.tx.read("getLicenseActionHistory", [license_number])
             if not actions:
                 return []
 
             # Query local EventLog for blockchain transaction hashes
             logs = EventLog.objects.filter(
-                license_id=license_id
+                license_number=license_number
             ).values("transaction_hash", "event_name", "event_data")
 
             enriched = []
@@ -154,8 +173,8 @@ class LicenseService(ILicenseService):
             return enriched
 
         except Exception as e:
-            logger.exception("Failed to enrich action history for license %s", license_id)
-            return self.tx.read("getLicenseActionHistory", [license_id])
+            logger.exception("Failed to enrich action history for license %s", license_number)
+            return self.tx.read("getLicenseActionHistory", [license_number])
 
     # ---------- VERIFY DOCUMENT ---------- #
     def verify_document(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -169,7 +188,7 @@ class LicenseService(ILicenseService):
         return self.tx.write(
             "updateLicenseDetails",
             [
-                data["license_id"],
+                data["license_number"],
                 data.get("firm_name", ""),
                 data.get("firm_type", ""),
                 data.get("firm_address", ""),
@@ -183,9 +202,9 @@ class LicenseService(ILicenseService):
         )
 
     # ---------- QR DATA ---------- #
-    def get_qr_data(self, license_id: int) -> Dict[str, Any]:
+    def get_qr_data(self, license_number: str) -> Dict[str, Any]:
         """Read-only blockchain call to fetch QR data for a given license."""
-        return self.tx.read("getLicenseQRData", [license_id])
+        return self.tx.read("getLicenseQRData", [license_number])
     
     # ---------- ADD OFFICER (ADMIN ONLY) ---------- #
     def add_officer(self, data: Dict[str, Any]) -> Dict[str, Any]:

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 GENERIC_TRANSFORM_MAP = {
     "getLicenseBasicInfo": {
         "fields": [
-            "licenseId", "licenseNumber", "applicantName", "category", "level", "status",
+            "licenseNumber", "applicantName", "category", "level", "status",
             "firmName", "firmType", "firmAddress", "salePointAddress", "saleStorageAddress",
             "productionCompany", "cropName", "cropVariety", "registeringOfficeName",
             "registeringAuthority", "applicationDate", "approvalDate", "rejectionDate",
@@ -96,7 +96,7 @@ def generic_transform(method_name: str, raw_data: Any) -> Any:
             if isinstance(value, int) and value < len(enum_list):
                 transformed[field] = enum_list[value]
             else:
-                transformed[field] = "UNKNOWN"
+                transformed[field] = str(value) if value is not None else "UNKNOWN"
             if field == "status":
                 status_str = transformed[field]
 

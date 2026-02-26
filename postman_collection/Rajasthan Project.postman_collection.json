@@ -1,10 +1,10 @@
 {
   "info": {
-    "_postman_id": "3fc5f273-7a3e-4900-aac9-ab2c4791d3a1",
+    "_postman_id": "8484bc47-94ef-419a-85fc-67062ecb9063",
     "name": "Rajasthan Project",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "43756014",
-    "_collection_link": "https://go.postman.co/collection/43756014-3fc5f273-7a3e-4900-aac9-ab2c4791d3a1?source=collection_link"
+    "_collection_link": "https://go.postman.co/collection/43756014-8484bc47-94ef-419a-85fc-67062ecb9063?source=collection_link"
   },
   "variable": [
     {
@@ -47,7 +47,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"licenseCategory\": \"FERTILIZER\",\n  \"licenseLevel\": \"STATE\",\n  \"registeringAuthority\": \"Department of Agriculture\",\n  \"registeringOfficeName\": \"District Agri Office, Jaipur\",\n  \"applicantName\": \"Ravi Kumar\",\n  \"aadhaarNumber\": \"IRk4zRfT9iJvf5CRYUQOZwor9ro553k8mWwlfqwLPheTWoz0oLEPlr/+4vPOPOa0nOROMII9ZhLV9r2DR1AnPqsVXUj2g1JiAZWvIE61Zu/qU/RU/B+yxUnbmztYC8kmK0eunlvFyNtmBidbgbatQWnn4JufcuewGFwCIUblTCQ9PpPouh8KK9602n4rPi36MGcGQFVdm8uoxig9/RRLh34UFb8yBamhuY5I/5UMDQUgli5Vu9Fc8AXuu+3sZ3odR8DIeMykmtTyrysTYAu7I8jHHThGcHNiysrESgaPEc5azFdFHdULoLiWA4RRMrgKDFWJV1MeTbI1UZsHtCc/PA==\",\n  \"applicantPermanentAddress\": \"H.No 45, Green Colony, Jaipur\",\n  \"firmName\": \"Ravi Agro Traders\",\n  \"firmType\": \"Partnership\",\n  \"firmAddress\": \"Plot No 22, Mandi Road, Jaipur\",\n  \"salePointAddress\": \"Shop No 5, Krishi Market, Jaipur\",\n  \"saleStorageAddress\": \"Warehouse No 3, Outer Ring Road, Jaipur\",\n  \"cropName\": \"Wheat\",\n  \"cropVariety\": \"HD2967\",\n  \"isSeedSelfProduced\": false, \n  \"productionCompany\": \"Agro Seeds Pvt Ltd\",  // required only when isSeedSelfProduced is true else its by default firmName\n  \"latitude\": 26.9124,\n  \"longitude\": 75.7873   \n}\n",
+                  "raw": "{\n  \"licenseCategory\": \"FERTILIZER\",\n  \"licenseLevel\": \"STATE\",\n  \"licenseNumber\": \"RJFTST-TEST-003\",\n  \"registeringAuthority\": \"Department of Agriculture\",\n  \"registeringOfficeName\": \"District Agri Office, Jaipur\",\n  \"applicantName\": \"Ravi Kumar\",\n  \"aadhaarNumber\": \"IRk4zRfT9iJvf5CRYUQOZwor9ro553k8mWwlfqwLPheTWoz0oLEPlr/+4vPOPOa0nOROMII9ZhLV9r2DR1AnPqsVXUj2g1JiAZWvIE61Zu/qU/RU/B+yxUnbmztYC8kmK0eunlvFyNtmBidbgbatQWnn4JufcuewGFwCIUblTCQ9PpPouh8KK9602n4rPi36MGcGQFVdm8uoxig9/RRLh34UFb8yBamhuY5I/5UMDQUgli5Vu9Fc8AXuu+3sZ3odR8DIeMykmtTyrysTYAu7I8jHHThGcHNiysrESgaPEc5azFdFHdULoLiWA4RRMrgKDFWJV1MeTbI1UZsHtCc/PA==\",\n  \"applicantPermanentAddress\": \"H.No 45, Green Colony, Jaipur\",\n  \"firmName\": \"Ravi Agro Traders\",\n  \"firmType\": \"Partnership\",\n  \"firmAddress\": \"Plot No 22, Mandi Road, Jaipur\",\n  \"salePointAddress\": \"Shop No 5, Krishi Market, Jaipur\",\n  \"saleStorageAddress\": \"Warehouse No 3, Outer Ring Road, Jaipur\",\n  \"cropName\": \"Wheat\",\n  \"cropVariety\": \"HD2967\",\n  \"isSeedSelfProduced\": false, \n  \"productionCompany\": \"Agro Seeds Pvt Ltd\",  // required only when isSeedSelfProduced is true else its by default firmName\n  \"latitude\": 26.9124,\n  \"longitude\": 75.7873   \n}\n",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -119,14 +119,14 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{base_url}}/license/info/1/",
+                  "raw": "{{base_url}}/license/info/RJFTST-TEST-003/",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
                     "license",
                     "info",
-                    "1",
+                    "RJFTST-TEST-003",
                     ""
                   ]
                 }
@@ -140,7 +140,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n \"licenseId\":2,\n \"status\":\"UNDER_REVIEW\", // SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED , INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWED\n \"officerName\": \"Shrawan\",\n \"role\": \"AGRICULTURE_OFFICER\",\n \"renewalPeriodDays\": 34, // Only required when status is APPROVED or RENEWED\n \"remarks\":\"License is UNDER_REVIEW\"\n}",
+                  "raw": "{\n \"licenseNumber\":\"RJFTST-TEST-003\",\n \"status\":\"APPROVED\", // SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED , INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWED\n \"officerName\": \"Shrawan\",\n \"role\": \"AGRICULTURE_OFFICER\",\n \"renewalPeriodDays\": 34, // Only required when status is APPROVED or RENEWED\n \"remarks\":\"License is APPROVED\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -167,14 +167,14 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{base_url}}/license/history/1/",
+                  "raw": "{{base_url}}/license/history/RJFTST-TEST-003/",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
                     "license",
                     "history",
-                    "1",
+                    "RJFTST-TEST-003",
                     ""
                   ]
                 }
@@ -187,14 +187,14 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{base_url}}/license/qr/<str:license_id>/",
+                  "raw": "{{base_url}}/license/qr/RJFTST-TEST-003/",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
                     "license",
                     "qr",
-                    "<str:license_id>",
+                    "RJFTST-TEST-003",
                     ""
                   ]
                 }
@@ -208,7 +208,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"licenseNumber\": \"RJSDST1\",\n    \"expectedHash\": \"212d02520d33be03153a2c34cb4d50b63f570e6d6881589ebbec2ec6b3da51b0\"\n}",
+                  "raw": "{\n    \"licenseNumber\": \"RJFTST-TEST-003\",\n    \"expectedHash\": \"212d02520d33be03153a2c34cb4d50b63f570e6d6881589ebbec2ec6b3da51b0\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -236,7 +236,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    // license_id and role are required fields, rest ae optional but atleast there should be 1 field to update\n    \"license_id\": 1,\n    \"firm_name\": \"New Firm Name\",\n    \"firm_type\": \"New Firm Type\",\n    \"firm_address\": \"New Firm Address\",\n    \"sale_point_address\": \"New Sale Point Address\",\n    // \"sale_storage_address\": \"New Sale Storage Address\",\n    // \"production_company\": \"New Production Company\",\n    // \"crop_name\": \"New Crop Name\",\n    \"crop_variety\": \"New Crop Variety\",\n    \"role\": \"JOINT_DIRECTOR\"\n}",
+                  "raw": "{\n    // license_id and role are required fields, rest ae optional but atleast there should be 1 field to update\n    \"license_number\": \"RJFTST-TEST-003\",\n    \"firm_name\": \"New Firm Name\",\n    \"firm_type\": \"New Firm Type\",\n    \"firm_address\": \"New Firm Address\",\n    \"sale_point_address\": \"New Sale Point Address\",\n    // \"sale_storage_address\": \"New Sale Storage Address\",\n    // \"production_company\": \"New Production Company\",\n    // \"crop_name\": \"New Crop Name\",\n    \"crop_variety\": \"New Crop Variety\",\n    \"role\": \"JOINT_DIRECTOR\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -384,7 +384,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"licenseCategory\": \"PESTICIDE\",\n  \"licenseLevel\": \"STATE\",\n  \"registeringAuthority\": \"Department of Agriculture\",\n  \"registeringOfficeName\": \"District Agri Office, Jaipur\",\n  \"applicantName\": \"Ravi Kumar\",\n  \"aadhaarNumber\": \"IRk4zRfT9iJvf5CRYUQOZwor9ro553k8mWwlfqwLPheTWoz0oLEPlr/+4vPOPOa0nOROMII9ZhLV9r2DR1AnPqsVXUj2g1JiAZWvIE61Zu/qU/RU/B+yxUnbmztYC8kmK0eunlvFyNtmBidbgbatQWnn4JufcuewGFwCIUblTCQ9PpPouh8KK9602n4rPi36MGcGQFVdm8uoxig9/RRLh34UFb8yBamhuY5I/5UMDQUgli5Vu9Fc8AXuu+3sZ3odR8DIeMykmtTyrysTYAu7I8jHHThGcHNiysrESgaPEc5azFdFHdULoLiWA4RRMrgKDFWJV1MeTbI1UZsHtCc/PA==\",\n  \"applicantPermanentAddress\": \"H.No 45, Green Colony, Jaipur\",\n  \"firmName\": \"Ravi Agro Traders\",\n  \"firmType\": \"Partnership\",\n  \"firmAddress\": \"Plot No 22, Mandi Road, Jaipur\",\n  \"salePointAddress\": \"Shop No 5, Krishi Market, Jaipur\",\n  \"saleStorageAddress\": \"Warehouse No 3, Outer Ring Road, Jaipur\",\n  \"cropName\": \"Wheat\",\n  \"cropVariety\": \"HD2967\",\n  \"isSeedSelfProduced\": false, \n  \"productionCompany\": \"Agro Seeds Pvt Ltd\",  // required only when isSeedSelfProduced is true else its by default firmName\n  \"latitude\": 26.9124,\n  \"longitude\": 75.7873\n}\n",
+                  "raw": "{\n  \"licenseCategory\": \"PESTICIDE\",\n  \"licenseLevel\": \"STATE\",\n  \"licenseNumber\": \"RJPSST-TEST-002\",\n  \"registeringAuthority\": \"Department of Agriculture\",\n  \"registeringOfficeName\": \"District Agri Office, Jaipur\",\n  \"applicantName\": \"Ravi Kumar\",\n  \"aadhaarNumber\": \"IRk4zRfT9iJvf5CRYUQOZwor9ro553k8mWwlfqwLPheTWoz0oLEPlr/+4vPOPOa0nOROMII9ZhLV9r2DR1AnPqsVXUj2g1JiAZWvIE61Zu/qU/RU/B+yxUnbmztYC8kmK0eunlvFyNtmBidbgbatQWnn4JufcuewGFwCIUblTCQ9PpPouh8KK9602n4rPi36MGcGQFVdm8uoxig9/RRLh34UFb8yBamhuY5I/5UMDQUgli5Vu9Fc8AXuu+3sZ3odR8DIeMykmtTyrysTYAu7I8jHHThGcHNiysrESgaPEc5azFdFHdULoLiWA4RRMrgKDFWJV1MeTbI1UZsHtCc/PA==\",\n  \"applicantPermanentAddress\": \"H.No 45, Green Colony, Jaipur\",\n  \"firmName\": \"Ravi Agro Traders\",\n  \"firmType\": \"Partnership\",\n  \"firmAddress\": \"Plot No 22, Mandi Road, Jaipur\",\n  \"salePointAddress\": \"Shop No 5, Krishi Market, Jaipur\",\n  \"saleStorageAddress\": \"Warehouse No 3, Outer Ring Road, Jaipur\",\n  \"cropName\": \"Wheat\",\n  \"cropVariety\": \"HD2967\",\n  \"isSeedSelfProduced\": false, \n  \"productionCompany\": \"Agro Seeds Pvt Ltd\",  // required only when isSeedSelfProduced is true else its by default firmName\n  \"latitude\": 26.9124,\n  \"longitude\": 75.7873\n}\n",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -437,14 +437,14 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{base_url}}/license/info/3/",
+                  "raw": "{{base_url}}/license/info/RJPSST-TEST-002/",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
                     "license",
                     "info",
-                    "3",
+                    "RJPSST-TEST-002",
                     ""
                   ]
                 }
@@ -477,7 +477,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n \"licenseId\":1,\n \"status\":\"APPROVED\", // SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED , INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWED\n \"officerName\": \"Shrawan\",\n \"role\": \"AGRICULTURE_OFFICER\",\n \"renewalPeriodDays\": 34, // Only required when status is APPROVED or RENEWED\n \"remarks\":\"License is UNDER_REVIEW\"\n}",
+                  "raw": "{\n \"licenseNumber\":\"RJPSST-TEST-002\",\n \"status\":\"APPROVED\", // SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED , INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWED\n \"officerName\": \"Shrawan\",\n \"role\": \"AGRICULTURE_OFFICER\",\n \"renewalPeriodDays\": 34, // Only required when status is APPROVED or RENEWED\n \"remarks\":\"License is UNDER_REVIEW\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -504,14 +504,14 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{base_url}}/license/history/1/",
+                  "raw": "{{base_url}}/license/history/RJPSST-TEST-004/",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
                     "license",
                     "history",
-                    "1",
+                    "RJPSST-TEST-004",
                     ""
                   ]
                 }
@@ -524,14 +524,14 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{base_url}}/license/qr/<str:license_id>/",
+                  "raw": "{{base_url}}/license/qr/RJPSST-TEST-002/",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
                     "license",
                     "qr",
-                    "<str:license_id>",
+                    "RJPSST-TEST-002",
                     ""
                   ]
                 }
@@ -545,7 +545,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"licenseNumber\": \"RJSDST1\",\n    \"expectedHash\": \"212d02520d33be03153a2c34cb4d50b63f570e6d6881589ebbec2ec6b3da51b0\"\n}",
+                  "raw": "{\n    \"licenseNumber\": \"RJPSST-TEST-002\",\n    \"expectedHash\": \"212d02520d33be03153a2c34cb4d50b63f570e6d6881589ebbec2ec6b3da51b0\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -573,7 +573,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    // license_id and role are required fields, rest ae optional but atleast there should be 1 field to update\n    \"license_id\": 1,\n    \"firm_name\": \"New Firm Name\",\n    \"firm_type\": \"New Firm Type\",\n    \"firm_address\": \"New Firm Address\",\n    \"sale_point_address\": \"New Sale Point Address\",\n    // \"sale_storage_address\": \"New Sale Storage Address\",\n    // \"production_company\": \"New Production Company\",\n    // \"crop_name\": \"New Crop Name\",\n    \"crop_variety\": \"New Crop Variety\",\n    \"role\": \"JOINT_DIRECTOR\"\n}",
+                  "raw": "{\n    // license_id and role are required fields, rest ae optional but atleast there should be 1 field to update\n    \"license_number\": \"RJPSST-TEST-002\",\n    \"firm_name\": \"New Firm Name\",\n    \"firm_type\": \"New Firm Type\",\n    \"firm_address\": \"New Firm Address\",\n    \"sale_point_address\": \"New Sale Point Address\",\n    // \"sale_storage_address\": \"New Sale Storage Address\",\n    // \"production_company\": \"New Production Company\",\n    // \"crop_name\": \"New Crop Name\",\n    \"crop_variety\": \"New Crop Variety\",\n    \"role\": \"JOINT_DIRECTOR\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -721,7 +721,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"licenseCategory\": \"SEED\",\n  \"licenseLevel\": \"STATE\",\n  \"registeringAuthority\": \"Department of Agriculture\",\n  \"registeringOfficeName\": \"District Agri Office, Jaipur\",\n  \"applicantName\": \"Ravi Kumar\",\n  \"aadhaarNumber\": \"IRk4zRfT9iJvf5CRYUQOZwor9ro553k8mWwlfqwLPheTWoz0oLEPlr/+4vPOPOa0nOROMII9ZhLV9r2DR1AnPqsVXUj2g1JiAZWvIE61Zu/qU/RU/B+yxUnbmztYC8kmK0eunlvFyNtmBidbgbatQWnn4JufcuewGFwCIUblTCQ9PpPouh8KK9602n4rPi36MGcGQFVdm8uoxig9/RRLh34UFb8yBamhuY5I/5UMDQUgli5Vu9Fc8AXuu+3sZ3odR8DIeMykmtTyrysTYAu7I8jHHThGcHNiysrESgaPEc5azFdFHdULoLiWA4RRMrgKDFWJV1MeTbI1UZsHtCc/PA==\",\n  \"applicantPermanentAddress\": \"H.No 45, Green Colony, Jaipur\",\n  \"firmName\": \"Ravi Agro Traders\",\n  \"firmType\": \"Partnership\",\n  \"firmAddress\": \"Plot No 22, Mandi Road, Jaipur\",\n  \"salePointAddress\": \"Shop No 5, Krishi Market, Jaipur\",\n  \"saleStorageAddress\": \"Warehouse No 3, Outer Ring Road, Jaipur\",\n  \"cropName\": \"Wheat\",\n  \"cropVariety\": \"HD2967\",\n  \"isSeedSelfProduced\": false, \n  \"productionCompany\": \"Agro Seeds Pvt Ltd\"  // required only when isSeedSelfProduced is true else its by default firmName\n}\n",
+                  "raw": "{\n  \"licenseCategory\": \"SEED\",\n  \"licenseLevel\": \"STATE\",\n  \"licenseNumber\": \"RJSDST-TEST-003\",\n  \"registeringAuthority\": \"Department of Agriculture\",\n  \"registeringOfficeName\": \"District Agri Office, Jaipur\",\n  \"applicantName\": \"Ravi Kumar\",\n  \"aadhaarNumber\": \"IRk4zRfT9iJvf5CRYUQOZwor9ro553k8mWwlfqwLPheTWoz0oLEPlr/+4vPOPOa0nOROMII9ZhLV9r2DR1AnPqsVXUj2g1JiAZWvIE61Zu/qU/RU/B+yxUnbmztYC8kmK0eunlvFyNtmBidbgbatQWnn4JufcuewGFwCIUblTCQ9PpPouh8KK9602n4rPi36MGcGQFVdm8uoxig9/RRLh34UFb8yBamhuY5I/5UMDQUgli5Vu9Fc8AXuu+3sZ3odR8DIeMykmtTyrysTYAu7I8jHHThGcHNiysrESgaPEc5azFdFHdULoLiWA4RRMrgKDFWJV1MeTbI1UZsHtCc/PA==\",\n  \"applicantPermanentAddress\": \"H.No 45, Green Colony, Jaipur\",\n  \"firmName\": \"Ravi Agro Traders\",\n  \"firmType\": \"Partnership\",\n  \"firmAddress\": \"Plot No 22, Mandi Road, Jaipur\",\n  \"salePointAddress\": \"Shop No 5, Krishi Market, Jaipur\",\n  \"saleStorageAddress\": \"Warehouse No 3, Outer Ring Road, Jaipur\",\n  \"cropName\": \"Wheat\",\n  \"cropVariety\": \"HD2967\",\n  \"isSeedSelfProduced\": false, \n  \"productionCompany\": \"Agro Seeds Pvt Ltd\"  // required only when isSeedSelfProduced is true else its by default firmName\n}\n",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -793,14 +793,14 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{base_url}}/license/info/1/",
+                  "raw": "{{base_url}}/license/info/RJSDST-TEST-001/",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
                     "license",
                     "info",
-                    "1",
+                    "RJSDST-TEST-001",
                     ""
                   ]
                 }
@@ -814,7 +814,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n \"licenseId\":1,\n \"status\":\"UNDER_REVIEW\", // SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED , INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWED\n \"officerName\": \"Shrawan\",\n \"role\": \"AGRICULTURE_OFFICER\",\n \"renewalPeriodDays\": 34, // Only required when status is APPROVED or RENEWED\n \"remarks\":\"License is UNDER_REVIEW\"\n}",
+                  "raw": "{\n \"licenseNumber\":\"RJSDST-TEST-003\",\n \"status\":\"UNDER_REVIEW\", // SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED , INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWED\n \"officerName\": \"Shrawan\",\n \"role\": \"AGRICULTURE_OFFICER\",\n \"renewalPeriodDays\": 34, // Only required when status is APPROVED or RENEWED\n \"remarks\":\"License is UNDER_REVIEW\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -841,14 +841,14 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{base_url}}/license/history/4/",
+                  "raw": "{{base_url}}/license/history/RJSDST-TEST-003/",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
                     "license",
                     "history",
-                    "4",
+                    "RJSDST-TEST-003",
                     ""
                   ]
                 }
@@ -861,14 +861,14 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{base_url}}/license/qr/<str:license_id>/",
+                  "raw": "{{base_url}}/license/qr/RJSDST-TEST-003/",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
                     "license",
                     "qr",
-                    "<str:license_id>",
+                    "RJSDST-TEST-003",
                     ""
                   ]
                 }
@@ -882,7 +882,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"licenseNumber\": \"RJSDST1\",\n    \"expectedHash\": \"212d02520d33be03153a2c34cb4d50b63f570e6d6881589ebbec2ec6b3da51b0\"\n}",
+                  "raw": "{\n    \"licenseNumber\": \"RJSDST-TEST-003\",\n    \"expectedHash\": \"212d02520d33be03153a2c34cb4d50b63f570e6d6881589ebbec2ec6b3da51b0\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -910,7 +910,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    // license_id and role are required fields, rest ae optional but atleast there should be 1 field to update\n    \"license_id\": 1,\n    \"firm_name\": \"New Firm Name\",\n    \"firm_type\": \"New Firm Type\",\n    \"firm_address\": \"New Firm Address\",\n    \"sale_point_address\": \"New Sale Point Address\",\n    // \"sale_storage_address\": \"New Sale Storage Address\",\n    // \"production_company\": \"New Production Company\",\n    // \"crop_name\": \"New Crop Name\",\n    \"crop_variety\": \"New Crop Variety\",\n    \"role\": \"JOINT_DIRECTOR\"\n}",
+                  "raw": "{\n    // license_id and role are required fields, rest ae optional but atleast there should be 1 field to update\n    \"license_number\": \"RJSDST-TEST-003\",\n    \"firm_name\": \"New Firm Name\",\n    \"firm_type\": \"New Firm Type\",\n    \"firm_address\": \"New Firm Address\",\n    \"sale_point_address\": \"New Sale Point Address\",\n    // \"sale_storage_address\": \"New Sale Storage Address\",\n    // \"production_company\": \"New Production Company\",\n    // \"crop_name\": \"New Crop Name\",\n    \"crop_variety\": \"New Crop Variety\",\n    \"role\": \"JOINT_DIRECTOR\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -1023,6 +1023,30 @@
           ]
         }
       ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
     }
   ]
 }

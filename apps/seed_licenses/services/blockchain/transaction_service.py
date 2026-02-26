@@ -153,7 +153,7 @@ class TransactionService:
         """Fetch on-chain confirmation and metadata."""
         try:
             receipt = w3.eth.get_transaction_receipt(tx_hash)
-            block = w3.eth.get_block(receipt.blockNumber)
+            block   = w3.eth.get_block(receipt.blockNumber)
             return {
                 "tx_hash": tx_hash,
                 "status": "CONFIRMED" if receipt.status == 1 else "FAILED",
@@ -432,10 +432,10 @@ def process_transaction_confirmation(self, tx_hash: str, abi: List[Dict], contra
                     # Instantiate parser and store events
                     parser = EventParser(abi, contract_address)
                     logger.info(f"[EVENT PARSER] Starting event parsing for tx={tx_hash}")
-                    license_id, events = await parser.parse_and_store(parsed_receipt)
+                    license_number, events = await parser.parse_and_store(parsed_receipt)
 
                     logger.info(
-                        f"[EVENT PARSER] ✅ Parsed {len(events)} events for license_id={license_id}"
+                        f"[EVENT PARSER] ✅ Parsed {len(events)} events for license_id={license_number}"
                     )
                     return True
 
