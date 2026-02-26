@@ -173,12 +173,12 @@ class BlockchainStateManager:
         """Mock the TransactionService.write() method"""
         print(f"[TX SERVICE WRITE] Method: {method_name}, Params: {params}, Address: {address}")
         address = address or self.accounts[0]["address"]
-        if method_name == "submitLicenseApplication":
+        if method_name == "submitLicenseApplicationV2":
             self.counter += 1
             license_id = self.counter
         
             struct_input = params[0]
-            license_number = f"RJSDST{license_id}"
+            license_number = struct_input.get("licenseNumber") or f"RJSDST{license_id}"
             
             # Create license with proper structure for new data transformer
             self.licenses[license_id] = {
@@ -339,6 +339,7 @@ def complete_license_payload():
         "licenseLevel": "STATE",
         "registeringAuthority": "Department of Agriculture",
         "registeringOfficeName": "State Agriculture Office",
+        "licenseNumber": "RJSDST-TEST-002",
         "applicantName": "Rajesh Kumar",
         "aadhaarNumber": encrypt_aadhaar("234567890123"),
         "applicantPermanentAddress": "123 Main St, Jaipur, Rajasthan",

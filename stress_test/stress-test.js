@@ -296,8 +296,10 @@ function simulatedRpcPing(){
 // ---------------- APPLICATION HELPERS ----------------
 function generateApplication(){
   const base = randItem(applicantData);
+  const licenseNumber = `RJSDST-${Date.now()}-${randInt(1000, 9999)}`;
   return {
     ...base,
+    licenseNumber,
     aadhaarNumber: getEncryptedAadhaar(),
     registeringAuthority: 'Department of Agriculture',
     registeringOfficeName: `District Agri Office, ${randItem(['Jaipur','Udaipur','Jodhpur','Kota'])}`,

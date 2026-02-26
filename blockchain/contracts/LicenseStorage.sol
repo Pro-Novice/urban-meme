@@ -175,6 +175,27 @@ contract LicenseStorage {
         int256 longitude;
     }
 
+    struct LicenseApplicationInputV2 {
+        LicenseCategory category;
+        LicenseLevel level;
+        string licenseNumber;
+        string registeringAuthority;
+        string registeringOfficeName;
+        string applicantName;
+        string aadhaarNumber;
+        string applicantPermanentAddress;
+        string firmName;
+        string firmType;
+        string firmAddress;
+        string salePointAddress;
+        string saleStorageAddress;
+        string productionCompany;
+        string cropName;
+        string cropVariety;
+        int256 latitude;
+        int256 longitude;
+    }
+
     // Main storage mappings
     mapping(uint256 => License) internal licenses;
     mapping(string => uint256) internal licenseNumberToId;

@@ -82,6 +82,7 @@ class TestSystemState:
             for i in range(3):
                 payload = complete_license_payload.copy()
                 payload["applicantName"] = f"Applicant {i+1}"
+                payload["licenseNumber"] = f"RJSDST-SYS-{i+1:03d}"
                 resp = client.post(
                     reverse("submit-license-application"),
                     data=json.dumps(payload),
@@ -122,6 +123,7 @@ class TestSystemState:
             for i in range(5):
                 payload = complete_license_payload.copy()
                 payload["applicantName"] = f"Applicant {i+1}"
+                payload["licenseNumber"] = f"RJSDST-SYS-{i+1:03d}"
                 resp = client.post(
                     reverse("submit-license-application"),
                     data=json.dumps(payload),

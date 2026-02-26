@@ -1,5 +1,6 @@
 import logging
 from django.core.cache import cache  
+from django.db import IntegrityError, transaction
 from rest_framework.decorators import api_view
 from rest_framework.status import (
     HTTP_200_OK,
@@ -18,11 +19,7 @@ from apps.seed_licenses.serializers import (
 from apps.seed_licenses.services.license_service import LicenseService
 from apps.seed_licenses.services.blockchain import TransactionService
 from apps.seed_licenses.enums import LicenseStatusEnum
-from apps.seed_licenses.views.schemas import (
-    license_count_schema, submit_license_schema, license_basic_info_schema,
-    license_history_schema, license_qr_schema, update_status_schema,
-    verify_document_schema, update_details_schema, add_officer_schema,
-)
+from apps.seed_licenses.models import LicenseSubmission, EventLog
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +62,6 @@ VALID_STATUS_TRANSITIONS = {
 # --------------------------------------------------------------------
 # 1️ Get Total License Count
 # --------------------------------------------------------------------
-@license_count_schema()
 @api_view(["GET"])
 def check_total_license_count(request):
     """Retrieve total number of licenses created on blockchain."""
@@ -84,7 +80,6 @@ def check_total_license_count(request):
 # --------------------------------------------------------------------
 # 2️ Submit License Application
 # --------------------------------------------------------------------
-@submit_license_schema()
 @api_view(["POST"])
 def submit_license_application(request):
     """Validate and submit a new license application to blockchain."""
@@ -92,10 +87,31 @@ def submit_license_application(request):
     if not serializer.is_valid():
         return ApiResponse(err=serializer.errors, status=HTTP_400_BAD_REQUEST)
 
+    license_number = serializer.validated_data["license_number"]
+
+    try:
+        with transaction.atomic():
+            LicenseSubmission.objects.create(license_number=license_number)
+    except IntegrityError:
+        return ApiResponse(err="License number already exists.", status=HTTP_400_BAD_REQUEST)
+
     try:
         result = license_service.submit_application(serializer.validated_data)
-        return _tx_response(result,include_sender_address=True)
+        if result.get("success") is False:
+            LicenseSubmission.objects.filter(license_number=license_number).delete()
+        else:
+            tx_hash = result.get("transaction_hash")
+            if tx_hash:
+                LicenseSubmission.objects.filter(license_number=license_number).update(
+                    transaction_hash=tx_hash
+                )
+        return _tx_response(
+            result,
+            include_sender_address=True,
+            extra_data={"license_number": license_number},
+        )
     except Exception as e:
+        LicenseSubmission.objects.filter(license_number=license_number).delete()
         logger.exception("Submit license failed")
         return ApiResponse(
             err=f"Submit license failed: {e}",
@@ -105,7 +121,6 @@ def submit_license_application(request):
 # --------------------------------------------------------------------
 # 3️ Get License Basic Info
 # --------------------------------------------------------------------
-@license_basic_info_schema()
 @api_view(["GET"])
 def get_license_basic_info(request, license_id: int):
     """Retrieve basic license details by license ID."""
@@ -120,6 +135,7 @@ def get_license_basic_info(request, license_id: int):
 
         logger.info(f"Cache miss for license {license_id}, reading from blockchain")
         data = license_service.get_basic_info((license_id))
+        data = _override_license_number(data, license_id)
         
 
         cache.set(cache_key, data, timeout=1800)
@@ -132,9 +148,48 @@ def get_license_basic_info(request, license_id: int):
         return ApiResponse(err=str(e), status=HTTP_500_INTERNAL_SERVER_ERROR)
 
 # --------------------------------------------------------------------
+# 3.1️ Get License Basic Info By License Number
+# --------------------------------------------------------------------
+@api_view(["GET"])
+def get_license_basic_info_by_number(request, license_number: str):
+    """Retrieve basic license details by license number."""
+    try:
+        license_number = (license_number or "").strip()
+        if not license_number:
+            return ApiResponse(err="License number cannot be empty.", status=HTTP_400_BAD_REQUEST)
+
+        cache_key = f"license_basic_info_by_number_{license_number}"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            logger.info(f"Cache hit for license number {license_number}")
+            return ApiResponse(data=cached_data, status=HTTP_200_OK)
+
+        submission = LicenseSubmission.objects.filter(license_number=license_number).first()
+        if submission and submission.license_id:
+            data = license_service.get_basic_info(submission.license_id)
+            data = _override_license_number(data, submission.license_id)
+            cache.set(cache_key, data, timeout=1800)
+            return ApiResponse(data=data, status=HTTP_200_OK)
+
+        if submission and submission.transaction_hash and not submission.license_id:
+            _try_attach_license_id(submission)
+            if submission.license_id:
+                data = license_service.get_basic_info(submission.license_id)
+                data = _override_license_number(data, submission.license_id)
+                cache.set(cache_key, data, timeout=1800)
+                return ApiResponse(data=data, status=HTTP_200_OK)
+
+        return ApiResponse(
+            err="License number not found yet. Please try again later.",
+            status=HTTP_400_BAD_REQUEST,
+        )
+    except Exception as e:
+        logger.exception(f"License info fetch failed for number {license_number}")
+        return ApiResponse(err=str(e), status=HTTP_500_INTERNAL_SERVER_ERROR)
+
+# --------------------------------------------------------------------
 # 4️ Get License QR Data
 # --------------------------------------------------------------------
-@license_qr_schema()
 @api_view(["GET"])
 def get_license_qr_data(request, license_id: int):
     """Retrieve QR-code verification data for a license."""
@@ -169,13 +224,19 @@ def get_license_qr_data(request, license_id: int):
 # --------------------------------------------------------------------
 # 5️ Get License Action History
 # --------------------------------------------------------------------
-@license_history_schema()
 @api_view(["GET"])
 def get_license_action_history(request, license_id: int):
     """Retrieve historical actions performed on a license."""
     try:
-        data = license_service.get_action_history(int(license_id))
-        return ApiResponse(data=data, status=HTTP_200_OK)
+        history = license_service.get_action_history(int(license_id))
+        license_number = _resolve_license_number(license_id=license_id)
+        return ApiResponse(
+            data={
+                "licenseNumber": license_number,
+                "history": history,
+            },
+            status=HTTP_200_OK,
+        )
     except ValueError:
         return ApiResponse(err="License ID must be an integer.", status=HTTP_400_BAD_REQUEST)
     except Exception as e:
@@ -183,9 +244,112 @@ def get_license_action_history(request, license_id: int):
         return ApiResponse(err=str(e), status=HTTP_500_INTERNAL_SERVER_ERROR)
 
 # --------------------------------------------------------------------
+# 5.1️ Get License Action History By License Number
+# --------------------------------------------------------------------
+@api_view(["GET"])
+def get_license_action_history_by_number(request, license_number: str):
+    """Retrieve historical actions by license number."""
+    try:
+        license_number = (license_number or "").strip()
+        if not license_number:
+            return ApiResponse(err="License number cannot be empty.", status=HTTP_400_BAD_REQUEST)
+
+        submission = LicenseSubmission.objects.filter(license_number=license_number).first()
+        if submission and submission.license_id:
+            history = license_service.get_action_history(int(submission.license_id))
+            return ApiResponse(
+                data={
+                    "licenseNumber": license_number,
+                    "history": history,
+                },
+                status=HTTP_200_OK,
+            )
+
+        if submission and submission.transaction_hash and not submission.license_id:
+            _try_attach_license_id(submission)
+            if submission.license_id:
+                history = license_service.get_action_history(int(submission.license_id))
+                return ApiResponse(
+                    data={
+                        "licenseNumber": license_number,
+                        "history": history,
+                    },
+                    status=HTTP_200_OK,
+                )
+
+        return ApiResponse(
+            err="License number not found yet. Please try again later.",
+            status=HTTP_400_BAD_REQUEST,
+        )
+    except Exception as e:
+        logger.exception(f"License history fetch failed for number {license_number}")
+        return ApiResponse(err=str(e), status=HTTP_500_INTERNAL_SERVER_ERROR)
+
+# --------------------------------------------------------------------
+# Helpers
+# --------------------------------------------------------------------
+def _try_attach_license_id(submission: LicenseSubmission) -> None:
+    """Attach license_id from EventLog if available for the submission tx hash."""
+    if not submission.transaction_hash or submission.license_id:
+        return
+    log = (
+        EventLog.objects.filter(transaction_hash=submission.transaction_hash)
+        .order_by("timestamp")
+        .first()
+    )
+    if log and log.license_id:
+        submission.license_id = log.license_id
+        submission.save(update_fields=["license_id"])
+
+
+def _override_license_number(data: dict, license_id: int) -> dict:
+    """Override blockchain licenseNumber with submitted one and hide licenseId."""
+    if not isinstance(data, dict):
+        return data
+
+    submission = LicenseSubmission.objects.filter(license_id=license_id).first()
+    if not submission:
+        log = EventLog.objects.filter(license_id=license_id).order_by("timestamp").first()
+        if log:
+            submission = LicenseSubmission.objects.filter(transaction_hash=log.transaction_hash).first()
+            if submission and not submission.license_id:
+                submission.license_id = license_id
+                submission.save(update_fields=["license_id"])
+
+    if submission and submission.license_number:
+        data["licenseNumber"] = submission.license_number
+
+    data.pop("licenseId", None)
+    return data
+
+
+def _resolve_license_number(license_id: int) -> str:
+    """Resolve submitted license number for a license_id, fallback to blockchain."""
+    submission = LicenseSubmission.objects.filter(license_id=license_id).first()
+    if submission and submission.license_number:
+        return submission.license_number
+
+    log = EventLog.objects.filter(license_id=license_id).order_by("timestamp").first()
+    if log:
+        submission = LicenseSubmission.objects.filter(transaction_hash=log.transaction_hash).first()
+        if submission and submission.license_number:
+            if not submission.license_id:
+                submission.license_id = license_id
+                submission.save(update_fields=["license_id"])
+            return submission.license_number
+
+    try:
+        data = license_service.get_basic_info(int(license_id))
+        if isinstance(data, dict):
+            return data.get("licenseNumber")
+    except Exception:
+        return None
+
+    return None
+
+# --------------------------------------------------------------------
 # 6️ Update License Status
 # --------------------------------------------------------------------
-@update_status_schema()
 @api_view(["POST"])
 def update_license_status_view(request):
     """Update the status of a license (e.g., REVIEW → APPROVED)."""
@@ -229,7 +393,6 @@ def update_license_status_view(request):
 # --------------------------------------------------------------------
 # 7️ Verify License Document
 # --------------------------------------------------------------------
-@verify_document_schema()
 @api_view(["POST"])
 def verify_license_document(request):
     """Verify the integrity and validity of a license document."""
@@ -250,7 +413,6 @@ def verify_license_document(request):
 # --------------------------------------------------------------------
 # 8️ Update License Details
 # --------------------------------------------------------------------
-@update_details_schema()
 @api_view(["POST"])
 def update_license_details(request):
     """Update firm/crop details for an existing license."""
@@ -279,7 +441,6 @@ def update_license_details(request):
 # --------------------------------------------------------------------
 # 9️ Add Officer to Contract
 # --------------------------------------------------------------------
-@add_officer_schema()
 @api_view(["POST"])
 def add_officer_to_contract(request):
     """
@@ -301,7 +462,7 @@ def add_officer_to_contract(request):
 # --------------------------------------------------------------------
 # Helper Function: Uniform Transaction Response
 # --------------------------------------------------------------------
-def _tx_response(result: dict, include_sender_address=False):
+def _tx_response(result: dict, include_sender_address=False, extra_data=None):
     """Standardized response wrapper for blockchain transactions."""
     # If LicenseService returns "changed": False, handle no-op gracefully
     if result.get("changed") is False:
@@ -325,5 +486,7 @@ def _tx_response(result: dict, include_sender_address=False):
     }
     if include_sender_address and "sender_address" in result:
         response_data["sender_address"] = result["sender_address"]
+    if extra_data:
+        response_data.update(extra_data)
     
     return ApiResponse(data=response_data, status=HTTP_202_ACCEPTED)
