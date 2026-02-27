@@ -135,7 +135,7 @@ class TestSubmitLicenseApplication:
         data = resp.json()["data"]
         assert data["status"] == "accepted"
         assert "transaction_hash" in data
-        assert data["licenseNumber"] == valid_license_payload["licenseNumber"]
+        assert data["license_number"] == valid_license_payload["licenseNumber"]
 
     def test_duplicate_license_number(self, client, valid_license_payload, monkeypatch):
         """Test duplicate license number is rejected"""

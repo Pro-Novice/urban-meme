@@ -375,6 +375,10 @@ def update_license_status_view(request):
         license_id = validated["license_id"]
         cache.delete(f"license_basic_info_{license_id}")
         cache.delete(f"license_qr_data_{license_id}")
+        submission = LicenseSubmission.objects.filter(license_id=license_id).first()
+        if submission and submission.license_number:
+            cache.delete(f"license_basic_info_by_number_{submission.license_number}")
+
         logger.info(f"Cache invalidated for license {license_id}")
         
         return _tx_response(result)
@@ -428,6 +432,11 @@ def update_license_details(request):
         if license_id:
             cache.delete(f"license_basic_info_{license_id}")
             cache.delete(f"license_qr_data_{license_id}")
+            submission = LicenseSubmission.objects.filter(license_id=license_id).first()
+            if submission and submission.license_number:
+                cache.delete(f"license_basic_info_by_number_{submission.license_number}")
+                logger.info(f"Cache invalidated for license number {submission.license_number}")
+
             logger.info(f"Cache invalidated for license {license_id}")
         
         return _tx_response(result)

@@ -98,6 +98,8 @@ const applicantData = new SharedArray('applicants', () => [
     cropVariety: 'HD2967',
     isSeedSelfProduced: false,
     productionCompany: 'Sharma Seeds Pvt Ltd',
+    latitude: 26.9124,
+    longitude: 75.7873,
   },
   {
     licenseCategory: 'FERTILIZER',
@@ -109,6 +111,8 @@ const applicantData = new SharedArray('applicants', () => [
     cropVariety: 'Basmati',
     isSeedSelfProduced: false,
     productionCompany: 'AgroTech Ltd',
+    latitude: 27.0238,
+    longitude: 74.2179,
   },
 ]);
 
