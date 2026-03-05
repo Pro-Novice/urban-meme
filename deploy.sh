@@ -25,8 +25,8 @@ fi
 
 # Ask user for environment to run
 echo "Select environment to deploy:"
-echo "1) Local (no Postgres)"
-echo "2) Server (with Postgres)"
+echo "1) Local (with Postgres)"
+echo "2) Server (no Postgres)"
 read -rp "Enter your choice [1 or 2]: " ENV_CHOICE
 
 if [[ "$ENV_CHOICE" == "1" ]]; then
