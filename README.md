@@ -31,8 +31,7 @@ RAJASTHAN-SEED-BACKEND/
 ├── .env.example          # Example env file for setup
 ├── .gitignore            # Git ignore rules
 │
-├── deploy.sh             # Deployment automation script
-├── stop.sh               # Script to stop containers
+├── docker-manage.sh      # Deployment/Stopping automation script(for managing dockerised container)
 ├── docker-compose.yaml   # Multi-container definition
 ├── Dockerfile            # Web app Docker image
 ├── entrypoint.sh         # Entrypoint for migrations & collectstatic
@@ -116,20 +115,51 @@ docker compose logs -f celery
 ```
 
 ---
+## Testing
+
+---
+
+### ✅ Prerequisites
+
+Ensure you have the following installed in your virtual environment:
+
+* `pytest`
+* `pytest-django`
+
+
+### ⚙️ Configuration
+
+Make sure your `pytest.ini` (or `pyproject.toml`) is configured properly. Example `pytest.ini`:
+
+```ini
+# pytest.ini
+[pytest]
+DJANGO_SETTINGS_MODULE = config.settings
+python_files = tests.py test_*.py *_tests.py
+```
+
+### 🔍 Running Tests by following command
+
+
+```bash
+python -m pytest apps/seed_licenses/Tests/
+
+```
+
 
 ## 📜 Deployment
 
-Use the provided `deploy.sh` script for automated deployment:
+Use the provided `docker-manage.sh` script for automated deployment and removal of containers:
 
 ```bash
 # For staging/dev
-./deploy.sh
+./docker-manage.sh
 
 # For production
-./deploy.sh production
+./docker-manage.sh production
 
 # To stop everything
-./deploy.sh stop
+./docker-manage.sh stop
 ```
 
 The script will:
@@ -146,3 +176,76 @@ The script will:
 * Static and media files are stored in **Docker volumes**: `static_volume`, `media_volume`.
 * Logs are mounted to `./logs` for easier debugging.
 * Entrypoint ensures **migrations and collectstatic** run automatically before starting Gunicorn.
+
+---
+
+## 📡 API Example
+
+### Submit License Application
+
+**Endpoint**
+
+`POST /license/create/`
+
+**Required fields include `licenseNumber` (must be unique).**
+
+```json
+{
+  "licenseCategory": "SEED",
+  "licenseLevel": "STATE",
+  "registeringAuthority": "Department of Agriculture",
+  "registeringOfficeName": "District Agri Office, Jaipur",
+  "licenseNumber": "RJSDST-EXAMPLE-001",
+  "applicantName": "Ravi Kumar",
+  "aadhaarNumber": "<encrypted_aadhaar>",
+  "applicantPermanentAddress": "H.No 45, Green Colony, Jaipur",
+  "firmName": "Ravi Agro Traders",
+  "firmType": "Partnership",
+  "firmAddress": "Plot No 22, Mandi Road, Jaipur",
+  "salePointAddress": "Shop No 5, Krishi Market, Jaipur",
+  "saleStorageAddress": "Warehouse No 3, Outer Ring Road, Jaipur",
+  "cropName": "Wheat",
+  "cropVariety": "HD2967",
+  "isSeedSelfProduced": false,
+  "productionCompany": "Agro Seeds Pvt Ltd"
+}
+```
+
+**Success response (202)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "transactionHash": "0xabc123...",
+    "status": "accepted",
+    "message": "Transaction submitted successfully.",
+    "licenseNumber": "RJSDST-EXAMPLE-001",
+    "senderAddress": "0x..."
+  }
+}
+```
+
+### Get License Details By Number
+
+**Endpoint**
+
+`GET /license/info-by-number/<licenseNumber>/`
+
+**Example**
+
+`/license/info-by-number/RJSDST-EXAMPLE-001/`
+
+### Get License Action History
+
+**Endpoint**
+
+`GET /license/history/<licenseId>/`
+
+**Response includes submitted `licenseNumber` and `history` list.**
+
+### Get License Action History By Number
+
+**Endpoint**
+
+`GET /license/history-by-number/<licenseNumber>/`

@@ -1,0 +1,136 @@
+name: Jira PR Integration (Comments + Transitions)
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited, closed]
+
+jobs:
+  jira-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🧩 Auto-update PR title using branch name
+        if: github.event.action == 'opened' || github.event.action == 'reopened'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          echo "=== 🧩 Auto-updating PR title ==="
+          BRANCH="${{ github.head_ref }}"
+          echo "Branch name: $BRANCH"
+          JIRA_KEY=$(echo "$BRANCH" | grep -oE 'RAP-[0-9]+')
+          if [ -n "$JIRA_KEY" ]; then
+            NEW_TITLE="$JIRA_KEY | ${BRANCH}"
+            echo "Updating PR title to: $NEW_TITLE"
+            curl -s -X PATCH \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }} \
+              -d "{\"title\":\"$NEW_TITLE\"}"
+          else
+            echo "⚠️ No Jira key found in branch name, skipping title update."
+          fi
+
+      - name: 🧩 Extract Jira Key (RAP project only)
+        id: extract
+        shell: bash
+        run: |
+          echo "=== 🧩 Extracting Jira Key ==="
+          TITLE="${{ github.event.pull_request.title }}"
+          BRANCH="${{ github.head_ref }}"
+          KEY=$(echo "$TITLE $BRANCH" | grep -oE 'RAP-[0-9]+' | head -n 1 || true)
+          if [ -n "$KEY" ]; then
+            echo "✅ Jira key found: $KEY"
+            echo "JIRA_KEY=$KEY" >> "$GITHUB_ENV"
+          else
+            echo "⚠️ No Jira key found in title or branch — skipping."
+          fi
+
+      - name: 🌐 Test Jira Connectivity
+        shell: bash
+        run: |
+          echo "=== 🌐 Testing Jira Connectivity ==="
+          RESPONSE=$(curl -s -w "%{http_code}" -o serverinfo.json \
+            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
+            -H "Accept: application/json" \
+            "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/serverInfo")
+          echo "HTTP Status: $RESPONSE"
+          cat serverinfo.json | jq || cat serverinfo.json
+          [ "$RESPONSE" != "200" ] && { echo "❌ Jira connectivity failed."; exit 1; }
+          echo "✅ Jira Cloud connectivity verified."
+
+      - name: 🔐 Verify Jira Authentication
+        if: env.JIRA_KEY != ''
+        shell: bash
+        run: |
+          echo "=== 🔐 Verifying Jira Authentication ==="
+          RESPONSE=$(curl -s -w "%{http_code}" -o jira_me.json \
+            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
+            -H "Accept: application/json" \
+            "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/myself")
+          echo "HTTP Status: $RESPONSE"
+          cat jira_me.json | jq || cat jira_me.json
+          [ "$RESPONSE" != "200" ] && { echo "❌ Jira authentication failed."; exit 1; }
+          echo "✅ Jira authentication successful."
+
+      - name: 💬 Add rich Jira comment (proper ADF formatting)
+        if: env.JIRA_KEY != '' && github.event.action != 'closed'
+        shell: bash
+        run: |
+          echo "=== 💬 Adding formatted Jira comment ==="
+          COMMIT_MESSAGE="${{ github.event.pull_request.title }}"
+          COMMIT_SHA=${{ github.event.pull_request.head.sha }}
+          COMMIT_URL="https://github.com/${{ github.repository }}/commit/${COMMIT_SHA}"
+          AUTHOR="@${{ github.actor }}"
+
+          # Build Jira ADF JSON
+          ADF_JSON=$(jq -nc \
+            --arg msg "$COMMIT_MESSAGE" \
+            --arg url "$COMMIT_URL" \
+            --arg author "$AUTHOR" \
+            '{
+              body: {
+                type: "doc",
+                version: 1,
+                content: [
+                  { type: "paragraph", content: [
+                      { type: "text", text: "🔗 Commit: ", marks: [{type: "strong"}] },
+                      { type: "text", text: $msg }
+                  ]},
+                  { type: "paragraph", content: [
+                      { type: "text", text: "➡️ View Commit: ", marks: [{type: "strong"}] },
+                      { type: "text", text: $url, marks: [{type: "link", attrs: {href: $url}}] }
+                  ]},
+                  { type: "paragraph", content: [
+                      { type: "text", text: "👤 Author: ", marks: [{type: "strong"}] },
+                      { type: "text", text: $author }
+                  ]}
+                ]
+              }
+            }')
+
+          RESPONSE=$(curl -s -w "%{http_code}" -o comment_res.json \
+            -X POST -H "Content-Type: application/json" \
+            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
+            --data "$ADF_JSON" \
+            "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/issue/${{ env.JIRA_KEY }}/comment")
+
+          echo "HTTP Status: $RESPONSE"
+          cat comment_res.json | jq || cat comment_res.json
+          [ "$RESPONSE" != "201" ] && { echo "❌ Failed to add comment (HTTP $RESPONSE)"; exit 1; }
+          echo "✅ Rich comment successfully added to Jira issue."
+
+      - name: 🔄 Transition Jira issue to 'In Review' (on PR open)
+        if: env.JIRA_KEY != '' && github.event.action == 'opened'
+        shell: bash
+        run: |
+          echo "=== 🔄 Transitioning Jira issue to 'In Review' ==="
+          RESPONSE=$(curl -s -w "%{http_code}" -o transition_res.json \
+            -X POST -H "Content-Type: application/json" \
+            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
+            --data '{"transition": {"id": "31"}}' \
+            "https://${{ secrets.JIRA_DOMAIN }}/rest/api/3/issue/${{ env.JIRA_KEY }}/transitions")
+          echo "HTTP Status: $RESPONSE"
+          cat transition_res.json | jq || cat transition_res.json
+          [ "$RESPONSE" != "204" ] && { echo "⚠️ Transition may not have succeeded (HTTP $RESPONSE)"; exit 0; }
+          echo "✅ Jira issue transitioned to 'In Review' successfully."

@@ -11,11 +11,19 @@ fi
 
 TASK=${1:-help}   # default = help if no argument
 
+# Optional: skip Hardhat's compile step (useful when the container has no internet)
+NO_COMPILE_FLAG=""
+if [ "${HARDHAT_NO_COMPILE:-}" = "1" ] || [ "${HARDHAT_NO_COMPILE:-}" = "true" ] || \
+   [ "${SKIP_COMPILATION:-}" = "1" ] || [ "${SKIP_COMPILATION:-}" = "true" ] || \
+   [ "${NO_COMPILE:-}" = "1" ] || [ "${NO_COMPILE:-}" = "true" ]; then
+  NO_COMPILE_FLAG="--no-compile"
+fi
+
 case "$TASK" in
   deploy)
     echo "🚀 Compiling + Deploying contracts to Besu..."
     docker compose -f docker-compose.hardhat.yml run --rm hardhat \
-      npx hardhat run scripts/deploy.ts --network besu
+      npx hardhat run scripts/deploy.ts --network besu $NO_COMPILE_FLAG
     ;;
 
   compile)

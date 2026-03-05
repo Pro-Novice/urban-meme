@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  */
 contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, OwnableUpgradeable {
     // Events
-    event LicenseApplicationSubmitted(uint256 indexed licenseId, string licenseNumber, LicenseCategory category, uint256 applicationDate);
+    event LicenseApplicationSubmitted(uint256 indexed licenseId, string licenseNumber, LicenseCategory category, uint256 applicationDate, int256 latitude, int256 longitude);
     event LicenseApproved(uint256 indexed licenseId, string changedBy, userRole changedByRole, uint256 approvalDate, uint256 expiryDate);
     event LicenseRevoked(uint256 indexed licenseId, string changedBy, userRole changedByRole, string reason, uint256 revokedDate);
     event LicenseRejected(uint256 indexed licenseId, string changedBy, userRole changedByRole, string reason, uint256 rejectionDate);
@@ -94,7 +94,19 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         newLicense.applicationDate = block.timestamp;
         newLicense.lastModifiedDate = block.timestamp;
         newLicense.isActive = false;
-
+       
+       if (
+            input.category == LicenseCategory.FERTILIZER ||
+            input.category == LicenseCategory.PESTICIDE
+        ) {
+            require(input.latitude != 0 && input.longitude != 0, "Geo required");
+            newLicense.latitude = input.latitude;
+            newLicense.longitude = input.longitude;
+        } else {
+            require(input.latitude == 0 && input.longitude == 0, "Geo not allowed");
+            newLicense.latitude = 0;
+            newLicense.longitude = 0;
+        }
         newLicense.actionHistory.push(
             Action({
                 timestamp: block.timestamp,
@@ -115,13 +127,22 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         licensesByLevel[input.level].push(newLicenseId);
         licenseNumberToId[newLicense.licenseNumber] = newLicenseId;
 
-        emit LicenseApplicationSubmitted(newLicenseId, newLicense.licenseNumber, input.category, newLicense.applicationDate);
+        emit LicenseApplicationSubmitted(newLicenseId, newLicense.licenseNumber, input.category, newLicense.applicationDate, newLicense.latitude, newLicense.longitude);
     }
 
     // 2. Get License Basic Info - to be performed by citizens/officers
     function getLicenseBasicInfo(uint256 _licenseId) public view licenseExists(_licenseId) returns (LicenseBasicInfo memory) {
         License storage license = licenses[_licenseId];
+        int256 lat = 0;
+        int256 lng = 0;
 
+        if (
+            license.category == LicenseCategory.FERTILIZER ||
+            license.category == LicenseCategory.PESTICIDE
+        ) {
+            lat = license.latitude;
+            lng = license.longitude;
+        } 
         return
             LicenseBasicInfo({
                 licenseId: license.licenseId,
@@ -146,6 +167,8 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                 expiryDate: license.expiryDate,
                 revokedDate: license.revokedDate,
                 renewalDate: license.renewalDate,
+                latitude: lat,
+                longitude: lng,
                 isActive: license.isActive,
                 isPaid: license.isPaid,
                 documentsVerified: license.documentsVerified,
@@ -344,12 +367,12 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             ? "SD"
             : _category == LicenseCategory.FERTILIZER
                 ? "FT"
-                : "IN";
+                : "PS";
         string memory levelCode = _level == LicenseLevel.STATE
             ? "ST"
             : _level == LicenseLevel.DIVISION
                 ? "DV"
-                : "DT";
+                : "DT"; 
 
         return string(abi.encodePacked("RJ", categoryCode, levelCode, Strings.toString(_licenseId)));
     }
@@ -395,28 +418,35 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         LicenseStatus _newStatus,
         string memory _remarks
     ) private pure returns (string memory) {
+        string memory baseMessage;
+
         if (_newStatus == LicenseStatus.REVOKED) {
-            return string(abi.encodePacked("License revoked: ", _remarks));
+            baseMessage = "License revoked";
         } else if (_newStatus == LicenseStatus.APPROVED) {
             if (_oldStatus == LicenseStatus.EXPIRED) {
-                return "License renewed";
+                baseMessage = "License renewed";
             } else {
-                return "License approved";
+                baseMessage = "License approved";
             }
         } else {
-            return
-                string(
-                    abi.encodePacked(
-                        "Status changed from ",
-                        _licenseStatusToString(_oldStatus),
-                        " to ",
-                        _licenseStatusToString(_newStatus),
-                        ": ",
-                        _remarks
-                    )
-                );
+            baseMessage = string(
+                abi.encodePacked(
+                    "Status changed from ",
+                    _licenseStatusToString(_oldStatus),
+                    " to ",
+                    _licenseStatusToString(_newStatus)
+                )
+            );
         }
+
+        // Append officer remarks ONLY if provided
+        if (bytes(_remarks).length > 0) {
+            return string(abi.encodePacked(baseMessage, ": ", _remarks));
+        }
+
+        return baseMessage;
     }
+
 
     function _emitStatusEvent(
         uint256 _licenseId,

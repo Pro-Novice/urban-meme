@@ -1,17 +1,28 @@
-import re, base64
+import re
+import base64
 from django.conf import settings
-from django.core.exceptions import ValidationError
 from rest_framework import serializers
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 
-from .enums import LicenseStatusEnum, OfficerRole, LICENSE_CATEGORY_MAP, LEVEL_MAP
+from .enums import (
+    LicenseStatusEnum,
+    OfficerRole,
+    LICENSE_CATEGORY_MAP,
+    LEVEL_MAP,
+)
+from .models import LicenseSubmission
 
+
+# ============================================================
+# 1️⃣ Submit License Application Serializer
+# ============================================================
 class SubmitLicenseApplicationSerializer(serializers.Serializer):
     license_category = serializers.CharField()
     license_level = serializers.CharField()
     registering_authority = serializers.CharField()
     registering_office_name = serializers.CharField()
+    license_number = serializers.CharField()
     applicant_name = serializers.CharField()
     aadhaar_number = serializers.CharField()
     applicant_permanent_address = serializers.CharField()
@@ -23,63 +34,93 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
     production_company = serializers.CharField(required=False, allow_blank=True)
     crop_name = serializers.CharField()
     crop_variety = serializers.CharField()
+    latitude = serializers.FloatField(required=False)
+    longitude = serializers.FloatField(required=False)
+
 
     def validate_license_category(self, value):
         enum_value = LICENSE_CATEGORY_MAP.get(value.upper())
         if enum_value is None:
-            raise serializers.ValidationError("Invalid license category")
+            raise serializers.ValidationError("Invalid license category.")
         return enum_value
 
     def validate_license_level(self, value):
         enum_value = LEVEL_MAP.get(value.upper())
         if enum_value is None:
-            raise serializers.ValidationError("Invalid license level")
+            raise serializers.ValidationError("Invalid license level.")
         return enum_value
+
+    def validate_license_number(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("License number cannot be empty.")
+        value = value.strip()
+        if LicenseSubmission.objects.filter(license_number=value).exists():
+            raise serializers.ValidationError("License number already exists.")
+        return value
     
+    def to_internal_value(self, data):
+        ret = super().to_internal_value(data)
+        # Scale latitude/longitude to integers
+        for field in ["latitude", "longitude"]:
+            if field in ret and ret[field] is not None:
+                ret[field] = int(ret[field] * 1_000_000)
+
+        # Drop isSeedSelfProduced unless category is SEED
+        if ret["license_category"] != LICENSE_CATEGORY_MAP["SEED"]:
+            ret.pop("is_seed_self_produced", None)
+
+        return ret
+    def validate(self, attrs):
+        category = attrs["license_category"]
+
+        if category in {LICENSE_CATEGORY_MAP["FERTILIZER"], LICENSE_CATEGORY_MAP["PESTICIDE"]}:
+            if attrs.get("latitude") is None or attrs.get("longitude") is None:
+                raise serializers.ValidationError(
+                    "Latitude and longitude are required for this category"
+                )
+        else:
+            # SEED
+            attrs.pop("latitude", None)
+            attrs.pop("longitude", None)
+
+        return attrs
+
     def validate_aadhaar_number(self, value):
         """
-        Decrypts and validates the Aadhaar number.
+        Decrypts and validates the Aadhaar number using RSA private key.
         """
         try:
-            # 1. Load the private key from settings bytes
             private_key = serialization.load_pem_private_key(
                 settings.GENERATED_PRIVATE_KEY_BYTES,
                 password=None,
             )
 
-            # 2. The incoming 'value' is a Base64 string from the frontend. Decode it.
             encrypted_aadhaar_bytes = base64.b64decode(value)
-
-            # 3. Decrypt the data using the private key
-            # The padding scheme MUST match what the frontend library (e.g. JSEncrypt) uses.
-            # JSEncrypt uses OAEP with SHA-1 by default, but SHA-256 is more secure, Assuming JSEncrypt is configured for SHA-256. 
             decrypted_aadhaar_bytes = private_key.decrypt(
                 encrypted_aadhaar_bytes,
                 padding.OAEP(
                     mgf=padding.MGF1(algorithm=hashes.SHA256()),
                     algorithm=hashes.SHA256(),
-                    label=None
-                )
+                    label=None,
+                ),
             )
 
-            # 4. Decode the decrypted bytes into a string
-            decrypted_aadhaar_str = decrypted_aadhaar_bytes.decode('utf-8')
+            aadhaar_plain = decrypted_aadhaar_bytes.decode("utf-8")
 
-            # 5. Now, validate the plaintext Aadhaar number
-            if not re.match(r"^[2-9]{1}[0-9]{11}$", decrypted_aadhaar_str):
-                 raise serializers.ValidationError("Invalid Aadhaar number format after decryption.")
+            if not re.match(r"^[2-9]{1}[0-9]{11}$", aadhaar_plain):
+                raise serializers.ValidationError(
+                    "Invalid Aadhaar number format after decryption."
+                )
 
-            return decrypted_aadhaar_str
+            return aadhaar_plain
+
         except Exception as e:
-            # Catch-all for any other unexpected errors
-            raise serializers.ValidationError
-
-    # def validate_aadhaar_number(self, value):
-    #     if not re.match(r"^[1-9]{1}[0-9]{11}$", value):
-    #         raise ValidationError("Invalid Aadhaar number. Must be 12 digits starting with non-zero.")
-    #     return value
+            raise serializers.ValidationError(f"Decryption failed: {str(e)}")
 
 
+# ============================================================
+# 2️⃣ Update License Status Serializer
+# ============================================================
 class UpdateLicenseStatusSerializer(serializers.Serializer):
     license_id = serializers.IntegerField(min_value=1)
     status = serializers.CharField()
@@ -90,15 +131,14 @@ class UpdateLicenseStatusSerializer(serializers.Serializer):
 
     def validate_status(self, value):
         try:
-            status_enum_value = LicenseStatusEnum.from_string(value)
-            return status_enum_value
+            return LicenseStatusEnum.from_string(value)  # returns int
         except ValueError as e:
             raise serializers.ValidationError(str(e))
 
     def validate_role(self, value):
         try:
-            role_enum = OfficerRole.from_string(value)
-            return role_enum.value
+            # OfficerRole.from_string() returns int (not Enum)
+            return OfficerRole.from_string(value)
         except ValueError as e:
             raise serializers.ValidationError(str(e))
 
@@ -115,39 +155,52 @@ class UpdateLicenseStatusSerializer(serializers.Serializer):
     def validate(self, data):
         status = data.get("status")
 
-        if status == LicenseStatusEnum.APPROVED.value:
+        # Renewal period validation
+        if status in [
+            LicenseStatusEnum.APPROVED.value,
+            LicenseStatusEnum.RENEWED.value,
+        ]:
             if "renewal_period_days" not in data or data["renewal_period_days"] <= 0:
-                raise serializers.ValidationError({
-                    "renewal_period_days": "Renewal period must be provided and greater than 0 when approving a license."
-                })
+                raise serializers.ValidationError(
+                    {
+                        "renewal_period_days": (
+                            "Renewal period must be provided and greater than 0 "
+                            "when approving or renewing a license."
+                        )
+                    }
+                )
 
         return data
-    
 
+
+# ============================================================
+# 3️⃣ Verify License Serializer
+# ============================================================
 class VerifyLicenseSerializer(serializers.Serializer):
     license_number = serializers.CharField()
     expected_hash = serializers.CharField()
 
-    def validate_expected_hash(self, value):
-        if not value.strip():
-            raise serializers.ValidationError("Expected hash cannot be empty.")
-        return value
-    
     def validate_license_number(self, value):
         if not value.strip():
             raise serializers.ValidationError("License number cannot be empty.")
         return value
 
+    def validate_expected_hash(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Expected hash cannot be empty.")
+        return value
+
     def validate(self, data):
-        license_id = data.get("license_number")
-        expected_hash = data.get("expected_hash")
-
-        if not license_id or not expected_hash:
-            raise serializers.ValidationError("Both license ID and expected hash are required.")
-
+        if not data.get("license_number") or not data.get("expected_hash"):
+            raise serializers.ValidationError(
+                "Both license number and expected hash are required."
+            )
         return data
 
 
+# ============================================================
+# 4️⃣ Update License Details Serializer
+# ============================================================
 class UpdateLicenseDetailsSerializer(serializers.Serializer):
     license_id = serializers.IntegerField(min_value=1)
     firm_name = serializers.CharField(required=False, allow_blank=True)
@@ -162,27 +215,79 @@ class UpdateLicenseDetailsSerializer(serializers.Serializer):
 
     def validate_license_id(self, value):
         if value <= 0:
-            raise serializers.ValidationError("License ID must be a positive integer.")
+            raise serializers.ValidationError(
+                "License ID must be a positive integer."
+            )
         return value
-    
+
     def validate_role(self, value):
         try:
-            role_enum = OfficerRole.from_string(value)
-            return role_enum.value
+            return OfficerRole.from_string(value)  # returns int
         except ValueError as e:
             raise serializers.ValidationError(str(e))
 
     def validate(self, data):
-        license_id = data.get("license_id")
-        if not license_id:
+        if not data.get("license_id"):
             raise serializers.ValidationError("License ID is required.")
 
-        # Ensure at least one field is provided for update
-        if not any(data.get(field) for field in [
-            "firm_name", "firm_type", "firm_address", 
-            "sale_point_address", "sale_storage_address", 
-            "production_company", "crop_name", "crop_variety"
-        ]):
-            raise serializers.ValidationError("At least one field must be provided for update.")
+        # Ensure at least one updatable field is provided
+        update_fields = [
+            "firm_name",
+            "firm_type",
+            "firm_address",
+            "sale_point_address",
+            "sale_storage_address",
+            "production_company",
+            "crop_name",
+            "crop_variety",
+        ]
+        if not any(data.get(field) for field in update_fields):
+            raise serializers.ValidationError(
+                "At least one field must be provided for update."
+            )
 
         return data
+
+# ============================================================
+# 5️⃣ Add Officer Serializer
+# ============================================================
+class AddOfficerSerializer(serializers.Serializer):
+    address = serializers.CharField(max_length=42)
+    new_officer_address = serializers.CharField(max_length=42)
+
+    def validate_address(self, value):
+        if not isinstance(value, str) or not value.startswith("0x") or len(value) != 42:
+            raise serializers.ValidationError("Invalid Ethereum address format for 'address'.")
+        return value.lower()
+
+    def validate_new_officer_address(self, value):
+        if not isinstance(value, str) or not value.startswith("0x") or len(value) != 42:
+            raise serializers.ValidationError("Invalid Ethereum address format for 'new_officer_address'.")
+        return value.lower()
+
+    def validate(self, attrs):
+        from apps.seed_licenses.services.blockchain.connection import get_default_account
+        
+        caller_address = attrs.get("address", "").lower()
+        new_officer_address = attrs.get("new_officer_address", "").lower()
+
+        # Get admin address from default account
+        default_account = get_default_account()
+        if not default_account:
+            raise serializers.ValidationError(
+                {"address": "Admin wallet address not initialized in blockchain configuration."}
+            )
+
+        admin_address = default_account["address"].lower()
+
+        if caller_address != admin_address:
+            raise serializers.ValidationError(
+                {"address": "Access denied. Only the admin wallet can add officers."}
+            )
+        
+        if caller_address == new_officer_address:
+            raise serializers.ValidationError(
+                {"new_officer_address": "Admin and new officer address cannot be the same."}
+            )
+
+        return attrs

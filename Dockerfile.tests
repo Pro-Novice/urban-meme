@@ -1,0 +1,29 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Layer 1: System dependencies (rarely change)
+RUN apt-get update && apt-get install -y \
+    postgresql-client gcc python3-dev libpq-dev netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
+
+# Layer 2: Python dependencies (change occasionally)
+# Copy only requirements first to leverage Docker cache
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Layer 3: Application code (changes frequently)
+# This layer will rebuild when your code changes
+COPY . /app/
+RUN chmod +x /app/run_tests.sh
+
+# Layer 4: Environment variables (rarely change)
+ENV PYTHONPATH=/app:$PYTHONPATH \
+    DJANGO_SETTINGS_MODULE=config.test_settings \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    TESTING=1 \
+    WEB3_ENABLED=0
+
+CMD ["bash", "/app/run_tests.sh"]

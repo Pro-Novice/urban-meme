@@ -13,7 +13,7 @@ contract LicenseStorage {
     enum LicenseCategory {
         SEED,
         FERTILIZER,
-        INSECTICIDE
+        PESTICIDE
     }
     enum LicenseLevel {
         STATE,
@@ -51,19 +51,23 @@ contract LicenseStorage {
         LicenseCategory category;
         LicenseStatus status;
         LicenseLevel level;
+
         // Registering authority details---
         string registeringAuthority;
         string registeringOfficeName;
+        
         // Applicant details
         string applicantName;
         string aadhaarNumber;
         string applicantPermanentAddress;
+
         // Firm details
         string firmName;
         string firmType; // Private Ltd, Public Ltd, Partnership Firm, Proprietor Firm, etc.
         string firmAddress;
         string salePointAddress;
         string saleStorageAddress;
+
         // Crop details
         bool isSeedSelfProduced;
         string productionCompany;
@@ -71,6 +75,7 @@ contract LicenseStorage {
         string cropVariety;
         mapping(string => string) customFields;
         string[] customFieldKeys;
+
         // Payment paymentDetails;
         uint256 applicationDate;
         uint256 lastModifiedDate;
@@ -79,6 +84,8 @@ contract LicenseStorage {
         uint256 expiryDate;
         uint256 revokedDate;
         uint256 renewalDate;
+        int256 latitude;
+        int256 longitude;
         Action[] actionHistory;
         bool isActive;
         bool isPaid;
@@ -126,6 +133,8 @@ contract LicenseStorage {
         uint256 expiryDate;
         uint256 revokedDate;
         uint256 renewalDate;
+        int256 latitude;
+        int256 longitude;
         bool isActive;
         bool isPaid;
         bool documentsVerified;
@@ -162,6 +171,29 @@ contract LicenseStorage {
         string productionCompany;
         string cropName;
         string cropVariety;
+        int256 latitude;
+        int256 longitude;
+    }
+
+    struct LicenseApplicationInputV2 {
+        LicenseCategory category;
+        LicenseLevel level;
+        string licenseNumber;
+        string registeringAuthority;
+        string registeringOfficeName;
+        string applicantName;
+        string aadhaarNumber;
+        string applicantPermanentAddress;
+        string firmName;
+        string firmType;
+        string firmAddress;
+        string salePointAddress;
+        string saleStorageAddress;
+        string productionCompany;
+        string cropName;
+        string cropVariety;
+        int256 latitude;
+        int256 longitude;
     }
 
     // Main storage mappings
