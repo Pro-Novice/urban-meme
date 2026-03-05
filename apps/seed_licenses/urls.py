@@ -13,7 +13,9 @@ urlpatterns = [
     path("license/create/", views.submit_license_application, name="submit-license-application"),
     path("license/count/", views.check_total_license_count, name="license-count"),
     path("license/info/<int:license_id>/", views.get_license_basic_info, name="license-basic-info"),
+    path("license/info-by-number/<str:license_number>/", views.get_license_basic_info_by_number, name="license-basic-info-by-number"),
     path("license/history/<int:license_id>/", views.get_license_action_history, name="license-action-history"),
+    path("license/history-by-number/<str:license_number>/", views.get_license_action_history_by_number, name="license-action-history-by-number"),
     path("license/qr/<int:license_id>/", views.get_license_qr_data, name="license-qr-data"),
 
     # License actions

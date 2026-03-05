@@ -33,6 +33,7 @@ def valid_license_payload():
         "licenseLevel": "STATE",
         "registeringAuthority": "Department of Agriculture",
         "registeringOfficeName": "State Agriculture Office",
+        "licenseNumber": "RJSDST-TEST-001",
         "applicantName": "Rajesh Kumar",
         "aadhaarNumber": encrypt_aadhaar("234567890123"),
         "applicantPermanentAddress": "123 Main St, Jaipur, Rajasthan",
@@ -155,4 +156,3 @@ def mock_celery_and_redis(monkeypatch):
         def delete(self, key): return True
 
     monkeypatch.setattr("redis.Redis", lambda *a, **kw: DummyRedis())
-

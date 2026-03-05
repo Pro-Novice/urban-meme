@@ -35,6 +35,7 @@ class LicenseService(ILicenseService):
         struct_input = {
             "category": data["license_category"],
             "level": data["license_level"],
+            "licenseNumber": data["license_number"],
             "registeringAuthority": data["registering_authority"],
             "registeringOfficeName": data["registering_office_name"],
             "applicantName": data["applicant_name"],
@@ -51,7 +52,7 @@ class LicenseService(ILicenseService):
             "latitude": int(lat),   
             "longitude": int(lng),   
         }
-        return self.tx.write("submitLicenseApplication", [struct_input])
+        return self.tx.write("submitLicenseApplicationV2", [struct_input])
 
     # ---------- GET BASIC INFO ---------- #
     def get_basic_info(self, license_id: int) -> Dict[str, Any]:

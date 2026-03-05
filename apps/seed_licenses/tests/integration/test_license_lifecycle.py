@@ -105,7 +105,7 @@ class TestCompleteLicenseLifecycle:
             assert license_data["status"] in ["SUBMITTED", 0, "0"] 
             assert license_data["applicantName"] == "Rajesh Kumar"
             assert license_data["firmName"] == "Kumar Seeds Pvt Ltd"
-            assert license_data["licenseId"] == license_id
+            assert "licenseId" not in license_data
             assert license_data["licenseNumber"].startswith("RJSDST")
             
             print("🔹 Step 5: Updating status to UNDER_REVIEW...")
@@ -240,6 +240,7 @@ class TestCompleteLicenseLifecycle:
                 "licenseLevel": "STATE",
                 "registeringAuthority": "Department of Agriculture",
                 "registeringOfficeName": "State Agriculture Office",
+                "licenseNumber": "RJSDST-MIN-001",
                 "applicantName": "Minimal Applicant",
                 "aadhaarNumber": "encrypted_aadhaar_placeholder",  
                 "applicantPermanentAddress": "123 Test St",

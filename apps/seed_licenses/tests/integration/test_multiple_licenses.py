@@ -32,6 +32,7 @@ class TestMultipleLicenses:
                 payload = complete_license_payload.copy()
                 payload["applicantName"] = f"Applicant {i+1}"
                 payload["firmName"] = f"Firm {i+1}"
+                payload["licenseNumber"] = f"RJSDST-MULTI-{i+1:03d}"
                 
                 resp = client.post(
                     reverse("submit-license-application"),
@@ -107,6 +108,7 @@ class TestMultipleLicenses:
                 payload = complete_license_payload.copy()
                 payload["applicantName"] = f"Applicant {i+1}"
                 payload["firmName"] = f"Firm {i+1}"
+                payload["licenseNumber"] = f"RJSDST-MULTI-{i+1:03d}"
                 resp = client.post(
                     reverse("submit-license-application"),
                     data=json.dumps(payload),
@@ -157,6 +159,7 @@ class TestMultipleLicenses:
                 payload["applicantName"] = license_info["applicant"]
                 payload["firmName"] = license_info["firm"]
                 payload["cropName"] = license_info["crop"]
+                payload["licenseNumber"] = f"RJSDST-MULTI-{license_info['id']:03d}"
                 
                 resp = client.post(
                     reverse("submit-license-application"),
