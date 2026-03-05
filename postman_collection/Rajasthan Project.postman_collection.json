@@ -160,7 +160,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n \"licenseId\":2,\n \"status\":\"UNDER_REVIEW\", // SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED , INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWED\n \"officerName\": \"Shrawan\",\n \"role\": \"AGRICULTURE_OFFICER\",\n \"renewalPeriodDays\": 34, // Only required when status is APPROVED or RENEWED\n \"remarks\":\"License is UNDER_REVIEW\"\n}",
+                  "raw": "{\n \"licenseNumber\":\"RJSDST-TEST-001\",\n \"status\":\"UNDER_REVIEW\", // SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED , INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWED\n \"officerName\": \"Shrawan\",\n \"role\": \"AGRICULTURE_OFFICER\",\n \"renewalPeriodDays\": 34, // Only required when status is APPROVED or RENEWED\n \"remarks\":\"License is UNDER_REVIEW\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -537,7 +537,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n \"licenseId\":1,\n \"status\":\"APPROVED\", // SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED , INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWED\n \"officerName\": \"Shrawan\",\n \"role\": \"AGRICULTURE_OFFICER\",\n \"renewalPeriodDays\": 34, // Only required when status is APPROVED or RENEWED\n \"remarks\":\"License is UNDER_REVIEW\"\n}",
+                  "raw": "{\n \"licenseNumber\":\"RJSDST-TEST-002\",\n \"status\":\"APPROVED\", // SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED , INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWED\n \"officerName\": \"Shrawan\",\n \"role\": \"AGRICULTURE_OFFICER\",\n \"renewalPeriodDays\": 34, // Only required when status is APPROVED or RENEWED\n \"remarks\":\"License is UNDER_REVIEW\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -914,7 +914,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n \"licenseId\":3,\n \"status\":\"APPROVED\", // SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED , INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWED\n \"officerName\": \"Shrawan\",\n \"role\": \"AGRICULTURE_OFFICER\",\n \"renewalPeriodDays\": 34, // Only required when status is APPROVED or RENEWED\n \"remarks\":\"License is UNDER_REVIEW\"\n}",
+                  "raw": "{\n \"licenseNumber\":\"RJSDST-TEST-003\",\n \"status\":\"APPROVED\", // SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED , INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWED\n \"officerName\": \"Shrawan\",\n \"role\": \"AGRICULTURE_OFFICER\",\n \"renewalPeriodDays\": 34, // Only required when status is APPROVED or RENEWED\n \"remarks\":\"License is UNDER_REVIEW\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"

@@ -122,7 +122,8 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
 # 2️⃣ Update License Status Serializer
 # ============================================================
 class UpdateLicenseStatusSerializer(serializers.Serializer):
-    license_id = serializers.IntegerField(min_value=1)
+    license_id = serializers.IntegerField(min_value=1, required=False)
+    license_number = serializers.CharField(required=False, allow_blank=True)
     status = serializers.CharField()
     remarks = serializers.CharField()
     officer_name = serializers.CharField()
@@ -152,7 +153,20 @@ class UpdateLicenseStatusSerializer(serializers.Serializer):
             raise serializers.ValidationError("Remarks cannot be empty.")
         return value
 
+    def validate_license_number(self, value):
+        if value is None:
+            return value
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("License number cannot be empty.")
+        return value
+
     def validate(self, data):
+        if not data.get("license_id") and not data.get("license_number"):
+            raise serializers.ValidationError(
+                {"license_id": "Provide license_id or license_number."}
+            )
+
         status = data.get("status")
 
         # Renewal period validation
