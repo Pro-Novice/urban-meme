@@ -182,6 +182,35 @@
               "response": []
             },
             {
+              "name": "5.1 Force refresh mapping",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"licenseNumber\": \"RJSDST-TEST-001\"\n}\n",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/license/mapping/refresh/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "license",
+                    "mapping",
+                    "refresh",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
               "name": "6. License action history",
               "request": {
                 "method": "GET",
@@ -559,6 +588,35 @@
               "response": []
             },
             {
+              "name": "5.1 Force refresh mapping",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"licenseNumber\": \"RJSDST-TEST-002\"\n}\n",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/license/mapping/refresh/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "license",
+                    "mapping",
+                    "refresh",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
               "name": "6. License action history",
               "request": {
                 "method": "GET",
@@ -929,6 +987,35 @@
                   "path": [
                     "license",
                     "update-status",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "5.1 Force refresh mapping",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"licenseNumber\": \"RJSDST-TEST-003\"\n}\n",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/license/mapping/refresh/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "license",
+                    "mapping",
+                    "refresh",
                     ""
                   ]
                 }

@@ -257,3 +257,17 @@ The script will:
 `POST /license/update-status/`
 
 Use `licenseNumber` instead of `licenseId` in the payload.
+
+### Force Refresh License Mapping
+
+**Endpoint**
+
+`POST /license/mapping/refresh/`
+
+**Body**
+
+```json
+{
+  "licenseNumber": "RJSDST-EXAMPLE-001"
+}
+```
