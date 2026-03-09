@@ -323,6 +323,37 @@ def _override_license_number(data: dict, license_id: int) -> dict:
     return data
 
 
+def _resolve_license_id_from_number(license_number: str) -> int:
+    """Resolve license_id from submitted license_number."""
+    if not license_number:
+        return None
+    submission = LicenseSubmission.objects.filter(license_number=license_number).first()
+    if submission:
+        if not submission.license_id:
+            _try_attach_license_id(submission)
+        if submission.license_id:
+            return submission.license_id
+    # Fallback: resolve from EventLog by licenseNumber in event_data
+    log = (
+        EventLog.objects.filter(event_data__licenseNumber=license_number)
+        .order_by("timestamp")
+        .first()
+    )
+    if log and log.license_id:
+        if submission:
+            submission.license_id = log.license_id
+            submission.transaction_hash = submission.transaction_hash or log.transaction_hash
+            submission.save(update_fields=["license_id", "transaction_hash"])
+        else:
+            LicenseSubmission.objects.create(
+                license_number=license_number,
+                license_id=log.license_id,
+                transaction_hash=log.transaction_hash,
+            )
+        return log.license_id
+    return None
+
+
 def _resolve_license_number(license_id: int) -> str:
     """Resolve submitted license number for a license_id, fallback to blockchain."""
     submission = LicenseSubmission.objects.filter(license_id=license_id).first()
@@ -359,8 +390,19 @@ def update_license_status_view(request):
 
     try:
         validated = serializer.validated_data
+        license_id = validated.get("license_id")
+        license_number = validated.get("license_number")
+
+        if not license_id and license_number:
+            license_id = _resolve_license_id_from_number(license_number)
+            if not license_id:
+                return ApiResponse(
+                    err="License number not found yet. Please try again later.",
+                    status=HTTP_400_BAD_REQUEST,
+                )
+
         payload = {
-            "license_id": validated["license_id"],
+            "license_id": license_id,
             "status": validated["status"],  # returns int now
             "officer_name": validated["officer_name"],
             "role": validated["role"],
@@ -371,8 +413,6 @@ def update_license_status_view(request):
 
         result = license_service.update_status(payload)
         
-
-        license_id = validated["license_id"]
         cache.delete(f"license_basic_info_{license_id}")
         cache.delete(f"license_qr_data_{license_id}")
         submission = LicenseSubmission.objects.filter(license_id=license_id).first()
@@ -393,6 +433,45 @@ def update_license_status_view(request):
             err=f"License status update failed: {e}",
             status=HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+# --------------------------------------------------------------------
+# 6.1️ Force Refresh License Mapping (Admin)
+# --------------------------------------------------------------------
+@api_view(["POST"])
+def force_refresh_license_mapping(request):
+    """Force-refresh licenseNumber <-> licenseId mapping from EventLog."""
+    license_number = (request.data.get("licenseNumber") or "").strip()
+    if not license_number:
+        return ApiResponse(err="licenseNumber is required.", status=HTTP_400_BAD_REQUEST)
+
+    log = (
+        EventLog.objects.filter(event_data__licenseNumber=license_number)
+        .order_by("timestamp")
+        .first()
+    )
+    if not log or not log.license_id:
+        return ApiResponse(err="License number not found in events yet.", status=HTTP_400_BAD_REQUEST)
+
+    submission, _ = LicenseSubmission.objects.get_or_create(
+        license_number=license_number,
+        defaults={
+            "license_id": log.license_id,
+            "transaction_hash": log.transaction_hash,
+        },
+    )
+    if submission.license_id != log.license_id or submission.transaction_hash != log.transaction_hash:
+        submission.license_id = log.license_id
+        submission.transaction_hash = log.transaction_hash
+        submission.save(update_fields=["license_id", "transaction_hash"])
+
+    return ApiResponse(
+        data={
+            "licenseNumber": license_number,
+            "licenseId": log.license_id,
+            "transactionHash": log.transaction_hash,
+        },
+        status=HTTP_200_OK,
+    )
 
 # --------------------------------------------------------------------
 # 7️ Verify License Document

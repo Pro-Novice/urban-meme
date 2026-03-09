@@ -20,6 +20,7 @@ urlpatterns = [
 
     # License actions
     path("license/update-status/", views.update_license_status_view, name="update-license-status"),
+    path("license/mapping/refresh/", views.force_refresh_license_mapping, name="force-refresh-license-mapping"),
     path("license/update/", views.update_license_details, name="update-license-details"),
     path("license/verify/", views.verify_license_document, name="verify-license-document"),
 

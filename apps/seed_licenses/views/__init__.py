@@ -20,6 +20,7 @@ from .license_view import (
     verify_license_document,
     check_total_license_count,
     add_officer_to_contract, 
+    force_refresh_license_mapping,
 )
 
 from .blockchain_view import (
@@ -49,6 +50,7 @@ __all__ = [
     "get_license_action_history_by_number",
     "get_license_qr_data",
     "update_license_status_view",
+    "force_refresh_license_mapping",
     "update_license_details",
     "verify_license_document",
     "check_total_license_count",
