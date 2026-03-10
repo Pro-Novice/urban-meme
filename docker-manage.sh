@@ -13,6 +13,27 @@ log() {
     echo -e "####################################################################${NC}"
 }
 
+
+mkdir -p ./logs
+LOG_FILE="./logs/deployment.log"
+PID_FILE="./.live_logger.pid"
+> "$LOG_FILE"
+exec > >(tee "$LOG_FILE") 2>&1
+
+# ── ADDED: Live logger functions ──────────────────────────────────────────────
+stop_live_logger() {
+    if [[ -f "$PID_FILE" ]]; then
+        kill "$(cat "$PID_FILE")" 2>/dev/null || true
+        rm -f "$PID_FILE"
+    fi
+}
+
+start_live_logger() {
+    stop_live_logger
+    docker compose -f "$COMPOSE_FILE" logs -f --no-color >> "$LOG_FILE" 2>&1 &
+    echo $! > "$PID_FILE"
+}
+
 # Load .env if exists
 if [[ -f .env ]]; then
     export $(grep -v '^#' .env | xargs)
@@ -53,6 +74,7 @@ case "$ACTION_CHOICE" in
     1)
         # Full deployment with rebuild
         log "Stopping Existing Containers for $ENV_NAME Environment"
+        stop_live_logger                                                  
         docker compose -f "$COMPOSE_FILE" down 
         
         log "Building and Starting Containers for $ENV_NAME Environment"
@@ -72,11 +94,13 @@ case "$ACTION_CHOICE" in
         
         log "Deployment Successful ✓"
         docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+        start_live_logger                                                  
         ;;
         
     2)
         # Stop only
         log "Stopping and Removing All Containers for $ENV_NAME Environment"
+        stop_live_logger                                                  
         docker compose -f "$COMPOSE_FILE" down
         log "All Containers Stopped Successfully ✓"
         echo ""
@@ -87,11 +111,13 @@ case "$ACTION_CHOICE" in
     3)
         # Quick restart without rebuild
         log "Restarting Containers for $ENV_NAME Environment (No Rebuild)"
+        stop_live_logger                                                  
         docker compose -f "$COMPOSE_FILE" down
         docker compose -f "$COMPOSE_FILE" up -d
         
         log "Restart Successful ✓"
         docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+        start_live_logger                                                  
         ;;
         
     *)
