@@ -1,7 +1,3 @@
-"""
-Test cases for seed license endpoints.
-Place this file as: tests/test_license_endpoints.py
-"""
 import pytest
 from unittest.mock import MagicMock, patch
 from django.urls import reverse, NoReverseMatch
@@ -135,10 +131,32 @@ class TestSubmitLicenseApplication:
         data = resp.json()["data"]
         assert data["status"] == "accepted"
         assert "transaction_hash" in data
+        assert data["license_number"] == valid_license_payload["licenseNumber"]
+
+    def test_duplicate_license_number(self, client, valid_license_payload, monkeypatch):
+        """Test duplicate license number is rejected"""
+        monkeypatch.setattr(
+            "apps.seed_licenses.views.license_view.license_service.submit_application",
+            MagicMock(return_value={"success": True, "transaction_hash": "0xabc123"})
+        )
+
+        first = client.post(
+            reverse("submit-license-application"),
+            data=valid_license_payload,
+            format="json",
+        )
+        assert first.status_code == status.HTTP_202_ACCEPTED
+
+        second = client.post(
+            reverse("submit-license-application"),
+            data=valid_license_payload,
+            format="json",
+        )
+        assert second.status_code == status.HTTP_400_BAD_REQUEST
     
     @pytest.mark.parametrize("field", [
         "licenseCategory", "licenseLevel", "registeringAuthority",
-        "registeringOfficeName", "applicantName", "aadhaarNumber",
+        "registeringOfficeName", "licenseNumber", "applicantName", "aadhaarNumber",
     ])
     def test_missing_required_fields(self, client, valid_license_payload, field):
         """Test missing required fields"""
@@ -225,7 +243,7 @@ class TestGetLicenseBasicInfo:
     """Tests for get-license-basic-info endpoint"""
     
     EXPECTED_KEYS = {
-        "licenseId", "licenseNumber", "applicantName", "category", "level", "status",
+        "licenseNumber", "applicantName", "category", "level", "status",
         "firmName", "firmType", "firmAddress", "salePointAddress", "saleStorageAddress",
         "productionCompany", "cropName", "cropVariety", "registeringOfficeName",
         "registeringAuthority", "applicationDate", "isActive"
@@ -241,15 +259,19 @@ class TestGetLicenseBasicInfo:
             reverse("submit-license-application"),
             data=valid_license_payload,
             format="json",
-        )        
+        )
+        from apps.seed_licenses.models import LicenseSubmission
+        LicenseSubmission.objects.filter(license_number=valid_license_payload["licenseNumber"]).update(
+            license_id=1
+        )
         resp = client.get(reverse("license-basic-info", args=[1]))
         
         assert_success_response(resp)
         data = resp.json()["data"]
         
         assert_has_keys(data, self.EXPECTED_KEYS)
-        assert data["licenseId"] == 1
-        assert data["licenseNumber"] == "LIC001"
+        assert "licenseId" not in data
+        assert data["licenseNumber"] == valid_license_payload["licenseNumber"]
     
     @pytest.mark.parametrize("license_id", [1, 10, 100, 1000, 9999])
     def test_valid_positive_license_ids(self, client, monkeypatch, license_id):
@@ -328,14 +350,14 @@ class TestGetLicenseQRData:
         data = resp.json()["data"]
         assert "verificationHash" in data
         assert "licenseNumber" in data
-        assert data["licenseNumber"] == "LIC001"
+        assert data["licenseNumber"] == "RJSDST-TEST-001"
     
     @pytest.mark.parametrize("license_id", [1, 50, 100, 500])
     def test_various_valid_license_ids(self, client, monkeypatch, license_id):
         """Test with various valid license IDs"""
         monkeypatch.setattr(
             "apps.seed_licenses.views.license_view.license_service.get_qr_data",
-            MagicMock(return_value={"verificationHash": "hash", "licenseNumber": "LIC001"})
+            MagicMock(return_value={"verificationHash": "hash", "licenseNumber": "RJSDST-TEST-001"})
         )
         
         resp = client.get(reverse("license-qr-data", args=[license_id]))
@@ -389,15 +411,19 @@ class TestGetLicenseActionHistory:
             "apps.seed_licenses.views.license_view.license_service.get_action_history",
             MagicMock(return_value=mock_action_history)
         )
+        from apps.seed_licenses.models import LicenseSubmission
+        LicenseSubmission.objects.create(license_number="RJSDST-TEST-001", license_id=1)
         
         resp = client.get(reverse("license-action-history", args=[1]))
         
         assert_success_response(resp)
         data = resp.json()["data"]
-        assert isinstance(data, list)
-        assert len(data) == 2
-        assert data[0]["actionType"] == "SUBMITTED"
-        assert data[1]["actionType"] == "APPROVED"
+        assert isinstance(data, dict)
+        assert data["licenseNumber"] == "RJSDST-TEST-001"
+        assert isinstance(data["history"], list)
+        assert len(data["history"]) == 2
+        assert data["history"][0]["actionType"] == "SUBMITTED"
+        assert data["history"][1]["actionType"] == "APPROVED"
     
     def test_multiple_actions_ordering(self, client, monkeypatch):
         """Test that actions are returned in correct order"""
@@ -411,12 +437,14 @@ class TestGetLicenseActionHistory:
             "apps.seed_licenses.views.license_view.license_service.get_action_history",
             MagicMock(return_value=mock_history)
         )
+        from apps.seed_licenses.models import LicenseSubmission
+        LicenseSubmission.objects.create(license_number="RJSDST-TEST-002", license_id=1)
         
         resp = client.get(reverse("license-action-history", args=[1]))
         
         assert_success_response(resp)
         data = resp.json()["data"]
-        assert len(data) == 3
+        assert len(data["history"]) == 3
     
     @pytest.mark.parametrize("invalid_id", ["abc", -5])
     def test_invalid_license_ids(self, invalid_id):
@@ -632,7 +660,7 @@ class TestVerifyDocument:
         MagicMock(return_value={
             "success": True,
             "verified": True,
-            "license_number": "RJSDST1"
+            "license_number": "RJSDST-TEST-001"
         }))
         # 1. Submit license
         client.post(reverse("submit-license-application"), data=valid_license_payload, format="json")

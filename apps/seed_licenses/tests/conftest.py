@@ -1,7 +1,3 @@
-"""
-Pytest fixtures for seed license tests.
-Place this file as: tests/conftest.py
-"""
 import pytest
 import subprocess
 import time
@@ -33,6 +29,7 @@ def valid_license_payload():
         "licenseLevel": "STATE",
         "registeringAuthority": "Department of Agriculture",
         "registeringOfficeName": "State Agriculture Office",
+        "licenseNumber": "RJSDST-TEST-001",
         "applicantName": "Rajesh Kumar",
         "aadhaarNumber": encrypt_aadhaar("234567890123"),
         "applicantPermanentAddress": "123 Main St, Jaipur, Rajasthan",
@@ -87,7 +84,7 @@ def mock_license_data():
     """Complete mock license data for testing"""
     return {
         "licenseId": 1,
-        "licenseNumber": "LIC001",
+        "licenseNumber": "RJSDST-TEST-001",
         "applicantName": "John Doe",
         "category": "SEED_DEALER",
         "level": "STATE",
@@ -135,7 +132,7 @@ def mock_qr_data():
     """Mock QR data"""
     return {
         "verificationHash": "abc123def456",
-        "licenseNumber": "LIC001",
+        "licenseNumber": "RJSDST-TEST-001",
         "status": "APPROVED"
     }
     
@@ -155,4 +152,7 @@ def mock_celery_and_redis(monkeypatch):
         def delete(self, key): return True
 
     monkeypatch.setattr("redis.Redis", lambda *a, **kw: DummyRedis())
+
+
+
 

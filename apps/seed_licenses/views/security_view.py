@@ -6,7 +6,7 @@ from utils.api_response import ApiResponse
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
-from apps.seed_licenses.views.schemas import (public_key_schema, security_health_schema)   
+from apps.seed_licenses.schemas import (public_key_schema, security_health_schema)   
 logger = logging.getLogger(__name__)
 
 # ✅ 1️ Public Key Endpoint

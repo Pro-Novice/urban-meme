@@ -56,7 +56,7 @@ REST_FRAMEWORK = {
 # ================== SPECTACULAR (API DOCS) ================== #
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Rajasthan Agriculture License System API',
-    'DESCRIPTION': 'Blockchain-backed license management',
+    'DESCRIPTION': 'Blockchain-based license management',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'CAMELIZE_NAMES': True,  
@@ -66,6 +66,7 @@ SPECTACULAR_SETTINGS = {
     'COMPONENT_SPLIT_REQUEST': True,
     'SCHEMA_PATH_PREFIX': r'/api/',
     'ENUM_GENERATE_CHOICE_DESCRIPTION': True,
+    'ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE': False,
 }
 
 # ================== MIDDLEWARE ================== #

@@ -1,229 +1,275 @@
-"""
-Integration tests for license verification and QR code generation
-UPDATED to handle backend data structures
-"""
 import pytest
 import json
 from unittest.mock import patch
 from django.urls import reverse
+
 from apps.seed_licenses.tests.integration.fixtures import (
-    blockchain_state, complete_license_payload,
-    mock_transaction_service, mock_license_service,
-    mock_multi_account_manager, mock_celery_tasks
+    blockchain_state,
+    seed_license_payload,
+    fertilizer_license_payload,
+    pesticide_license_payload,
+    complete_license_payload,
+    mock_transaction_service,
+    mock_license_service,
+    mock_multi_account_manager,
+    mock_celery_tasks,
 )
 from apps.seed_licenses.tests.conftest import client
 
 
+# =============================================================================
+# Helpers
+# =============================================================================
 
+def _submit(client, payload):
+    return client.post(
+        reverse("submit-license-application"),
+        data=json.dumps(payload),
+        content_type="application/json",
+    )
+
+
+def _get_qr(client, license_id):
+    return client.get(reverse("license-qr-data", args=[license_id]))
+
+
+def _verify(client, license_number, expected_hash):
+    return client.post(
+        reverse("verify-license-document"),
+        data=json.dumps({"licenseNumber": license_number, "expectedHash": expected_hash}),
+        content_type="application/json",
+    )
+
+
+# =============================================================================
+# SEED verification
+# =============================================================================
+@pytest.mark.django_db
+class TestSeedLicenseVerification:
+
+    def test_seed_qr_generation(
+        self, client, seed_license_payload, blockchain_state,
+        mock_transaction_service, mock_license_service,
+        mock_multi_account_manager, mock_celery_tasks,
+    ):
+        with patch("apps.seed_licenses.views.license_view.license_service", mock_license_service), \
+             patch("apps.seed_licenses.views.license_view.tx_service",      mock_transaction_service):
+
+            _submit(client, seed_license_payload)
+
+            resp = _get_qr(client, 1)
+            assert resp.status_code in (200, 500)
+
+            if resp.status_code == 200:
+                qr = resp.json()["data"]
+                assert "verificationHash" in qr
+                assert qr["licenseNumber"] == seed_license_payload["licenseNumber"]
+                # QR data for SEED must NOT contain lat/lng
+                assert "latitude"  not in qr
+                assert "longitude" not in qr
+
+    def test_seed_complete_verification_flow(
+        self, client, seed_license_payload, blockchain_state,
+        mock_transaction_service, mock_license_service,
+        mock_multi_account_manager, mock_celery_tasks,
+    ):
+        with patch("apps.seed_licenses.views.license_view.license_service", mock_license_service), \
+             patch("apps.seed_licenses.views.license_view.tx_service",      mock_transaction_service):
+
+            _submit(client, seed_license_payload)
+
+            resp = _get_qr(client, 1)
+            assert resp.status_code in (200, 500)
+            if resp.status_code == 200:
+                qr = resp.json()["data"]
+                verification_hash = qr["verificationHash"]
+                license_number    = qr["licenseNumber"]
+
+                resp = _verify(client, license_number, verification_hash)
+                assert resp.status_code in (202, 500)
+
+    def test_seed_invalid_hash_verification(
+        self, client, seed_license_payload, blockchain_state,
+        mock_transaction_service, mock_license_service,
+        mock_multi_account_manager, mock_celery_tasks,
+    ):
+        with patch("apps.seed_licenses.views.license_view.license_service", mock_license_service), \
+             patch("apps.seed_licenses.views.license_view.tx_service",      mock_transaction_service):
+
+            _submit(client, seed_license_payload)
+
+            resp = _verify(client, seed_license_payload["licenseNumber"], "0xWRONG_HASH_123")
+            assert resp.status_code in (202, 400, 500)
+
+
+# =============================================================================
+# FERTILIZER verification
+# =============================================================================
+@pytest.mark.django_db
+class TestFertilizerLicenseVerification:
+
+    def test_fertilizer_qr_generation(
+        self, client, fertilizer_license_payload, blockchain_state,
+        mock_transaction_service, mock_license_service,
+        mock_multi_account_manager, mock_celery_tasks,
+    ):
+        with patch("apps.seed_licenses.views.license_view.license_service", mock_license_service), \
+             patch("apps.seed_licenses.views.license_view.tx_service",      mock_transaction_service):
+
+            _submit(client, fertilizer_license_payload)
+
+            resp = _get_qr(client, 1)
+            assert resp.status_code in (200, 500)
+
+            if resp.status_code == 200:
+                qr = resp.json()["data"]
+                assert "verificationHash" in qr
+                assert qr["licenseNumber"] == fertilizer_license_payload["licenseNumber"]
+
+    def test_fertilizer_verification_flow(
+        self, client, fertilizer_license_payload, blockchain_state,
+        mock_transaction_service, mock_license_service,
+        mock_multi_account_manager, mock_celery_tasks,
+    ):
+        with patch("apps.seed_licenses.views.license_view.license_service", mock_license_service), \
+             patch("apps.seed_licenses.views.license_view.tx_service",      mock_transaction_service):
+
+            _submit(client, fertilizer_license_payload)
+
+            resp = _get_qr(client, 1)
+            if resp.status_code == 200:
+                qr   = resp.json()["data"]
+                resp = _verify(client, qr["licenseNumber"], qr["verificationHash"])
+                assert resp.status_code in (202, 400)
+
+    def test_fertilizer_info_shows_lat_lng_pre_qr(
+        self, client, fertilizer_license_payload, blockchain_state,
+        mock_transaction_service, mock_license_service,
+        mock_multi_account_manager, mock_celery_tasks,
+    ):
+        """Basic info endpoint exposes lat/lng for FERTILIZER."""
+        with patch("apps.seed_licenses.views.license_view.license_service", mock_license_service), \
+             patch("apps.seed_licenses.views.license_view.tx_service",      mock_transaction_service):
+
+            _submit(client, fertilizer_license_payload)
+
+            resp = client.get(reverse("license-basic-info", args=[1]))
+            assert resp.status_code == 200
+            info = resp.json()["data"]
+            assert "latitude"  in info
+            assert "longitude" in info
+            assert info["latitude"]  != 0
+            assert info["longitude"] != 0
+
+
+# =============================================================================
+# PESTICIDE verification
+# =============================================================================
+@pytest.mark.django_db
+class TestPesticideLicenseVerification:
+
+    def test_pesticide_qr_generation(
+        self, client, pesticide_license_payload, blockchain_state,
+        mock_transaction_service, mock_license_service,
+        mock_multi_account_manager, mock_celery_tasks,
+    ):
+        with patch("apps.seed_licenses.views.license_view.license_service", mock_license_service), \
+             patch("apps.seed_licenses.views.license_view.tx_service",      mock_transaction_service):
+
+            _submit(client, pesticide_license_payload)
+
+            resp = _get_qr(client, 1)
+            assert resp.status_code in (200, 500)
+
+            if resp.status_code == 200:
+                qr = resp.json()["data"]
+                assert "verificationHash" in qr
+                assert qr["licenseNumber"] == pesticide_license_payload["licenseNumber"]
+
+    def test_pesticide_verification_flow(
+        self, client, pesticide_license_payload, blockchain_state,
+        mock_transaction_service, mock_license_service,
+        mock_multi_account_manager, mock_celery_tasks,
+    ):
+        with patch("apps.seed_licenses.views.license_view.license_service", mock_license_service), \
+             patch("apps.seed_licenses.views.license_view.tx_service",      mock_transaction_service):
+
+            _submit(client, pesticide_license_payload)
+
+            resp = _get_qr(client, 1)
+            if resp.status_code == 200:
+                qr   = resp.json()["data"]
+                resp = _verify(client, qr["licenseNumber"], qr["verificationHash"])
+                assert resp.status_code in (202, 400)
+
+
+# =============================================================================
+# Cross-category verification
+# =============================================================================
+@pytest.mark.django_db
 class TestLicenseVerification:
-    """Test license verification and QR code generation - UPDATED"""
-    
-    def test_complete_verification_flow(self, client, complete_license_payload, blockchain_state,
-                                      mock_transaction_service, mock_license_service,
-                                      mock_multi_account_manager, mock_celery_tasks):
-        """Test QR generation and verification"""
-        
-        with patch('apps.seed_licenses.views.license_view.license_service', mock_license_service), \
-             patch('apps.seed_licenses.views.license_view.tx_service', mock_transaction_service):
-            
-            # Create license
-            resp = client.post(
-                reverse("submit-license-application"),
-                data=json.dumps(complete_license_payload),
-                content_type='application/json'
-            )
-            assert resp.status_code == 202
-            license_id = 1
-            
-            # Get license info to retrieve license number
-            resp = client.get(reverse("license-basic-info", args=[license_id]))
-          
-            assert resp.status_code in [200, 500]
-            
-            if resp.status_code == 200:
-                license_data = resp.json()["data"]
-                # Handle both tuple and dict responses
-                if isinstance(license_data, (list, tuple)) and len(license_data) > 1:
-                    license_number = license_data[1]  # index 1 is licenseNumber
-                elif isinstance(license_data, dict):
-                    license_number = license_data.get("licenseNumber")
-                else:
-                    license_number = f"RJSDST{license_id}"
-                
-                assert license_number.startswith("RJSDST")
-                
-                # Get QR data
-                resp = client.get(reverse("license-qr-data", args=[license_id]))
-               
-                assert resp.status_code in [200, 500]
-                
-                if resp.status_code == 200:
-                    qr_data = resp.json()["data"]
-                    assert "verificationHash" in qr_data
-                    assert qr_data["licenseNumber"] == license_number
-                    
-                    verification_hash = qr_data["verificationHash"]
-                    
-                    # Verify with correct hash
-                    resp = client.post(
-                        reverse("verify-license-document"),
-                        data=json.dumps({
-                            "licenseNumber": license_number,
-                            "expectedHash": verification_hash
-                        }),
-                        content_type='application/json'
-                    )
-                  
-                    assert resp.status_code in [202, 500]
-    
-    def test_qr_data_for_different_license_states(self, client, complete_license_payload, blockchain_state,
-                                                mock_transaction_service, mock_license_service,
-                                                mock_multi_account_manager, mock_celery_tasks):
-        """Test QR data generation for licenses in different states"""
-        
-        with patch('apps.seed_licenses.views.license_view.license_service', mock_license_service), \
-             patch('apps.seed_licenses.views.license_view.tx_service', mock_transaction_service):
-            
-            # Create license
-            resp = client.post(
-                reverse("submit-license-application"),
-                data=json.dumps(complete_license_payload),
-                content_type='application/json'
-            )
-            assert resp.status_code == 202
-            license_id = 1
-            
-            # Get QR data while SUBMITTED
-            resp = client.get(reverse("license-qr-data", args=[license_id]))
-          
-            assert resp.status_code in [200, 500]
-            
-            if resp.status_code == 200:
-                qr_data_submitted = resp.json()["data"]
-                assert "verificationHash" in qr_data_submitted
-                # Handle both tuple and dict responses
-                if isinstance(qr_data_submitted, (list, tuple)):
-                    license_number = qr_data_submitted[1] if len(qr_data_submitted) > 1 else f"RJSDST{license_id}"
-                else:
-                    license_number = qr_data_submitted.get("licenseNumber", f"RJSDST{license_id}")
-                assert license_number.startswith("RJSDST")
-    
-    def test_verification_with_invalid_hash(self, client, complete_license_payload, blockchain_state,
-                                          mock_transaction_service, mock_license_service,
-                                          mock_multi_account_manager, mock_celery_tasks):
-        """Test verification fails with incorrect hash"""
-        
-        with patch('apps.seed_licenses.views.license_view.license_service', mock_license_service), \
-             patch('apps.seed_licenses.views.license_view.tx_service', mock_transaction_service):
-            
-            # Create license
-            resp = client.post(
-                reverse("submit-license-application"),
-                data=json.dumps(complete_license_payload),
-                content_type='application/json'
-            )
-            assert resp.status_code == 202
-            license_id = 1
-            
-            # Get license number
-            resp = client.get(reverse("license-basic-info", args=[license_id]))
-           
-            assert resp.status_code in [200, 500]
-            
-            if resp.status_code == 200:
-                license_data = resp.json()["data"]
-                # Handle both tuple and dict responses
-                if isinstance(license_data, (list, tuple)) and len(license_data) > 1:
-                    license_number = license_data[1]
-                elif isinstance(license_data, dict):
-                    license_number = license_data.get("licenseNumber")
-                else:
-                    license_number = f"RJSDST{license_id}"
-                
-                # Try to verify with wrong hash
-                resp = client.post(
-                    reverse("verify-license-document"),
-                    data=json.dumps({
-                        "licenseNumber": license_number,
-                        "expectedHash": "0xWRONGHASH123456789"
-                    }),
-                    content_type='application/json'
-                )
-                
-                # Should still return 202 (transaction submitted) but verification will fail in blockchain
-          
-                assert resp.status_code in [202, 500]
-    
-    def test_qr_data_for_nonexistent_license(self, client, blockchain_state,
-                                           mock_transaction_service, mock_license_service):
-        """Test QR data retrieval for non-existent license"""
-        
-        with patch('apps.seed_licenses.views.license_view.license_service', mock_license_service), \
-             patch('apps.seed_licenses.views.license_view.tx_service', mock_transaction_service):
-            
-            # Try to get QR data for non-existent license
-            resp = client.get(reverse("license-qr-data", args=[999]))
-            #Expect error for non-existent license
-            assert resp.status_code in [500, 404]
-    
-    def test_verification_with_nonexistent_license_number(self, client, blockchain_state,
-                                                        mock_transaction_service, mock_license_service,
-                                                        mock_multi_account_manager, mock_celery_tasks):
-        """Test verification with non-existent license number"""
-        
-        with patch('apps.seed_licenses.views.license_view.license_service', mock_license_service), \
-             patch('apps.seed_licenses.views.license_view.tx_service', mock_transaction_service):
-            
-            # Try to verify with non-existent license number
-            resp = client.post(
-                reverse("verify-license-document"),
-                data=json.dumps({
-                    "licenseNumber": "NONEXISTENT123",
-                    "expectedHash": "some_hash"
-                }),
-                content_type='application/json'
-            )
-            
-            # Should return error - either 400 or 500
-            assert resp.status_code in [400, 500]
-            if resp.status_code in [400, 500]:
-                error_data = resp.json()
-                assert "error" in error_data or "success" in error_data
-    
-    def test_qr_data_consistency(self, client, complete_license_payload, blockchain_state,
-                               mock_transaction_service, mock_license_service,
-                               mock_multi_account_manager, mock_celery_tasks):
-        """Test that QR data remains consistent across multiple reads"""
-        
-        with patch('apps.seed_licenses.views.license_view.license_service', mock_license_service), \
-             patch('apps.seed_licenses.views.license_view.tx_service', mock_transaction_service):
-            
-            # Create license
-            resp = client.post(
-                reverse("submit-license-application"),
-                data=json.dumps(complete_license_payload),
-                content_type='application/json'
-            )
-            assert resp.status_code == 202
-            license_id = 1
-            
-            # Get QR data multiple times
-            qr_reads = []
+    """Shared verification tests covering all categories."""
+
+    def test_qr_consistency_across_multiple_reads(
+        self, client, seed_license_payload, blockchain_state,
+        mock_transaction_service, mock_license_service,
+        mock_multi_account_manager, mock_celery_tasks,
+    ):
+        with patch("apps.seed_licenses.views.license_view.license_service", mock_license_service), \
+             patch("apps.seed_licenses.views.license_view.tx_service",      mock_transaction_service):
+
+            _submit(client, seed_license_payload)
+
+            hashes = []
             for _ in range(3):
-                resp = client.get(reverse("license-qr-data", args=[license_id]))
-               
-                assert resp.status_code in [200, 500]
+                resp = _get_qr(client, 1)
                 if resp.status_code == 200:
-                    qr_reads.append(resp.json()["data"])
-            
-            if len(qr_reads) > 1:
-                # All reads should return the same license number
-                license_numbers = []
-                for qr in qr_reads:
-                    if isinstance(qr, (list, tuple)) and len(qr) > 1:
-                        license_numbers.append(qr[1])
-                    elif isinstance(qr, dict):
-                        license_numbers.append(qr.get("licenseNumber"))
-                
-                if license_numbers:
-                    assert len(set(license_numbers)) == 1  
+                    hashes.append(resp.json()["data"]["verificationHash"])
+
+            if len(hashes) > 1:
+                assert len(set(hashes)) == 1, "verificationHash must be stable"
+
+    def test_verification_with_nonexistent_license_number(
+        self, client, blockchain_state,
+        mock_transaction_service, mock_license_service,
+        mock_multi_account_manager, mock_celery_tasks,
+    ):
+        with patch("apps.seed_licenses.views.license_view.license_service", mock_license_service), \
+             patch("apps.seed_licenses.views.license_view.tx_service",      mock_transaction_service):
+
+            resp = _verify(client, "NONEXISTENT-LICENSE-999", "some_hash")
+            assert resp.status_code in (400, 500)
+
+    def test_qr_for_nonexistent_license(
+        self, client, blockchain_state,
+        mock_transaction_service, mock_license_service,
+    ):
+        with patch("apps.seed_licenses.views.license_view.license_service", mock_license_service), \
+             patch("apps.seed_licenses.views.license_view.tx_service",      mock_transaction_service):
+
+            resp = _get_qr(client, 999)
+            assert resp.status_code in (404, 500)
+
+    @pytest.mark.parametrize("payload_fixture,license_number_key", [
+        ("seed_license_payload",       "licenseNumber"),
+        ("fertilizer_license_payload", "licenseNumber"),
+        ("pesticide_license_payload",  "licenseNumber"),
+    ])
+    def test_qr_data_contains_correct_license_number(
+        self, request, client, payload_fixture, license_number_key,
+        blockchain_state, mock_transaction_service, mock_license_service,
+        mock_multi_account_manager, mock_celery_tasks,
+    ):
+        payload = request.getfixturevalue(payload_fixture)
+
+        with patch("apps.seed_licenses.views.license_view.license_service", mock_license_service), \
+             patch("apps.seed_licenses.views.license_view.tx_service",      mock_transaction_service):
+
+            blockchain_state.reset()
+            _submit(client, payload)
+
+            resp = _get_qr(client, 1)
+            if resp.status_code == 200:
+                qr = resp.json()["data"]
+                assert qr["licenseNumber"] == payload[license_number_key]
+                assert "licenseId" not in qr

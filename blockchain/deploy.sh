@@ -28,25 +28,25 @@ case "$TASK" in
 
   compile)
     echo "🛠️ Compiling contracts..."
-    docker compose -f docker-compose.hardhat.yml run --rm hardhat \
+    docker compose -f docker-compose.hardhat.yml run --rm -e HARDHAT_OFFLINE=true hardhat \
       npx hardhat compile
     ;;
 
   test)
     echo "🧪 Running tests..."
-    docker compose -f docker-compose.hardhat.yml run --rm hardhat \
+    docker compose -f docker-compose.hardhat.yml run --rm -e HARDHAT_OFFLINE=true hardhat \
       npx hardhat test
     ;;
 
   gas-test)
     echo "⛽ Running gas usage tests..."
-    docker compose -f docker-compose.hardhat.yml run --rm -e REPORT_GAS=true hardhat \
+    docker compose -f docker-compose.hardhat.yml run --rm -e HARDHAT_OFFLINE=true -e REPORT_GAS=true hardhat \
       npx hardhat test
     ;;
 
   node)
     echo "🔗 Starting local Hardhat node (port 8545)..."
-    docker compose -f docker-compose.hardhat.yml run --rm -p 8545:8545 hardhat \
+    docker compose -f docker-compose.hardhat.yml run --rm -e HARDHAT_OFFLINE=true -p 8545:8545 hardhat \
       npx hardhat node
     ;;
 

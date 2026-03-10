@@ -14,7 +14,7 @@ from apps.seed_licenses.services.blockchain import (
 )
 from django.core.cache import cache 
 from apps.seed_licenses.services.blockchain import TransactionService
-from apps.seed_licenses.views.schemas import (
+from apps.seed_licenses.schemas import (
     owner_schema, contract_address_schema, contract_methods_schema,
     transaction_status_schema, blockchain_health_schema, network_info_schema,
     block_details_schema, cache_keys_schema, cache_clear_schema, redis_health_schema,

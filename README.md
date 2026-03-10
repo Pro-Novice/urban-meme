@@ -212,3 +212,83 @@ The script will:
 * Logs are mounted to `./logs` for easier debugging.
 * Entrypoint ensures **migrations and collectstatic** run automatically before starting Gunicorn.
 
+---
+
+## 📡 API Example
+
+### Submit License Application
+
+**Endpoint**
+
+`POST /license/create/`
+
+**Required fields include `licenseNumber` (must be unique).**
+
+```json
+{
+  "licenseCategory": "SEED",
+  "licenseLevel": "STATE",
+  "registeringAuthority": "Department of Agriculture",
+  "registeringOfficeName": "District Agri Office, Jaipur",
+  "licenseNumber": "RJSDST-EXAMPLE-001",
+  "applicantName": "Ravi Kumar",
+  "aadhaarNumber": "<encrypted_aadhaar>",
+  "applicantPermanentAddress": "H.No 45, Green Colony, Jaipur",
+  "firmName": "Ravi Agro Traders",
+  "firmType": "Partnership",
+  "firmAddress": "Plot No 22, Mandi Road, Jaipur",
+  "salePointAddress": "Shop No 5, Krishi Market, Jaipur",
+  "saleStorageAddress": "Warehouse No 3, Outer Ring Road, Jaipur",
+  "cropName": "Wheat",
+  "cropVariety": "HD2967",
+  "isSeedSelfProduced": false,
+  "productionCompany": "Agro Seeds Pvt Ltd"
+}
+```
+
+**Success response (202)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "transactionHash": "0xabc123...",
+    "status": "accepted",
+    "message": "Transaction submitted successfully.",
+    "licenseNumber": "RJSDST-EXAMPLE-001",
+    "senderAddress": "0x..."
+  }
+}
+```
+
+### Get License Details By Number
+
+**Endpoint**
+
+`GET /license/info-by-number/<licenseNumber>/`
+
+**Example**
+
+`/license/info-by-number/RJSDST-EXAMPLE-001/`
+
+### Get License Action History
+
+**Endpoint**
+
+`GET /license/history/<licenseId>/`
+
+**Response includes submitted `licenseNumber` and `history` list.**
+
+### Get License Action History By Number
+
+**Endpoint**
+
+`GET /license/history-by-number/<licenseNumber>/`
+
+### Update License Status (By Number)
+
+**Endpoint**
+
+`POST /license/update-status/`
+
+Use `licenseNumber` instead of `licenseId` in the payload.

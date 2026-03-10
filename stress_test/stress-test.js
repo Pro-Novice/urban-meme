@@ -98,6 +98,8 @@ const applicantData = new SharedArray('applicants', () => [
     cropVariety: 'HD2967',
     isSeedSelfProduced: false,
     productionCompany: 'Sharma Seeds Pvt Ltd',
+    latitude: 26.9124,
+    longitude: 75.7873,
   },
   {
     licenseCategory: 'FERTILIZER',
@@ -109,6 +111,8 @@ const applicantData = new SharedArray('applicants', () => [
     cropVariety: 'Basmati',
     isSeedSelfProduced: false,
     productionCompany: 'AgroTech Ltd',
+    latitude: 27.0238,
+    longitude: 74.2179,
   },
 ]);
 
@@ -296,8 +300,10 @@ function simulatedRpcPing(){
 // ---------------- APPLICATION HELPERS ----------------
 function generateApplication(){
   const base = randItem(applicantData);
+  const licenseNumber = `RJ${randItem(['SDDT','FDDT','SDST','FDST'])}-TEST-${randInt(1000,9999)}`;
   return {
     ...base,
+    licenseNumber,
     aadhaarNumber: getEncryptedAadhaar(),
     registeringAuthority: 'Department of Agriculture',
     registeringOfficeName: `District Agri Office, ${randItem(['Jaipur','Udaipur','Jodhpur','Kota'])}`,

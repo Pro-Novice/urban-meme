@@ -44,6 +44,8 @@ applicant_data = [
         "cropVariety": "HD2967",
         "isSeedSelfProduced": False,
         "productionCompany": "Sharma Seeds Pvt Ltd",
+        "latitude": 26.9124,
+        "longitude": 75.7873,
     },
     {
         "licenseCategory": "FERTILIZER",
@@ -55,6 +57,8 @@ applicant_data = [
         "cropVariety": "Basmati",
         "isSeedSelfProduced": False,
         "productionCompany": "AgroTech Ltd",
+        "latitude": 27.0238,
+        "longitude": 74.2179,
     }
 ]
 
@@ -437,9 +441,12 @@ def generate_application():
     """Generate random application data"""
     base = random_item(applicant_data)
     encrypted_aadhaar = random_item(ENCRYPTED_AADHAARS)
+    license_number = f"RJ{random.choice(['SDDT','FDDT','SDST','FDST'])}-TEST-{random_int(1000,9999)}"
+
     
     return {
         **base,
+        "licenseNumber": license_number,
         "aadhaarNumber": encrypted_aadhaar,
         "registeringAuthority": "Department of Agriculture",
         "registeringOfficeName": f"District Agri Office, {random_item(['Jaipur','Udaipur','Jodhpur','Kota'])}",
