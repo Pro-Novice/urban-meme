@@ -15,12 +15,27 @@ log() {
 
 
 mkdir -p ./logs
-LOG_FILE="./logs/deployment.log"
+LOG_DATE=$(date +"%Y-%m-%d")
+LOG_FILE="./logs/deployment_${LOG_DATE}.txt" 
 PID_FILE="./.live_logger.pid"
-> "$LOG_FILE"
-exec > >(tee "$LOG_FILE") 2>&1
 
-# ── ADDED: Live logger functions ──────────────────────────────────────────────
+
+> "$LOG_FILE"                                          
+exec > >(tee "$LOG_FILE") 2>&1  
+
+echo "========================================================================"
+echo " Session started : $(date)"
+echo " Log file        : $LOG_FILE"
+echo "========================================================================"
+
+clean_log() {
+    if [[ -f "$LOG_FILE" ]]; then
+        sed -i 's/\x1b\[[0-9;]*m//g' "$LOG_FILE" 2>/dev/null || \
+        sed -i '' 's/'$'\x1b''\[[0-9;]*m//g' "$LOG_FILE" 2>/dev/null || true
+    fi
+}
+
+# ── Live logger functions ─────────────────────────────────────────────────────
 stop_live_logger() {
     if [[ -f "$PID_FILE" ]]; then
         kill "$(cat "$PID_FILE")" 2>/dev/null || true
@@ -30,7 +45,9 @@ stop_live_logger() {
 
 start_live_logger() {
     stop_live_logger
-    docker compose -f "$COMPOSE_FILE" logs -f --no-color >> "$LOG_FILE" 2>&1 &
+    # Always append to today's dated file
+    CURRENT_LOG="./logs/deployment_$(date +"%Y-%m-%d").txt"
+    docker compose -f "$COMPOSE_FILE" logs -f --no-color >> "$CURRENT_LOG" 2>&1 &
     echo $! > "$PID_FILE"
 }
 
@@ -84,8 +101,7 @@ case "$ACTION_CHOICE" in
         log "Configuring Redis ACL"
         sleep 2  # Give Redis time to start
         if docker exec -i rajasthan-seed-redis redis-cli \
-            ACL SETUSER "$REDIS_USER" on ">" password \
-            ">$REDIS_PASSWORD" +@all ~*; then
+            ACL SETUSER "$REDIS_USER" on ">$REDIS_PASSWORD" +@all ~*; then
             log "Redis ACL Configured Successfully"
         else
             echo -e "${RED}Redis ACL Configuration Failed${NC}"

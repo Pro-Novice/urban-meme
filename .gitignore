@@ -20,4 +20,5 @@ htmlcov_e2e/
 pytest_cache/
 reports
 deployment.log
+logs/
 .live_logger.pid
