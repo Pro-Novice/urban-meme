@@ -22,3 +22,5 @@ reports
 deployment.log
 logs/
 .live_logger.pid
+.container_logger.pid
+.terminal_logger.active
