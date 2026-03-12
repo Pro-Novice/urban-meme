@@ -8,9 +8,39 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 log() {
-    echo -e "${GREEN}####################################################################"
-    echo -e "   $1"
-    echo -e "####################################################################${NC}"
+    echo -e "${GREEN}####################################################################\n   $1\n####################################################################${NC}"
+}
+
+
+mkdir -p ./logs
+LOG_DATE=$(date +"%Y-%m-%d")
+LOG_FILE="./logs/deployment_${LOG_DATE}.txt" 
+PID_FILE="./.live_logger.pid"
+
+
+> "$LOG_FILE"                                          
+exec > >(tee >(sed -u -r 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g; s/\r/\n/g' > "$LOG_FILE")) 2>&1
+
+echo "========================================================================"
+echo " Session started : $(date)"
+echo " Log file        : $LOG_FILE"
+echo "========================================================================"
+
+
+# ── Live logger functions ─────────────────────────────────────────────────────
+stop_live_logger() {
+    if [[ -f "$PID_FILE" ]]; then
+        kill "$(cat "$PID_FILE")" 2>/dev/null || true
+        rm -f "$PID_FILE"
+    fi
+}
+
+start_live_logger() {
+    stop_live_logger
+    # Always append to today's dated file
+    CURRENT_LOG="./logs/deployment_$(date +"%Y-%m-%d").txt"
+    docker compose -f "$COMPOSE_FILE" logs -f --no-color >> "$CURRENT_LOG" 2>&1 &
+    echo $! > "$PID_FILE"
 }
 
 # Load .env if exists
@@ -53,6 +83,7 @@ case "$ACTION_CHOICE" in
     1)
         # Full deployment with rebuild
         log "Stopping Existing Containers for $ENV_NAME Environment"
+        stop_live_logger                                                  
         docker compose -f "$COMPOSE_FILE" down 
         
         log "Building and Starting Containers for $ENV_NAME Environment"
@@ -62,8 +93,7 @@ case "$ACTION_CHOICE" in
         log "Configuring Redis ACL"
         sleep 2  # Give Redis time to start
         if docker exec -i rajasthan-seed-redis redis-cli \
-            ACL SETUSER "$REDIS_USER" on ">" password \
-            ">$REDIS_PASSWORD" +@all ~*; then
+            ACL SETUSER "$REDIS_USER" on ">$REDIS_PASSWORD" +@all ~*; then
             log "Redis ACL Configured Successfully"
         else
             echo -e "${RED}Redis ACL Configuration Failed${NC}"
@@ -72,11 +102,13 @@ case "$ACTION_CHOICE" in
         
         log "Deployment Successful ✓"
         docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+        start_live_logger                                                  
         ;;
         
     2)
         # Stop only
         log "Stopping and Removing All Containers for $ENV_NAME Environment"
+        stop_live_logger                                                  
         docker compose -f "$COMPOSE_FILE" down
         log "All Containers Stopped Successfully ✓"
         echo ""
@@ -87,11 +119,13 @@ case "$ACTION_CHOICE" in
     3)
         # Quick restart without rebuild
         log "Restarting Containers for $ENV_NAME Environment (No Rebuild)"
+        stop_live_logger                                                  
         docker compose -f "$COMPOSE_FILE" down
         docker compose -f "$COMPOSE_FILE" up -d
         
         log "Restart Successful ✓"
         docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+        start_live_logger                                                  
         ;;
         
     *)

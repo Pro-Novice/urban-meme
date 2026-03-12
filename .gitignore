@@ -19,3 +19,8 @@ htmlcov_unit/
 htmlcov_e2e/
 pytest_cache/
 reports
+deployment.log
+logs/
+.live_logger.pid
+.container_logger.pid
+.terminal_logger.active
