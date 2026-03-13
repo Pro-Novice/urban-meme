@@ -78,6 +78,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'utils.middleware.RequestLogMiddleware',
 ]
 
 # ================== LOGGING ================== #
@@ -87,6 +88,7 @@ LOGGING = {
     'formatters': {
         'verbose': {'format': '{levelname} {asctime} {module} {message}', 'style': '{'},
         'simple': {'format': '{levelname} {message}', 'style': '{'},
+        'request': {'format': '{asctime} {levelname} {message}', 'style': '{'},
     },
     'handlers': {
         'console': {'class': 'logging.StreamHandler', 'formatter': 'simple'},
@@ -95,6 +97,7 @@ LOGGING = {
         'django': {'handlers': ['console'], 'level': 'INFO', 'propagate': True},
         'apps.seed_licenses': {'handlers': ['console'], 'level': 'DEBUG', 'propagate': False},
         'blockchain': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'django.request': {'handlers': ['console'], 'level': 'DEBUG', 'propagate': False},
     },
 }
 

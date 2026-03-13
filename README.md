@@ -206,6 +206,22 @@ The script will:
 
 ---
 
+## 📑 Log Monitoring & Deployment Logs
+
+This backend includes a **log monitoring system** that captures deployment logs and live container logs, with automatic daily rotation.
+
+### Components
+- **`./docker-manage.sh`** →  
+  Handles deployments (full rebuild, stop only, quick restart).  
+  - Captures **deployment logs** (build, start, Redis ACL setup, container status).  
+  - Starts a **live logger** that streams container logs into daily files.  
+
+- **`./log_monitoring/log-manager.sh`** →  
+  Provides options to view and save **terminal logs** or **container logs** into `.txt` files inside `./logs`.
+
+- **`./logs`** →  
+  Stores all log files with daily rotation:
+
 ## 📌 Notes
 
 * Static and media files are stored in **Docker volumes**: `static_volume`, `media_volume`.
@@ -292,3 +308,17 @@ The script will:
 `POST /license/update-status/`
 
 Use `licenseNumber` instead of `licenseId` in the payload.
+
+### Force Refresh License Mapping
+
+**Endpoint**
+
+`POST /license/mapping/refresh/`
+
+**Body**
+
+```json
+{
+  "licenseNumber": "RJSDST-EXAMPLE-001"
+}
+```

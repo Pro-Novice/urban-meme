@@ -160,7 +160,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n \"licenseNumber\":\"RJSDST-TEST-001\",\n \"status\":\"UNDER_REVIEW\", // SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED , INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWED\n \"officerName\": \"Shrawan\",\n \"role\": \"AGRICULTURE_OFFICER\",\n \"renewalPeriodDays\": 34, // Only required when status is APPROVED or RENEWED\n \"remarks\":\"License is UNDER_REVIEW\"\n}",
+                  "raw": "{\n \"licenseNumber\":\"RJFTST-TEST-001\",\n \"status\":\"UNDER_REVIEW\", // SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED , INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWED\n \"officerName\": \"Shrawan\",\n \"role\": \"AGRICULTURE_OFFICER\",\n \"renewalPeriodDays\": 34, // Only required when status is APPROVED or RENEWED\n \"remarks\":\"License is UNDER_REVIEW\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -175,6 +175,35 @@
                   "path": [
                     "license",
                     "update-status",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "5.1 Force refresh mapping",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"licenseNumber\": \"RJFTST-TEST-001\"\n}\n",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/license/mapping/refresh/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "license",
+                    "mapping",
+                    "refresh",
                     ""
                   ]
                 }
@@ -424,7 +453,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"licenseCategory\": \"PESTICIDE\",\n  \"licenseLevel\": \"STATE\",\n  \"registeringAuthority\": \"Department of Agriculture\",\n  \"registeringOfficeName\": \"District Agri Office, Jaipur\",\n  \"licenseNumber\": \"RJPSST-TEST-002\",  // must be unique\n  \"applicantName\": \"Ravi Kumar\",\n  \"aadhaarNumber\": \"IRk4zRfT9iJvf5CRYUQOZwor9ro553k8mWwlfqwLPheTWoz0oLEPlr/+4vPOPOa0nOROMII9ZhLV9r2DR1AnPqsVXUj2g1JiAZWvIE61Zu/qU/RU/B+yxUnbmztYC8kmK0eunlvFyNtmBidbgbatQWnn4JufcuewGFwCIUblTCQ9PpPouh8KK9602n4rPi36MGcGQFVdm8uoxig9/RRLh34UFb8yBamhuY5I/5UMDQUgli5Vu9Fc8AXuu+3sZ3odR8DIeMykmtTyrysTYAu7I8jHHThGcHNiysrESgaPEc5azFdFHdULoLiWA4RRMrgKDFWJV1MeTbI1UZsHtCc/PA==\",\n  \"applicantPermanentAddress\": \"H.No 45, Green Colony, Jaipur\",\n  \"firmName\": \"Ravi Agro Traders\",\n  \"firmType\": \"Partnership\",\n  \"firmAddress\": \"Plot No 22, Mandi Road, Jaipur\",\n  \"salePointAddress\": \"Shop No 5, Krishi Market, Jaipur\",\n  \"saleStorageAddress\": \"Warehouse No 3, Outer Ring Road, Jaipur\",\n  \"cropName\": \"Wheat\",\n  \"cropVariety\": \"HD2967\",\n  \"isSeedSelfProduced\": false, \n  \"productionCompany\": \"Agro Seeds Pvt Ltd\",  // required only when isSeedSelfProduced is true else its by default firmName\n  \"latitude\": 26.9124,\n  \"longitude\": 75.7873\n}\n",
+                  "raw": "{\n  \"licenseCategory\": \"PESTICIDE\",\n  \"licenseLevel\": \"STATE\",\n  \"registeringAuthority\": \"Department of Agriculture\",\n  \"registeringOfficeName\": \"District Agri Office, Jaipur\",\n  \"licenseNumber\": \"RJPST-TEST-002\",  // must be unique\n  \"applicantName\": \"Ravi Kumar\",\n  \"aadhaarNumber\": \"IRk4zRfT9iJvf5CRYUQOZwor9ro553k8mWwlfqwLPheTWoz0oLEPlr/+4vPOPOa0nOROMII9ZhLV9r2DR1AnPqsVXUj2g1JiAZWvIE61Zu/qU/RU/B+yxUnbmztYC8kmK0eunlvFyNtmBidbgbatQWnn4JufcuewGFwCIUblTCQ9PpPouh8KK9602n4rPi36MGcGQFVdm8uoxig9/RRLh34UFb8yBamhuY5I/5UMDQUgli5Vu9Fc8AXuu+3sZ3odR8DIeMykmtTyrysTYAu7I8jHHThGcHNiysrESgaPEc5azFdFHdULoLiWA4RRMrgKDFWJV1MeTbI1UZsHtCc/PA==\",\n  \"applicantPermanentAddress\": \"H.No 45, Green Colony, Jaipur\",\n  \"firmName\": \"Ravi Agro Traders\",\n  \"firmType\": \"Partnership\",\n  \"firmAddress\": \"Plot No 22, Mandi Road, Jaipur\",\n  \"salePointAddress\": \"Shop No 5, Krishi Market, Jaipur\",\n  \"saleStorageAddress\": \"Warehouse No 3, Outer Ring Road, Jaipur\",\n  \"cropName\": \"Wheat\",\n  \"cropVariety\": \"HD2967\",\n  \"isSeedSelfProduced\": false, \n  \"productionCompany\": \"Agro Seeds Pvt Ltd\",  // required only when isSeedSelfProduced is true else its by default firmName\n  \"latitude\": 26.9124,\n  \"longitude\": 75.7873\n}\n",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -516,14 +545,14 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{base_url}}/license/info-by-number/RJPSST-TEST-002/",
+                  "raw": "{{base_url}}/license/info-by-number/RJPST-TEST-002/",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
                     "license",
                     "info-by-number",
-                    "RJPSST-TEST-002",
+                    "RJPST-TEST-002",
                     ""
                   ]
                 }
@@ -537,7 +566,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n \"licenseNumber\":\"RJSDST-TEST-002\",\n \"status\":\"APPROVED\", // SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED , INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWED\n \"officerName\": \"Shrawan\",\n \"role\": \"AGRICULTURE_OFFICER\",\n \"renewalPeriodDays\": 34, // Only required when status is APPROVED or RENEWED\n \"remarks\":\"License is UNDER_REVIEW\"\n}",
+                  "raw": "{\n \"licenseNumber\":\"RJPST-TEST-002\",\n \"status\":\"APPROVED\", // SUBMITTED, UNDER_REVIEW, DOCUMENTS_VERIFIED, INSPECTION_SCHEDULED , INSPECTION_COMPLETED, APPROVED, REJECTED, REVOKED, EXPIRED, RENEWED\n \"officerName\": \"Shrawan\",\n \"role\": \"AGRICULTURE_OFFICER\",\n \"renewalPeriodDays\": 34, // Only required when status is APPROVED or RENEWED\n \"remarks\":\"License is UNDER_REVIEW\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -552,6 +581,35 @@
                   "path": [
                     "license",
                     "update-status",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "5.1 Force refresh mapping",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"licenseNumber\": \"RJPST-TEST-002\"\n}\n",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/license/mapping/refresh/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "license",
+                    "mapping",
+                    "refresh",
                     ""
                   ]
                 }
@@ -625,7 +683,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"licenseNumber\": \"RJPSST-TEST-002\",\n    \"expectedHash\": \"212d02520d33be03153a2c34cb4d50b63f570e6d6881589ebbec2ec6b3da51b0\"\n}",
+                  "raw": "{\n    \"licenseNumber\": \"RJPST-TEST-002\",\n    \"expectedHash\": \"212d02520d33be03153a2c34cb4d50b63f570e6d6881589ebbec2ec6b3da51b0\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -929,6 +987,35 @@
                   "path": [
                     "license",
                     "update-status",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "5.1 Force refresh mapping",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"licenseNumber\": \"RJSDST-TEST-003\"\n}\n",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/license/mapping/refresh/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "license",
+                    "mapping",
+                    "refresh",
                     ""
                   ]
                 }
