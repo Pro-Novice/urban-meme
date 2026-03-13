@@ -27,6 +27,11 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - agri-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   redis:
     image: redis:alpine
@@ -39,11 +44,17 @@ services:
     restart: unless-stopped
     networks:
       - agri-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
 
   celery:
     build: .
     container_name: rajasthan-seed-celery
     command: celery -A config worker -l info
+    mem_limit: 2g
     volumes:
       - .:/app
       - ./logs:/app/logs
@@ -56,6 +67,11 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - agri-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   postgres:
     image: postgres:15-alpine       # Using a lightweight official postgres image
@@ -71,6 +87,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - agri-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
 
 volumes:
   redis_data:
