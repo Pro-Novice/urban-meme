@@ -48,6 +48,10 @@ if [[ -f .env ]]; then
     export $(grep -v '^#' .env | xargs)
 fi
 
+# Disable BuildKit to avoid pulling buildx images during builds
+export DOCKER_BUILDKIT=0
+export COMPOSE_DOCKER_CLI_BUILD=0
+
 # Validate Redis credentials
 if [[ -z "$REDIS_USER" || -z "$REDIS_PASSWORD" ]]; then
     echo -e "${RED}Error: REDIS_USER and REDIS_PASSWORD must be set in .env${NC}"

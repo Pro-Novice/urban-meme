@@ -71,6 +71,11 @@ REDIS_PASSWORD=your-redis-password
 # Django
 DJANGO_SECRET_KEY=your-secret-key
 DJANGO_DEBUG=True
+
+# DRF throttling
+DRF_THROTTLE_ANON=60/min
+DRF_THROTTLE_USER=120/min
+DRF_NUM_PROXIES=1
 ```
 ---
 
@@ -100,6 +105,16 @@ python manage.py runserver
 ```bash
 docker compose up -d --build
 ```
+
+The Nginx reverse proxy listens on port `8000` and forwards to the Django app on `web:8000`.
+
+### Test Nginx + DRF Rate Limits
+
+```bash
+./scripts/test_rate_limits.sh http://localhost:8000 /
+```
+
+Optional: pass a specific API path as the second argument.
 
 ### Stop Services
 

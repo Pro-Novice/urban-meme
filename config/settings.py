@@ -49,6 +49,16 @@ REST_FRAMEWORK = {
     'DEFAULT_PARSER_CLASSES': (
         'djangorestframework_camel_case.parser.CamelCaseJSONParser',
     ),
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': config('DRF_THROTTLE_ANON', default='60/min'),
+        'user': config('DRF_THROTTLE_USER', default='120/min'),
+    },
+    # Trust X-Forwarded-For from nginx reverse proxy
+    'NUM_PROXIES': config('DRF_NUM_PROXIES', default=1, cast=int),
 }
 
 # ================== MIDDLEWARE ================== #
