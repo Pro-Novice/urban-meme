@@ -14,12 +14,17 @@ from apps.seed_licenses.services.blockchain import (
 )
 from django.core.cache import cache 
 from apps.seed_licenses.services.blockchain import TransactionService
+from apps.seed_licenses.schemas import (
+    owner_schema, contract_address_schema, contract_methods_schema,
+    transaction_status_schema, blockchain_health_schema, network_info_schema,
+    block_details_schema, cache_keys_schema, cache_clear_schema, redis_health_schema,
+)
 
 logger = logging.getLogger(__name__)
 
 # Create one shared TransactionService instance
 tx_service = TransactionService()
-
+@owner_schema()
 @api_view(["GET"])
 def check_owner_blockchain(request):
     """
@@ -40,6 +45,7 @@ def check_owner_blockchain(request):
 # ===============================================================
 # 1 GET Contract Address
 # ===============================================================
+@contract_address_schema()
 @api_view(["GET"])
 def contract_address_view(request):
     """
@@ -61,6 +67,7 @@ def contract_address_view(request):
 # ===============================================================
 # 2️ GET All Available Methods
 # ===============================================================
+@contract_methods_schema()
 @api_view(["GET"])
 def contract_methods_view(request):
     """
@@ -90,6 +97,7 @@ def contract_methods_view(request):
 # ===============================================================
 # 3️ GET Transaction Status
 # ===============================================================
+@transaction_status_schema()
 @api_view(["GET"])
 def transaction_status_view(request, tx_hash):
     """
@@ -109,6 +117,7 @@ def transaction_status_view(request, tx_hash):
 # ===============================================================
 # 4️ Health Check / Node Status
 # ===============================================================
+@blockchain_health_schema()
 @api_view(["GET"])
 def blockchain_health_check(request):
     """
@@ -150,6 +159,7 @@ def blockchain_health_check(request):
 # ===============================================================
 # 5️ GET Gas Price & Chain Info
 # ===============================================================
+@network_info_schema()
 @api_view(["GET"])
 def blockchain_network_info(request):
     """
@@ -174,6 +184,11 @@ def blockchain_network_info(request):
             err=f"Error fetching blockchain info: {str(e)}",
             status=HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+# ===============================================================
+# 6️ Get Block Details with Transactions
+# ===============================================================
+@block_details_schema()
 @api_view(["GET"])
 def get_block_details(request, block_number):
     """
@@ -195,6 +210,10 @@ def get_block_details(request, block_number):
 
     return ApiResponse(data=result["data"], status=HTTP_200_OK)
 
+# ===============================================================
+# 7️ Cache Inspection & Management (DEBUG ONLY)
+# ===============================================================
+@cache_keys_schema()
 @api_view(["GET"])
 def view_all_cache_keys(request):
     """View all cached keys and their values (DEBUG ONLY)."""
@@ -243,7 +262,10 @@ def view_all_cache_keys(request):
             status=HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-
+# ===============================================================
+# 8️ Clear Cache (DEBUG ONLY)
+# ===============================================================
+@cache_clear_schema()
 @api_view(["GET"])
 def clear_cache_view(request):
     """Clear all cache data (DEBUG ONLY)."""
@@ -260,6 +282,10 @@ def clear_cache_view(request):
             status=HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+# ===============================================================
+# 9️ Redis Health Check
+# ===============================================================
+@redis_health_schema()
 @api_view(["GET"]) 
 def redis_health_check(request):
     """Check Redis cache connectivity and performance."""

@@ -1,405 +1,545 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock, patch
 from utils.encrypt_aadhaar import encrypt_aadhaar
 from apps.seed_licenses.services.license_service import LicenseService, TransactionService
 from apps.seed_licenses.services.multi_account_manager import multi_account_manager
+from django.core.cache import cache as django_cache
 
-# Shared blockchain state manager for testing
+
+# =============================================================================
+# Blockchain State Manager
+# =============================================================================
+
 class BlockchainStateManager:
-    """Shared blockchain state manager for testing with new architecture"""
-    
-    _shared_state = {
-        'licenses': {},
-        'counter': 0,
-        'owner': "0x0000000000000000000000000000000000000001",
-        'accounts': [
+    """
+    In-memory blockchain state simulator — one independent instance per test.
+    """
+
+    STATUS_MAP = {
+        0: "SUBMITTED",            1: "UNDER_REVIEW",
+        2: "DOCUMENTS_VERIFIED",   3: "INSPECTION_SCHEDULED",
+        4: "INSPECTION_COMPLETED", 5: "APPROVED",
+        6: "REJECTED",             7: "REVOKED",
+        8: "EXPIRED",              9: "RENEWED",
+    }
+    STATUS_REVERSE = {v: k for k, v in STATUS_MAP.items()}
+
+    CATEGORY_MAP     = {0: "SEED", 1: "FERTILIZER", 2: "PESTICIDE"}
+    CATEGORY_REVERSE = {v: k for k, v in CATEGORY_MAP.items()}
+
+    LEVEL_MAP     = {0: "STATE", 1: "DIVISION", 2: "DISTRICT"}
+    LEVEL_REVERSE = {v: k for k, v in LEVEL_MAP.items()}
+
+    ROLE_MAP = {
+        0: "CITIZEN",                       1: "AGRICULTURE_OFFICER",
+        2: "ASSISTANT_AGRICULTURE_OFFICER", 3: "ASSISTANT_DIRECTOR",
+        4: "DEPUTY_DIRECTOR",               5: "JOINT_DIRECTOR",
+        6: "JOINT_DIRECTOR_INPUT",          7: "FIELD_INSPECTOR",
+    }
+    ROLE_REVERSE = {v: k for k, v in ROLE_MAP.items()}
+
+    GEO_REQUIRED_CATEGORIES = {1, 2}   # FERTILIZER, PESTICIDE
+    GEO_SCALE               = 1_000_000
+
+    # FIX-1: all state is instance-level — no class-level dict
+    def __init__(self):
+        self._accounts = [
             {
-                "address": "0x0000000000000000000000000000000000000001",
+                "address":     "0x0000000000000000000000000000000000000001",
                 "private_key": "TEST_PRIVATE_KEY",
-                "source": "test",
-                "index": 0
+                "source":      "test",
+                "index":        0,
             }
         ]
-    }
-    
-    def __init__(self):
-        self.state = self._shared_state
-    
+        self._owner = "0x0000000000000000000000000000000000000001"
+        self.reset()
+
     def reset(self):
-        """Reset the shared state"""
-        self._shared_state['licenses'] = {}
-        self._shared_state['counter'] = 0
-        print(f"[RESET] State reset. Counter: {self._shared_state['counter']}, Licenses: {len(self._shared_state['licenses'])}")
-    
+        self._licenses        = {}   # int license_id -> dict
+        self._license_numbers = {}   # str license_number -> int license_id
+        self._counter         = 0
+
+    # ── properties ────────────────────────────────────────────────────────
+
     @property
     def licenses(self):
-        return self._shared_state['licenses']
-    
+        return self._licenses
+
+    @property
+    def license_numbers(self):
+        return self._license_numbers
+
     @property
     def counter(self):
-        return self._shared_state['counter']
-    
+        return self._counter
+
     @counter.setter
     def counter(self, value):
-        self._shared_state['counter'] = value
-    
+        self._counter = value
+
     @property
     def owner(self):
-        return self._shared_state['owner']
-    
+        return self._owner
+
     @property
     def accounts(self):
-        return self._shared_state['accounts']
-    
-    def transform_license_data(self, license_data):
-        """Transform license data from tuple/list to dict for testing with enum conversion"""
-        if isinstance(license_data, (list, tuple)):
-            transformed = {
-                "licenseId": license_data[0] if len(license_data) > 0 else None,
-                "licenseNumber": license_data[1] if len(license_data) > 1 else None,
-                "applicantName": license_data[2] if len(license_data) > 2 else None,
-                "category": license_data[3] if len(license_data) > 3 else None,
-                "level": license_data[4] if len(license_data) > 4 else None,
-                "status": license_data[5] if len(license_data) > 5 else None,
-                "firmName": license_data[6] if len(license_data) > 6 else None,
-                "firmType": license_data[7] if len(license_data) > 7 else None,
-                "firmAddress": license_data[8] if len(license_data) > 8 else None,
-                "salePointAddress": license_data[9] if len(license_data) > 9 else None,
-                "saleStorageAddress": license_data[10] if len(license_data) > 10 else None,
-                "productionCompany": license_data[11] if len(license_data) > 11 else None,
-                "cropName": license_data[12] if len(license_data) > 12 else None,
-                "cropVariety": license_data[13] if len(license_data) > 13 else None,
-                "registeringOfficeName": license_data[14] if len(license_data) > 14 else None,
-                "registeringAuthority": license_data[15] if len(license_data) > 15 else None,
-                "applicationDate": license_data[16] if len(license_data) > 16 else None,
-                "isActive": license_data[22] if len(license_data) > 22 else None,
+        return self._accounts
+
+    # ── helpers ──────────────────────────────────────────────────────────
+
+    def _resolve_license_id(self, license_id_or_number):
+        if isinstance(license_id_or_number, int):
+            return license_id_or_number
+        lid = self._license_numbers.get(license_id_or_number)
+        if lid is None:
+            raise Exception(f"License number '{license_id_or_number}' does not exist")
+        return lid
+
+    def transform_license_data(self, raw):
+        if isinstance(raw, (list, tuple)):
+            data = {
+                "licenseId":               raw[0]  if len(raw) > 0  else None,
+                "licenseNumber":           raw[1]  if len(raw) > 1  else None,
+                "applicantName":           raw[2]  if len(raw) > 2  else None,
+                "category":                raw[3]  if len(raw) > 3  else None,
+                "level":                   raw[4]  if len(raw) > 4  else None,
+                "status":                  raw[5]  if len(raw) > 5  else None,
+                "firmName":                raw[6]  if len(raw) > 6  else None,
+                "firmType":                raw[7]  if len(raw) > 7  else None,
+                "firmAddress":             raw[8]  if len(raw) > 8  else None,
+                "salePointAddress":        raw[9]  if len(raw) > 9  else None,
+                "saleStorageAddress":      raw[10] if len(raw) > 10 else None,
+                "productionCompany":       raw[11] if len(raw) > 11 else None,
+                "cropName":                raw[12] if len(raw) > 12 else None,
+                "cropVariety":             raw[13] if len(raw) > 13 else None,
+                "registeringOfficeName":   raw[14] if len(raw) > 14 else None,
+                "registeringAuthority":    raw[15] if len(raw) > 15 else None,
+                "applicationDate":         raw[16] if len(raw) > 16 else None,
+                "isActive":                raw[22] if len(raw) > 22 else None,
             }
         else:
-            transformed = license_data.copy()
-        
-        # Convert enum values to strings for testing
-        status_map = {
-            0: "SUBMITTED",
-            1: "UNDER_REVIEW", 
-            2: "DOCUMENTS_VERIFIED",
-            3: "INSPECTION_SCHEDULED",
-            4: "INSPECTION_COMPLETED",
-            5: "APPROVED",
-            6: "REJECTED",
-            7: "REVOKED",
-            8: "EXPIRED",
-            9: "RENEWED"
-        }
-        
-        if "status" in transformed and isinstance(transformed["status"], int):
-            transformed["status"] = status_map.get(transformed["status"], "UNKNOWN")
-        
-        # Convert category and level if needed
-        category_map = {0: "SEED", 1: "FERTILIZER", 2: "INSECTICIDE"}
-        level_map = {0: "DISTRICT", 1: "DIVISION", 2: "STATE"}
-        
-        if "category" in transformed and isinstance(transformed["category"], int):
-            transformed["category"] = category_map.get(transformed["category"], "UNKNOWN")
-        
-        if "level" in transformed and isinstance(transformed["level"], int):
-            transformed["level"] = level_map.get(transformed["level"], "UNKNOWN")
-        
-        return transformed
+            data = dict(raw)
 
-    # ================== MOCK TRANSACTION SERVICE METHODS ================== #
+        if isinstance(data.get("status"),   int):
+            data["status"]   = self.STATUS_MAP.get(data["status"],   "UNKNOWN")
+        if isinstance(data.get("category"), int):
+            data["category"] = self.CATEGORY_MAP.get(data["category"], "UNKNOWN")
+        if isinstance(data.get("level"),    int):
+            data["level"]    = self.LEVEL_MAP.get(data["level"],    "UNKNOWN")
+
+        return data
+
+    # ── READ mock ─────────────────────────────────────────────────────────
 
     def mock_transaction_service_read(self, method_name, params):
-        """Mock the TransactionService.read() method"""
-        print(f"[TX SERVICE READ] Method: {method_name}, Params: {params}")
-        
         if method_name == "owner":
-            return self.owner
-        
-        elif method_name == "licenseIdCounter":
-            return self.counter
-        
-        elif method_name == "getLicenseBasicInfo":
-            license_id = params[0]
-            if license_id not in self.licenses:
-                raise Exception(f"License {license_id} does not exist")
-            return self.transform_license_data(self.licenses[license_id])  
-        
-        elif method_name == "getLicenseActionHistory":
-            license_id = params[0]
-            if license_id not in self.licenses:
-                raise Exception(f"License {license_id} does not exist")
-            
-            history = self.licenses[license_id].get("history", [])
-            
-            # Transform enum values in history
-            action_type_map = {
-                0: "SUBMITTED", 1: "UNDER_REVIEW", 2: "DOCUMENTS_VERIFIED",
-                3: "INSPECTION_SCHEDULED", 4: "INSPECTION_COMPLETED", 5: "APPROVED",
-                6: "REJECTED", 7: "REVOKED", 8: "EXPIRED", 9: "RENEWED"
-            }
-            
-            role_map = {
-                0: "CITIZEN", 1: "AGRICULTURE_OFFICER", 2: "ASSISTANT_AGRICULTURE_OFFICER",
-                3: "ASSISTANT_DIRECTOR", 4: "DEPUTY_DIRECTOR", 5: "JOINT_DIRECTOR",
-                6: "JOINT_DIRECTOR_INPUT", 7: "FIELD_INSPECTOR"
-            }
-            
-            transformed_history = []
-            for item in history:
-                transformed_item = item.copy()
-                if "actionType" in transformed_item and isinstance(transformed_item["actionType"], int):
-                    transformed_item["actionType"] = action_type_map.get(transformed_item["actionType"], "UNKNOWN")
-                if "actorRole" in transformed_item and isinstance(transformed_item["actorRole"], int):
-                    transformed_item["actorRole"] = role_map.get(transformed_item["actorRole"], "UNKNOWN")
-                transformed_history.append(transformed_item)
-            
-            return transformed_history
-        
-        elif method_name == "getLicenseQRData":
-            license_id = params[0]
-            if license_id not in self.licenses:
-                raise Exception(f"License {license_id} does not exist")
-            license_data = self.licenses[license_id]
-            if not license_data.get("isActive", False):
+            return self._owner
+
+        if method_name == "licenseIdCounter":
+            return self._counter
+
+        if method_name == "getLicenseBasicInfo":
+            lid  = self._resolve_license_id(params[0])
+            raw  = self._licenses.get(lid)
+            if raw is None:
+                raise Exception(f"License {lid} does not exist")
+            data = self.transform_license_data(raw)
+
+            # FIX-4: return float degrees (divide stored scaled int)
+            category_int = raw.get("category", 0)
+            if category_int in self.GEO_REQUIRED_CATEGORIES:
+                raw_lat = raw.get("latitude",  0) or 0
+                raw_lng = raw.get("longitude", 0) or 0
+                data["latitude"]  = raw_lat / self.GEO_SCALE
+                data["longitude"] = raw_lng / self.GEO_SCALE
+            else:
+                data.pop("latitude",  None)
+                data.pop("longitude", None)
+
+            data.pop("licenseId", None)
+            return data
+
+        if method_name == "getLicenseActionHistory":
+            lid = self._resolve_license_id(params[0])
+            raw = self._licenses.get(lid)
+            if raw is None:
+                raise Exception(f"License {lid} does not exist")
+            result = []
+            for item in raw.get("history", []):
+                t = dict(item)
+                if isinstance(t.get("actionType"), int):
+                    t["actionType"] = self.STATUS_MAP.get(t["actionType"], "UNKNOWN")
+                if isinstance(t.get("actorRole"),  int):
+                    t["actorRole"]  = self.ROLE_MAP.get(t["actorRole"],  "UNKNOWN")
+                result.append(t)
+            return result
+
+        if method_name == "getLicenseQRData":
+            lid = self._resolve_license_id(params[0])
+            raw = self._licenses.get(lid)
+            if raw is None:
+                raise Exception(f"License {lid} does not exist")
+            if not raw.get("isActive", False):
                 raise Exception("License must be active to generate QR data")
             return {
-                "verificationHash": license_data.get("verificationHash", ""),
-                "licenseNumber": license_data.get("licenseNumber", "")
-            }
-        
-        raise ValueError(f"Method '{method_name}' not found")
-    
-    def mock_transaction_service_write(self, method_name, params, address=None, private_key=None):
-        """Mock the TransactionService.write() method"""
-        print(f"[TX SERVICE WRITE] Method: {method_name}, Params: {params}, Address: {address}")
-        address = address or self.accounts[0]["address"]
-        if method_name == "submitLicenseApplicationV2":
-            self.counter += 1
-            license_id = self.counter
-        
-            struct_input = params[0]
-            license_number = struct_input.get("licenseNumber") or f"RJSDST{license_id}"
-            
-            # Create license with proper structure for new data transformer
-            self.licenses[license_id] = {
-                "licenseId": license_id,
-                "licenseNumber": license_number,
-                "applicantName": struct_input["applicantName"],
-                "category": struct_input["category"],  # Already enum value from serializer
-                "level": struct_input["level"],        # Already enum value from serializer
-                "status": 0,  # SUBMITTED enum value
-                "firmName": struct_input["firmName"],
-                "firmType": struct_input["firmType"],
-                "firmAddress": struct_input["firmAddress"],
-                "salePointAddress": struct_input["salePointAddress"],
-                "saleStorageAddress": struct_input["saleStorageAddress"],
-                "productionCompany": struct_input.get("productionCompany", ""),
-                "cropName": struct_input["cropName"],
-                "cropVariety": struct_input["cropVariety"],
-                "registeringOfficeName": struct_input["registeringOfficeName"],
-                "registeringAuthority": struct_input["registeringAuthority"],
-                "applicantPermanentAddress": struct_input["applicantPermanentAddress"],
-                "aadhaarNumber": struct_input["aadhaarNumber"],
-                "applicationDate": 1733270400,  # Unix timestamp for 2025-01-03
-                "isActive": True,
-                "verificationHash": f"hash_{license_id}",
-                "history": [{
-                    "timestamp": 1733270400,
-                    "actionType": 0,  # SUBMITTED enum value
-                    "actorName": struct_input["applicantName"],
-                    "actorRole": 0,   # CITIZEN enum value
-                    "remarks": "License Application Successfully Submitted",
-                    "dataHash": f"hash_{license_id}"
-                }]
-            }
-            
-            return {
-                "success": True,
-                "transaction_hash": f"0xtx{license_id}",
-                "status": "pending",  # CHANGED: "accepted" → "pending"
-                "rpc_url": "http://test:8545",
-                "message": "Transaction submitted successfully",
-                "sender_address": address or self.accounts[0]["address"]
+                "verificationHash": raw.get("verificationHash", ""),
+                "licenseNumber":    raw.get("licenseNumber",    ""),
             }
 
-        elif method_name == "updateLicenseStatus":
-            license_id, new_status, officer_name, role, remarks, renewal_period = params
-            
-            if license_id not in self.licenses:
+        raise ValueError(f"Read method '{method_name}' not mocked")
+
+    # ── WRITE mock ────────────────────────────────────────────────────────
+
+    def mock_transaction_service_write(self, method_name, params,
+                                       address=None, private_key=None):
+        address = address or self._accounts[0]["address"]
+
+        # ── submitLicenseApplicationV2 ────────────────────────────────────
+        if method_name == "submitLicenseApplicationV2":
+            struct = params[0]
+
+            license_number = struct.get("licenseNumber") or ""
+
+            # Duplicate check — view DB unique constraint handles this first,
+            # but guard here too for robustness.
+            if license_number and license_number in self._license_numbers:
                 return {
                     "success": False,
-                    "error": f"License {license_id} does not exist"
+                    "error":   f"License number '{license_number}' already exists",
                 }
-            
-            license_data = self.licenses[license_id]
-            
-            # Update status (new_status is already enum value from serializer)
-            license_data["status"] = new_status
-            
-            # Add to history
-            license_data["history"].append({
-                "timestamp": 1733270400,
-                "actionType": new_status,
-                "actorName": officer_name,
-                "actorRole": role,  # Already enum value from serializer
-                "remarks": remarks,
-                "dataHash": f"hash_update_{license_id}"
-            })
-            
-            return {
-                "success": True,
-                "transaction_hash": f"0xtx_status_{license_id}_{new_status}",
-                "status": "pending",  
-                "rpc_url": "http://test:8545",
-                "message": "Transaction submitted successfully",
-                "sender_address": address or self.accounts[0]["address"]
+
+            self._counter += 1
+            lid = self._counter
+
+            if not license_number:
+                license_number = f"RJSDST{lid}"
+
+            category_int = struct.get("category", 0)
+
+            # FIX-4: serializer already scaled lat/lng x1_000_000
+            lat_scaled = struct.get("latitude",  0) or 0
+            lng_scaled = struct.get("longitude", 0) or 0
+
+            # FIX-3: geo validation returns {"success": False} so _tx_response
+            # converts it to HTTP 400 cleanly (no 500).
+            if category_int in self.GEO_REQUIRED_CATEGORIES:
+                if not lat_scaled or not lng_scaled:
+                    self._counter -= 1
+                    return {
+                        "success": False,
+                        "error":   "latitude and longitude are required for FERTILIZER/PESTICIDE",
+                    }
+                lat_deg = lat_scaled / self.GEO_SCALE
+                lng_deg = lng_scaled / self.GEO_SCALE
+                if not (-90 <= lat_deg <= 90):
+                    self._counter -= 1
+                    return {
+                        "success": False,
+                        "error":   f"latitude {lat_deg} is out of valid range [-90, 90]",
+                    }
+                if not (-180 <= lng_deg <= 180):
+                    self._counter -= 1
+                    return {
+                        "success": False,
+                        "error":   f"longitude {lng_deg} is out of valid range [-180, 180]",
+                    }
+            else:
+                # SEED: serializer strips lat/lng before we get here,
+                # so this guard should never trigger in valid flows.
+                if lat_scaled or lng_scaled:
+                    self._counter -= 1
+                    return {
+                        "success": False,
+                        "error":   "latitude and longitude are not allowed for SEED",
+                    }
+
+            self._licenses[lid] = {
+                "licenseId":                 lid,
+                "licenseNumber":             license_number,
+                "applicantName":             struct["applicantName"],
+                "category":                  category_int,
+                "level":                     struct.get("level", 0),
+                "status":                    0,
+                "firmName":                  struct["firmName"],
+                "firmType":                  struct["firmType"],
+                "firmAddress":               struct["firmAddress"],
+                "salePointAddress":          struct["salePointAddress"],
+                "saleStorageAddress":        struct["saleStorageAddress"],
+                "productionCompany":         struct.get("productionCompany", ""),
+                "cropName":                  struct["cropName"],
+                "cropVariety":               struct["cropVariety"],
+                "registeringOfficeName":     struct["registeringOfficeName"],
+                "registeringAuthority":      struct["registeringAuthority"],
+                "applicantPermanentAddress": struct["applicantPermanentAddress"],
+                "aadhaarNumber":             struct["aadhaarNumber"],
+                "applicationDate":           1733270400,
+                "isActive":                  True,
+                "latitude":                  lat_scaled,   # FIX-4: scaled int
+                "longitude":                 lng_scaled,   # FIX-4: scaled int
+                "verificationHash":          f"hash_{lid}",
+                "history": [{
+                    "timestamp":  1733270400,
+                    "actionType": 0,
+                    "actorName":  struct["applicantName"],
+                    "actorRole":  0,
+                    "remarks":    "License Application Successfully Submitted",
+                    "dataHash":   f"hash_{lid}",
+                }],
             }
-        
-        elif method_name == "updateLicenseDetails":
-            license_id = params[0]
-            
-            if license_id not in self.licenses:
-                return {
-                    "success": False,
-                    "error": f"License {license_id} does not exist"
-                }
-            
-            license_data = self.licenses[license_id]
-            
-           
-            if license_data["status"] != 5:  # APPROVED enum value
-                return {
-                    "success": False,
-                    "error": "License must be APPROVED to update details"
-                }
-            
-            # Update fields
+            self._license_numbers[license_number] = lid
+
+            tx_hash = f"0xtx{lid}"
+
+            # FIX-2: update the LicenseSubmission row the view already created
+            # (without license_id) so info-by-number resolves immediately.
+            try:
+                from apps.seed_licenses.models import LicenseSubmission
+                LicenseSubmission.objects.filter(
+                    license_number=license_number
+                ).update(
+                    license_id=lid,
+                    transaction_hash=tx_hash,
+                )
+            except Exception:
+                pass
+
+            return {
+                "success":          True,
+                "transaction_hash": tx_hash,
+                "status":           "pending",
+                "rpc_url":          "http://test:8545",
+                "message":          "Transaction submitted successfully",
+                "sender_address":   address,
+                "license_number":   license_number,
+            }
+
+        # ── updateLicenseStatus ───────────────────────────────────────────
+        if method_name == "updateLicenseStatus":
+            lid, new_status, officer_name, role, remarks, renewal_period = params
+
+            raw = self._licenses.get(lid)
+            if raw is None:
+                return {"success": False, "error": f"License {lid} does not exist"}
+
+            raw["status"] = new_status
+
+            if new_status in (5, 9):
+                raw["isActive"] = True
+            elif new_status in (6, 7):
+                raw["isActive"] = False
+
+            raw["history"].append({
+                "timestamp":  1733270400,
+                "actionType": new_status,
+                "actorName":  officer_name,
+                "actorRole":  role,
+                "remarks":    remarks,
+                "dataHash":   f"hash_status_{lid}_{new_status}",
+            })
+
+            return {
+                "success":          True,
+                "transaction_hash": f"0xtx_status_{lid}_{new_status}",
+                "status":           "pending",
+                "rpc_url":          "http://test:8545",
+                "message":          "Transaction submitted successfully",
+                "sender_address":   address,
+            }
+
+        # ── updateLicenseDetails ──────────────────────────────────────────
+        if method_name == "updateLicenseDetails":
+            lid = params[0]
+
+            raw = self._licenses.get(lid)
+            if raw is None:
+                return {"success": False, "error": f"License {lid} does not exist"}
+
+            if raw["status"] != 5:
+                return {"success": False, "error": "License must be APPROVED to update details"}
+
             update_fields = [
-                "firmName", "firmType", "firmAddress", "salePointAddress", 
-                "saleStorageAddress", "productionCompany", "cropName", "cropVariety"
+                "firmName", "firmType", "firmAddress", "salePointAddress",
+                "saleStorageAddress", "productionCompany", "cropName", "cropVariety",
             ]
-            
             for i, field in enumerate(update_fields, 1):
                 if i < len(params) and params[i]:
-                    license_data[field] = params[i]
-            
+                    raw[field] = params[i]
+
             return {
-                "success": True,
-                "transaction_hash": f"0xtx_update_{license_id}",
-                "status": "pending", 
-                "rpc_url": "http://test:8545",
-                "message": "Transaction submitted successfully",
-                "sender_address": address or self.accounts[0]["address"]
+                "success":          True,
+                "transaction_hash": f"0xtx_update_{lid}",
+                "status":           "pending",
+                "rpc_url":          "http://test:8545",
+                "message":          "Transaction submitted successfully",
+                "sender_address":   address,
             }
-        
-        elif method_name == "verifyLicenseWithHash":
+
+        # ── verifyLicenseWithHash ─────────────────────────────────────────
+        if method_name == "verifyLicenseWithHash":
             license_number, expected_hash = params
-            
-            # Find license by number
-            found_license = None
-            for lic_id, lic_data in self.licenses.items():
-                if lic_data["licenseNumber"] == license_number:
-                    found_license = lic_data
-                    break
-            
-            if not found_license:
-                return {
-                    "success": False,
-                    "error": "License not found"
-                }
-            
-            is_valid = found_license.get("verificationHash") == expected_hash
-            
+
+            lid = self._license_numbers.get(license_number)
+            if lid is None:
+                return {"success": False, "error": "License not found"}
+
+            raw      = self._licenses[lid]
+            verified = raw.get("verificationHash") == expected_hash
+
             return {
-                "success": True,
+                "success":          True,
                 "transaction_hash": f"0xtx_verify_{license_number}",
-                "status": "pending",  
-                "rpc_url": "http://test:8545",
-                "message": "Transaction submitted successfully",
-                "verified": is_valid,
-                "sender_address": address or self.accounts[0]["address"]
+                "status":           "pending",
+                "rpc_url":          "http://test:8545",
+                "message":          "Transaction submitted successfully",
+                "verified":         verified,
+                "sender_address":   address,
             }
-        
-        raise ValueError(f"Method '{method_name}' not found")
-    
+
+        raise ValueError(f"Write method '{method_name}' not mocked")
+
+
+# =============================================================================
+# Core fixtures
+# =============================================================================
+
 @pytest.fixture(scope="function")
 def blockchain_state():
-    """Fixture that provides blockchain state for each test"""
+    """Fresh BlockchainStateManager per test function — no shared class state."""
+    django_cache.clear()
     manager = BlockchainStateManager()
-    manager.reset()
     yield manager
     manager.reset()
+    django_cache.clear()
+
+
+# =============================================================================
+# Category-specific payload fixtures
+# =============================================================================
+
+@pytest.fixture
+def seed_license_payload():
+    """SEED license — latitude / longitude MUST NOT be present."""
+    return {
+        "licenseCategory":           "SEED",
+        "licenseLevel":              "STATE",
+        "registeringAuthority":      "Department of Agriculture",
+        "registeringOfficeName":     "State Agriculture Office",
+        "licenseNumber":             "RJSDST-TEST-001",
+        "applicantName":             "Rajesh Kumar",
+        "aadhaarNumber":             encrypt_aadhaar("234567890123"),
+        "applicantPermanentAddress": "123 Main St, Jaipur, Rajasthan",
+        "firmName":                  "Kumar Seeds Pvt Ltd",
+        "firmType":                  "Private Limited",
+        "firmAddress":               "456 Industrial Area, Jaipur",
+        "salePointAddress":          "789 Market Road, Jaipur",
+        "saleStorageAddress":        "101 Warehouse District, Jaipur",
+        "cropName":                  "Wheat",
+        "cropVariety":               "HD-2967",
+        "productionCompany":         "Kumar Seeds Pvt Ltd",
+        # NO latitude / longitude — SEED forbids them
+    }
 
 
 @pytest.fixture
-def complete_license_payload():
-    """Complete payload for license application"""
+def fertilizer_license_payload():
+    """FERTILIZER license — latitude / longitude REQUIRED."""
     return {
-        "licenseCategory": "SEED",
-        "licenseLevel": "STATE",
-        "registeringAuthority": "Department of Agriculture",
-        "registeringOfficeName": "State Agriculture Office",
-        "licenseNumber": "RJSDST-TEST-002",
-        "applicantName": "Rajesh Kumar",
-        "aadhaarNumber": encrypt_aadhaar("234567890123"),
-        "applicantPermanentAddress": "123 Main St, Jaipur, Rajasthan",
-        "firmName": "Kumar Seeds Pvt Ltd",
-        "firmType": "Private Limited",
-        "firmAddress": "456 Industrial Area, Jaipur",
-        "salePointAddress": "789 Market Road, Jaipur",
-        "saleStorageAddress": "101 Warehouse District, Jaipur",
-        "cropName": "Wheat",
-        "cropVariety": "HD-2967",
-        "isSeedSelfProduced": False, 
-        "productionCompany": "Kumar Seeds Pvt Ltd",
+        "licenseCategory":           "FERTILIZER",
+        "licenseLevel":              "STATE",
+        "registeringAuthority":      "Department of Agriculture",
+        "registeringOfficeName":     "District Agri Office, Jaipur",
+        "licenseNumber":             "RJFTST-TEST-001",
+        "applicantName":             "Suresh Sharma",
+        "aadhaarNumber":             encrypt_aadhaar("345678901234"),
+        "applicantPermanentAddress": "456 MG Road, Jaipur, Rajasthan",
+        "firmName":                  "Sharma Fertilizers Pvt Ltd",
+        "firmType":                  "Private Limited",
+        "firmAddress":               "Plot 45, Industrial Area, Jaipur",
+        "salePointAddress":          "Shop 12, Market Road, Jaipur",
+        "saleStorageAddress":        "Warehouse 3, NH-8, Jaipur",
+        "cropName":                  "Wheat",
+        "cropVariety":               "HD-2967",
+        "productionCompany":         "AgriChem India Ltd",
+        "latitude":                  26.9500,
+        "longitude":                 75.6800,
     }
 
+
+@pytest.fixture
+def pesticide_license_payload():
+    """PESTICIDE license — latitude / longitude REQUIRED."""
+    return {
+        "licenseCategory":           "PESTICIDE",
+        "licenseLevel":              "DISTRICT",
+        "registeringAuthority":      "Department of Agriculture",
+        "registeringOfficeName":     "District Agri Office, Jodhpur",
+        "licenseNumber":             "RJPSDT-TEST-001",
+        "applicantName":             "Mohan Verma",
+        "aadhaarNumber":             encrypt_aadhaar("456789012345"),
+        "applicantPermanentAddress": "789 Station Road, Jodhpur, Rajasthan",
+        "firmName":                  "Verma Pesticides Ltd",
+        "firmType":                  "Public Limited",
+        "firmAddress":               "Plot 22, RIICO Area, Jodhpur",
+        "salePointAddress":          "Shop 5, Agri Market, Jodhpur",
+        "saleStorageAddress":        "Godown 1, NH-65, Jodhpur",
+        "cropName":                  "Cotton",
+        "cropVariety":               "Bt Cotton",
+        "productionCompany":         "ChemAgro India",
+        "latitude":                  26.2900,
+        "longitude":                 73.0200,
+    }
+
+
+@pytest.fixture
+def complete_license_payload(seed_license_payload):
+    """Backward-compatible alias."""
+    return seed_license_payload
+
+
+# =============================================================================
+# Service / infrastructure fixtures
+# =============================================================================
 
 @pytest.fixture
 def mock_transaction_service(blockchain_state):
-    """Mock TransactionService for integration tests"""
-    mock_service = MagicMock(spec=TransactionService)
-    
-    # Mock the read method
-    mock_service.read.side_effect = blockchain_state.mock_transaction_service_read
-    
-    # Mock the write method  
-    mock_service.write.side_effect = blockchain_state.mock_transaction_service_write
-    
-    # Mock other methods
-    mock_service.get_status.return_value = {
-        "tx_hash": "0xtest123",
-        "status": "CONFIRMED",
-        "block_number": 12345,
-        "timestamp": 1733270400,
-        "confirmations": 10
+    mock_svc = MagicMock(spec=TransactionService)
+    mock_svc.read.side_effect  = blockchain_state.mock_transaction_service_read
+    mock_svc.write.side_effect = blockchain_state.mock_transaction_service_write
+    mock_svc.get_status.return_value = {
+        "tx_hash":       "0xtest123",
+        "status":        "CONFIRMED",
+        "block_number":  12345,
+        "timestamp":     1733270400,
+        "confirmations": 10,
     }
-    
-    return mock_service
+    return mock_svc
 
 
 @pytest.fixture
 def mock_license_service(mock_transaction_service):
-    """Mock LicenseService for integration tests"""
     return LicenseService(mock_transaction_service)
 
 
 @pytest.fixture
 def mock_multi_account_manager(blockchain_state):
-    """Mock multi-account manager"""
-    with patch('apps.seed_licenses.services.multi_account_manager.multi_account_manager') as mock_manager:
-        mock_manager.get_random_account.return_value = blockchain_state.accounts[0]
-        mock_manager.get_account_by_address.return_value = blockchain_state.accounts[0]
-        mock_manager.get_accounts_info.return_value = [
-            {"address": acc["address"], "source": acc["source"], "index": acc["index"]}
-            for acc in blockchain_state.accounts
+    with patch(
+        "apps.seed_licenses.services.multi_account_manager.multi_account_manager"
+    ) as mock_mgr:
+        mock_mgr.get_random_account.return_value     = blockchain_state.accounts[0]
+        mock_mgr.get_account_by_address.return_value = blockchain_state.accounts[0]
+        mock_mgr.get_accounts_info.return_value = [
+            {
+                "address": a["address"],
+                "source":  a["source"],
+                "index":   a["index"],
+            }
+            for a in blockchain_state.accounts
         ]
-        yield mock_manager
+        yield mock_mgr
 
 
 @pytest.fixture
 def mock_event_parser():
-    """Mock EventParser for integration tests"""
     mock_parser = MagicMock()
     mock_parser.parse_and_store.return_value = (1, [])
     return mock_parser
@@ -407,7 +547,9 @@ def mock_event_parser():
 
 @pytest.fixture
 def mock_celery_tasks():
-    """Mock Celery tasks to avoid background processing"""
-    with patch('apps.seed_licenses.services.blockchain.tasks.process_transaction_confirmation.delay') as mock_task:
+    with patch(
+        "apps.seed_licenses.services.blockchain.tasks"
+        ".process_transaction_confirmation.delay"
+    ) as mock_task:
         mock_task.return_value = None
         yield mock_task
