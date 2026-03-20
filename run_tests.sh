@@ -77,7 +77,8 @@ pytest -v \
     --no-header \
     --maxfail=5 \
     -x \
-    apps/seed_licenses/tests/test_license_apis.py 
+    apps/seed_licenses/tests/test_license_apis.py \
+    apps/seed_licenses/tests/integration/test_rate_limiting.py
 
 TEST_EXIT=$?
 

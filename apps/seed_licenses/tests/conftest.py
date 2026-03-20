@@ -4,6 +4,7 @@ import time
 from rest_framework.test import APIClient
 from utils.encrypt_aadhaar import encrypt_aadhaar
 from unittest.mock import MagicMock
+from django.core.cache import cache as django_cache
 
 @pytest.fixture
 def client():
@@ -11,6 +12,13 @@ def client():
     return APIClient()
 
 
+@pytest.fixture(autouse=True)
+def clear_throttle_cache():
+    """Clear DRF throttle counters before every test."""
+    django_cache.clear()
+    yield
+    django_cache.clear()
+    
 @pytest.fixture(scope="session", autouse=False)
 def reset_blockchain():
     """Reset blockchain before tests"""

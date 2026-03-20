@@ -51,6 +51,16 @@ REST_FRAMEWORK = {
         'djangorestframework_camel_case.parser.CamelCaseJSONParser',
     ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+
+    'NUM_PROXIES': config('DRF_NUM_PROXIES', default=1, cast=int),
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': config('DRF_THROTTLE_ANON', default='60/min'),
+        'user': config('DRF_THROTTLE_USER', default='120/min'),
+    },
 }
 
 # ================== SPECTACULAR (API DOCS) ================== #
@@ -67,16 +77,6 @@ SPECTACULAR_SETTINGS = {
     'SCHEMA_PATH_PREFIX': r'/api/',
     'ENUM_GENERATE_CHOICE_DESCRIPTION': True,
     'ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE': False,
-    'DEFAULT_THROTTLE_CLASSES': (
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
-    ),
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': config('DRF_THROTTLE_ANON', default='60/min'),
-        'user': config('DRF_THROTTLE_USER', default='120/min'),
-    },
-    # Trust X-Forwarded-For from nginx reverse proxy
-    'NUM_PROXIES': config('DRF_NUM_PROXIES', default=1, cast=int),
 }
 
 # ================== MIDDLEWARE ================== #
