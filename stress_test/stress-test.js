@@ -300,7 +300,7 @@ function simulatedRpcPing(){
 // ---------------- APPLICATION HELPERS ----------------
 function generateApplication(){
   const base = randItem(applicantData);
-  const licenseNumber = `RJSDST-${Date.now()}-${randInt(1000, 9999)}`;
+  const licenseNumber = `RJ${randItem(['SDDT','FDDT','SDST','FDST'])}-TEST-${randInt(1000,9999)}`;
   return {
     ...base,
     licenseNumber,
