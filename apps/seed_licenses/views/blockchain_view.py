@@ -19,11 +19,13 @@ from apps.seed_licenses.schemas import (
     transaction_status_schema, blockchain_health_schema, network_info_schema,
     block_details_schema, cache_keys_schema, cache_clear_schema, redis_health_schema,
 )
+from utils.middleware import sensitive_view 
 
 logger = logging.getLogger(__name__)
 
 # Create one shared TransactionService instance
 tx_service = TransactionService()
+@sensitive_view
 @owner_schema()
 @api_view(["GET"])
 def check_owner_blockchain(request):

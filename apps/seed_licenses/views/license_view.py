@@ -26,7 +26,7 @@ from apps.seed_licenses.schemas import (
     verify_document_schema, update_details_schema, add_officer_schema,
     license_basic_info_by_number_schema, license_history_by_number_schema
 )
-
+from utils.middleware import sensitive_view
 logger = logging.getLogger(__name__)
 
 # --------------------------------------------------------------------
@@ -68,6 +68,7 @@ VALID_STATUS_TRANSITIONS = {
 # --------------------------------------------------------------------
 # 1️ Get Total License Count
 # --------------------------------------------------------------------
+@sensitive_view
 @license_count_schema()
 @api_view(["GET"])
 def check_total_license_count(request):
@@ -87,6 +88,7 @@ def check_total_license_count(request):
 # --------------------------------------------------------------------
 # 2️ Submit License Application
 # --------------------------------------------------------------------
+@sensitive_view
 @submit_license_schema()
 @api_view(["POST"])
 def submit_license_application(request):
@@ -129,6 +131,7 @@ def submit_license_application(request):
 # --------------------------------------------------------------------
 # 3️ Get License Basic Info
 # --------------------------------------------------------------------
+@sensitive_view
 @license_basic_info_schema()
 @api_view(["GET"])
 def get_license_basic_info(request, license_id: int):
@@ -159,6 +162,7 @@ def get_license_basic_info(request, license_id: int):
 # --------------------------------------------------------------------
 # 3.1️ Get License Basic Info By License Number
 # --------------------------------------------------------------------
+@sensitive_view
 @license_basic_info_by_number_schema()
 @api_view(["GET"])
 def get_license_basic_info_by_number(request, license_number: str):
@@ -200,6 +204,7 @@ def get_license_basic_info_by_number(request, license_number: str):
 # --------------------------------------------------------------------
 # 4️ Get License QR Data
 # --------------------------------------------------------------------
+@sensitive_view
 @license_qr_schema()
 @api_view(["GET"])
 def get_license_qr_data(request, license_id: int):
@@ -235,6 +240,7 @@ def get_license_qr_data(request, license_id: int):
 # --------------------------------------------------------------------
 # 5️ Get License Action History
 # --------------------------------------------------------------------
+@sensitive_view
 @license_history_schema()
 @api_view(["GET"])
 def get_license_action_history(request, license_id: int):
@@ -258,6 +264,7 @@ def get_license_action_history(request, license_id: int):
 # --------------------------------------------------------------------
 # 5.1️ Get License Action History By License Number
 # --------------------------------------------------------------------
+@sensitive_view
 @license_history_by_number_schema()
 @api_view(["GET"])
 def get_license_action_history_by_number(request, license_number: str):
@@ -394,6 +401,7 @@ def _resolve_license_number(license_id: int) -> str:
 # --------------------------------------------------------------------
 # 6️ Update License Status
 # --------------------------------------------------------------------
+@sensitive_view
 @update_status_schema()
 @api_view(["POST"])
 def update_license_status_view(request):
@@ -451,6 +459,7 @@ def update_license_status_view(request):
 # --------------------------------------------------------------------
 # 6.1️ Force Refresh License Mapping (Admin)
 # --------------------------------------------------------------------
+@sensitive_view
 @api_view(["POST"])
 def force_refresh_license_mapping(request):
     """Force-refresh licenseNumber <-> licenseId mapping from EventLog."""
@@ -490,6 +499,7 @@ def force_refresh_license_mapping(request):
 # --------------------------------------------------------------------
 # 7️ Verify License Document
 # --------------------------------------------------------------------
+@sensitive_view
 @verify_document_schema()
 @api_view(["POST"])
 def verify_license_document(request):
@@ -511,6 +521,7 @@ def verify_license_document(request):
 # --------------------------------------------------------------------
 # 8️ Update License Details
 # --------------------------------------------------------------------
+@sensitive_view
 @update_details_schema()
 @api_view(["POST"])
 def update_license_details(request):
@@ -545,6 +556,7 @@ def update_license_details(request):
 # --------------------------------------------------------------------
 # 9️ Add Officer to Contract
 # --------------------------------------------------------------------
+@sensitive_view
 @add_officer_schema()
 @api_view(["POST"])
 def add_officer_to_contract(request):

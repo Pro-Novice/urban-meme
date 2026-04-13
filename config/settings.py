@@ -82,6 +82,7 @@ SPECTACULAR_SETTINGS = {
 # ================== MIDDLEWARE ================== #
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    "utils.middleware.SecurityHeadersMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     # 'django.middleware.csrf.CsrfViewMiddleware',
