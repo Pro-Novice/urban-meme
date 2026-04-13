@@ -7,9 +7,11 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
 from apps.seed_licenses.schemas import (public_key_schema, security_health_schema)   
+from utils.middleware import sensitive_view
 logger = logging.getLogger(__name__)
 
 # ✅ 1️ Public Key Endpoint
+@sensitive_view
 @public_key_schema()
 @api_view(["GET"])
 def get_public_key(request):
@@ -25,6 +27,7 @@ def get_public_key(request):
 
 
 # ✅ 2️ Security Health Check Endpoint
+@sensitive_view
 @security_health_schema()
 @api_view(["GET"])
 def security_health_check(request):
