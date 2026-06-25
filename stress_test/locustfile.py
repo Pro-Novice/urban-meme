@@ -441,7 +441,7 @@ def generate_application():
     """Generate random application data"""
     base = random_item(applicant_data)
     encrypted_aadhaar = random_item(ENCRYPTED_AADHAARS)
-    license_number = f"RJ{random.choice(['SDST','FDST','SDST','FDST'])}-TEST-{random_int(100,999)}"
+    license_number = f"RJ{random.choice(['SDDT','FDDT','SDST','FDST'])}-TEST-{random_int(1000,9999)}"
 
     
     return {

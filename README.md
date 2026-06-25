@@ -71,6 +71,11 @@ REDIS_PASSWORD=your-redis-password
 # Django
 DJANGO_SECRET_KEY=your-secret-key
 DJANGO_DEBUG=True
+
+# DRF throttling
+DRF_THROTTLE_ANON=60/min
+DRF_THROTTLE_USER=120/min
+DRF_NUM_PROXIES=1
 ```
 ---
 
@@ -100,6 +105,16 @@ python manage.py runserver
 ```bash
 docker compose up -d --build
 ```
+
+The Nginx reverse proxy listens on port `8000` and forwards to the Django app on `web:8000`.
+
+### Test Nginx + DRF Rate Limits
+
+```bash
+./scripts/test_rate_limits.sh http://localhost:8000 /
+```
+
+Optional: pass a specific API path as the second argument.
 
 ### Stop Services
 
@@ -146,6 +161,41 @@ python -m pytest apps/seed_licenses/Tests/
 
 ```
 
+## 📖 API Documentation (Swagger / OpenAPI 3.0)
+
+### Overview
+
+This project uses [`drf-spectacular`](https://github.com/tfranzel/drf-spectacular) to auto-generate an OpenAPI 3.0 schema directly from Django REST Framework views and serializers. The schema is served as an interactive Swagger UI and ReDoc page.
+
+### Accessing the Docs
+
+| Interface | URL |
+|---|---|
+| Swagger UI | http://localhost:8000/docs/ |
+| ReDoc | http://localhost:8000/redoc/ |
+| Raw OpenAPI YAML | http://localhost:8000/schema/ |
+
+### Installation
+
+`drf-spectacular` is listed in `requirements.txt`. If rebuilding a Docker image from scratch:
+```bash
+docker compose down
+docker compose build --no-cache
+docker compose up
+```
+
+For local development:
+```bash
+pip install drf-spectacular==0.27.2
+```
+
+#### Swagger / Schema Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/docs/` | Swagger UI — interactive API explorer |
+| GET | `/redoc/` | ReDoc — clean API reference |
+| GET | `/schema/` | Raw OpenAPI 3.0 YAML/JSON |
 
 ## 📜 Deployment
 

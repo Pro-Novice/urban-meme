@@ -1,7 +1,3 @@
-"""
-Test cases for seed license endpoints.
-Place this file as: tests/test_license_endpoints.py
-"""
 import pytest
 from unittest.mock import MagicMock, patch
 from django.urls import reverse, NoReverseMatch
@@ -354,14 +350,14 @@ class TestGetLicenseQRData:
         data = resp.json()["data"]
         assert "verificationHash" in data
         assert "licenseNumber" in data
-        assert data["licenseNumber"] == "LIC001"
+        assert data["licenseNumber"] == "RJSDST-TEST-001"
     
     @pytest.mark.parametrize("license_id", [1, 50, 100, 500])
     def test_various_valid_license_ids(self, client, monkeypatch, license_id):
         """Test with various valid license IDs"""
         monkeypatch.setattr(
             "apps.seed_licenses.views.license_view.license_service.get_qr_data",
-            MagicMock(return_value={"verificationHash": "hash", "licenseNumber": "LIC001"})
+            MagicMock(return_value={"verificationHash": "hash", "licenseNumber": "RJSDST-TEST-001"})
         )
         
         resp = client.get(reverse("license-qr-data", args=[license_id]))
@@ -664,7 +660,7 @@ class TestVerifyDocument:
         MagicMock(return_value={
             "success": True,
             "verified": True,
-            "license_number": "RJSDST1"
+            "license_number": "RJSDST-TEST-001"
         }))
         # 1. Submit license
         client.post(reverse("submit-license-application"), data=valid_license_payload, format="json")

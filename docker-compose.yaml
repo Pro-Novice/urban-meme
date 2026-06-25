@@ -4,8 +4,8 @@ services:
     image: rajasthan-seed-backend-web:latest
     container_name: rajasthan-seed-backend
     restart: always
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     volumes:
       - ./:/app
       - ./logs:/app/logs
@@ -64,6 +64,20 @@ services:
       - web
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - agri-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: rajasthan-seed-nginx
+    depends_on:
+      - web
+    ports:
+      - "8000:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - static_volume:/app/static
+      - media_volume:/app/media
     networks:
       - agri-network
     logging:

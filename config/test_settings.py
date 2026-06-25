@@ -22,11 +22,16 @@ ALLOWED_HOSTS = ["*"]
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
+        'LOCATION': 'throttle-test-cache',
     }
 }
 
-
+# Make throttle keys deterministic in tests
+REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {
+    'anon': '60/min',
+    'user': '120/min',
+}
+REST_FRAMEWORK['NUM_PROXIES'] = 1
 # ==============================================================
 # REDUCE LOG SPAM
 # ==============================================================
