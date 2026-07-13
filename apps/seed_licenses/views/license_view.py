@@ -57,7 +57,6 @@ VALID_STATUS_TRANSITIONS = {
     LicenseStatusEnum.APPROVED.value: [
         LicenseStatusEnum.REVOKED.value,
         LicenseStatusEnum.EXPIRED.value,
-        LicenseStatusEnum.RENEWED.value,
     ],
     LicenseStatusEnum.REJECTED.value: [],
     LicenseStatusEnum.REVOKED.value: [],

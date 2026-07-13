@@ -405,6 +405,7 @@ def update_status_schema():
             "**Valid statuses:** SUBMITTED → UNDER_REVIEW → DOCUMENTS_VERIFIED → "
             "INSPECTION_SCHEDULED → INSPECTION_COMPLETED → APPROVED / REJECTED / REVOKED / EXPIRED / RENEWED\n\n"
             "**Rules:**\n"
+            "- `RENEWED` is allowed only when the current status is `EXPIRED`\n"
             "- `renewalPeriodDays` is **required** when status is `APPROVED` or `RENEWED`\n"
             "- `licenseId` OR `licenseNumber` must be provided (not both required — `licenseId` takes precedence)"
         ),
@@ -465,7 +466,7 @@ def update_details_schema():
         tags=["Licenses"],
         summary="Update license details",
         description=(
-            "Updates mutable fields on an existing license. "
+            "Updates mutable fields on an APPROVED or RENEWED license. "
             "`licenseId` and `role` are required. At least one optional field must be provided.\n\n"
             "**Updatable fields:** applicantName, aadhaarNumber, applicantPermanentAddress, firmName, "
             "firmType, firmAddress, salePointAddress, saleStorageAddress, productionCompany, cropName, "

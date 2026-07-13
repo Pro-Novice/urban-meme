@@ -211,6 +211,36 @@ class TestSeedLicenseLifecycle:
             if resp.status_code == 200:
                 assert resp.json()["data"]["status"] in ("DOCUMENTS_VERIFIED", 2)
 
+    def test_renewal_is_allowed_only_after_expiry(
+        self, client, seed_license_payload, blockchain_state,
+        mock_transaction_service, mock_license_service,
+        mock_multi_account_manager, mock_celery_tasks,
+    ):
+        with patch("apps.seed_licenses.views.license_view.license_service", mock_license_service), \
+             patch("apps.seed_licenses.views.license_view.tx_service", mock_transaction_service):
+
+            assert _submit(client, seed_license_payload).status_code == 202
+
+            blockchain_state.licenses[1]["status"] = 5  # APPROVED
+            resp = _update_status(
+                client,
+                license_id=1,
+                status="RENEWED",
+                role="JOINT_DIRECTOR",
+                renewal_days=365,
+            )
+            assert resp.status_code == 400
+
+            blockchain_state.licenses[1]["status"] = 8  # EXPIRED
+            resp = _update_status(
+                client,
+                license_id=1,
+                status="RENEWED",
+                role="JOINT_DIRECTOR",
+                renewal_days=365,
+            )
+            assert resp.status_code == 202
+
 
 # =============================================================================
 # FERTILIZER lifecycle

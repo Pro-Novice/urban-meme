@@ -128,6 +128,28 @@ class TestLicenseUpdate:
                 assert d["firmName"] == seed_license_payload["firmName"]
                 assert d["cropName"] == seed_license_payload["cropName"]
 
+    def test_update_renewed_seed_license(
+        self, client, seed_license_payload, blockchain_state,
+        mock_transaction_service, mock_license_service,
+        mock_multi_account_manager, mock_celery_tasks,
+    ):
+        """A RENEWED license remains active and its mutable details can be edited."""
+        with patch("apps.seed_licenses.views.license_view.license_service", mock_license_service), \
+             patch("apps.seed_licenses.views.license_view.tx_service", mock_transaction_service):
+
+            _submit(client, seed_license_payload)
+            blockchain_state.licenses[1]["status"] = 9
+
+            resp = _update_details(client, {
+                "licenseId": 1,
+                "firmAddress": "Updated After Renewal",
+                "role": "AGRICULTURE_OFFICER",
+            })
+
+            assert resp.status_code == 202
+            info = client.get(reverse("license-basic-info", args=[1])).json()["data"]
+            assert info["firmAddress"] == "Updated After Renewal"
+
     def test_update_non_approved_license_fails(
         self, client, seed_license_payload, blockchain_state,
         mock_transaction_service, mock_license_service,

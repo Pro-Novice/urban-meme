@@ -105,7 +105,11 @@ contract LicenseSystemV2 is LicenseSystemV1 {
     ) external onlyAuthorizedCallers {
         License storage license = licenses[_licenseId];
         require(license.licenseId != 0, "License does not exist");
-        require(license.status == LicenseStatus.APPROVED, "Only approved licenses can be edited");
+        require(
+            license.status == LicenseStatus.APPROVED ||
+            license.status == LicenseStatus.RENEWED,
+            "Only approved or renewed licenses can be edited"
+        );
 
         if (bytes(input.applicantName).length > 0) license.applicantName = input.applicantName;
         if (bytes(input.aadhaarNumber).length > 0) license.aadhaarNumber = input.aadhaarNumber;
@@ -130,7 +134,7 @@ contract LicenseSystemV2 is LicenseSystemV1 {
             require(
                 license.category == LicenseCategory.FERTILIZER ||
                 license.category == LicenseCategory.PESTICIDE,
-                "Geo is only valid for fertilizer or pesticide licenses"
+                "Geo invalid for this license category"
             );
             require(input.latitude != 0 && input.longitude != 0, "Geo required");
             license.latitude = input.latitude;

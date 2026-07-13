@@ -10,6 +10,7 @@ const config: HardhatUserConfig = {
       {
         version: "0.8.28",   // Must match solc in node_modules
         settings: {
+          viaIR: true,
           optimizer: {
             enabled: true,
             runs: 100,

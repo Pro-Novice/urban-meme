@@ -356,8 +356,11 @@ class BlockchainStateManager:
             if raw is None:
                 return {"success": False, "error": f"License {lid} does not exist"}
 
-            if raw["status"] != 5:
-                return {"success": False, "error": "License must be APPROVED to update details"}
+            if raw["status"] not in (5, 9):
+                return {
+                    "success": False,
+                    "error": "License must be APPROVED or RENEWED to update details",
+                }
 
             if isinstance(params[1], dict):
                 updates = params[1]

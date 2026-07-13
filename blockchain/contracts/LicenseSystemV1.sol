@@ -12,6 +12,8 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  * @dev Implementation contract optimized for API integration
  */
 contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, OwnableUpgradeable {
+    error RenewalRequiresExpiredStatus();
+
     // Events
     event LicenseApplicationSubmitted(uint256 indexed licenseId, string licenseNumber, LicenseCategory category, uint256 applicationDate, int256 latitude, int256 longitude);
     event LicenseApproved(uint256 indexed licenseId, string changedBy, userRole changedByRole, uint256 approvalDate, uint256 expiryDate);
@@ -229,6 +231,9 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
 
         // Handle specific status updates
         if (_newStatus == LicenseStatus.APPROVED || _newStatus == LicenseStatus.RENEWED) {
+            if (_newStatus == LicenseStatus.RENEWED && oldStatus != LicenseStatus.EXPIRED) {
+                revert RenewalRequiresExpiredStatus();
+            }
             // For approvals (new or renewals)
             require(_renewalPeriodDays > 0, "Renewal period must be greater than 0");
             license.approvalDate = block.timestamp;
