@@ -8,6 +8,25 @@ import "./LicenseSystemV1.sol";
  * @dev Upgraded version with new features
  */
 contract LicenseSystemV2 is LicenseSystemV1 {
+    struct LicenseDetailsUpdateInput {
+        string applicantName;
+        string aadhaarNumber;
+        string applicantPermanentAddress;
+        string firmName;
+        string firmType;
+        string firmAddress;
+        string salePointAddress;
+        string saleStorageAddress;
+        string productionCompany;
+        string[] cropName;
+        string cropVariety;
+        bool isSeedSelfProduced;
+        bool isSeedSelfProducedProvided;
+        int256 latitude;
+        int256 longitude;
+        bool coordinatesProvided;
+    }
+
     // New events for V2
     event LicenseDetailsUpdated(uint256 indexed licenseId, uint256 lastModifiedDate);
     event LicenseApplicationSubmittedV2(uint256 indexed licenseId, string licenseNumber, LicenseCategory category, uint256 applicationDate, int256 latitude, int256 longitude);
@@ -36,7 +55,7 @@ contract LicenseSystemV2 is LicenseSystemV1 {
         newLicense.salePointAddress = input.salePointAddress;
         newLicense.saleStorageAddress = input.saleStorageAddress;
         newLicense.productionCompany = input.productionCompany;
-        newLicense.cropName = input.cropName;
+        _setCropName(newLicense, input.cropName);
         newLicense.cropVariety = input.cropVariety;
         newLicense.applicationDate = block.timestamp;
         newLicense.lastModifiedDate = block.timestamp;
@@ -80,33 +99,44 @@ contract LicenseSystemV2 is LicenseSystemV1 {
 
     function updateLicenseDetails(
         uint256 _licenseId,
-        string memory _firmName,
-        string memory _firmType,
-        string memory _firmAddress,
-        string memory _salePointAddress,
-        string memory _saleStorageAddress,
-        string memory _productionCompany,
-        string memory _cropName,
-        string memory _cropVariety,
+        LicenseDetailsUpdateInput calldata input,
         userRole _role
-    ) public virtual onlyAuthorizedCallers {
+    ) external onlyAuthorizedCallers {
         License storage license = licenses[_licenseId];
         require(license.licenseId != 0, "License does not exist");
         require(license.status == LicenseStatus.APPROVED, "Only approved licenses can be edited");
 
-        // Only update if non-empty
-        if (bytes(_firmName).length > 0) license.firmName = _firmName;
-        if (bytes(_firmType).length > 0) license.firmType = _firmType;
-        if (bytes(_firmAddress).length > 0) license.firmAddress = _firmAddress;
-        if (bytes(_salePointAddress).length > 0) license.salePointAddress = _salePointAddress;
-        if (bytes(_saleStorageAddress).length > 0) license.saleStorageAddress = _saleStorageAddress;
-        if (bytes(_productionCompany).length > 0) license.productionCompany = _productionCompany;
-        if (bytes(_cropName).length > 0) license.cropName = _cropName;
-        if (bytes(_cropVariety).length > 0) license.cropVariety = _cropVariety;
+        if (bytes(input.applicantName).length > 0) license.applicantName = input.applicantName;
+        if (bytes(input.aadhaarNumber).length > 0) license.aadhaarNumber = input.aadhaarNumber;
+        if (bytes(input.applicantPermanentAddress).length > 0) {
+            license.applicantPermanentAddress = input.applicantPermanentAddress;
+        }
+        if (bytes(input.firmName).length > 0) license.firmName = input.firmName;
+        if (bytes(input.firmType).length > 0) license.firmType = input.firmType;
+        if (bytes(input.firmAddress).length > 0) license.firmAddress = input.firmAddress;
+        if (bytes(input.salePointAddress).length > 0) license.salePointAddress = input.salePointAddress;
+        if (bytes(input.saleStorageAddress).length > 0) license.saleStorageAddress = input.saleStorageAddress;
+        if (bytes(input.productionCompany).length > 0) license.productionCompany = input.productionCompany;
+        if (input.cropName.length > 0) _setCropName(license, input.cropName);
+        if (bytes(input.cropVariety).length > 0) license.cropVariety = input.cropVariety;
+
+        if (input.isSeedSelfProducedProvided) {
+            require(license.category == LicenseCategory.SEED, "Seed production flag is only valid for seed licenses");
+            license.isSeedSelfProduced = input.isSeedSelfProduced;
+        }
+
+        if (input.coordinatesProvided) {
+            require(
+                license.category == LicenseCategory.FERTILIZER ||
+                license.category == LicenseCategory.PESTICIDE,
+                "Geo is only valid for fertilizer or pesticide licenses"
+            );
+            require(input.latitude != 0 && input.longitude != 0, "Geo required");
+            license.latitude = input.latitude;
+            license.longitude = input.longitude;
+        }
 
         license.lastModifiedDate = block.timestamp;
-
-        // Add to action history
         license.actionHistory.push(
             Action({
                 timestamp: block.timestamp,
@@ -121,7 +151,4 @@ contract LicenseSystemV2 is LicenseSystemV1 {
         emit LicenseDetailsUpdated(_licenseId, block.timestamp);
     }
 
-    // Override existing function with new logic
-
-    // New internal function for V2
 }

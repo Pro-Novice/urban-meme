@@ -90,7 +90,7 @@ class TestLicenseUpdate:
                 "salePointAddress":  "Updated Market Road",
                 "saleStorageAddress":"Updated Warehouse Complex",
                 "productionCompany": "Updated Production Co",
-                "cropName":          "Updated Wheat Variety",
+                "cropName":          ["Updated Wheat", "Updated Rice"],
                 "cropVariety":       "HD-3086",
                 "role":              "AGRICULTURE_OFFICER",
             })
@@ -187,7 +187,7 @@ class TestLicenseUpdate:
             updates = [
                 {"firmName":        "First Update Firm"},
                 {"firmAddress":     "Second Update Address"},
-                {"cropName":        "Third Update Crop"},
+                {"cropName":        ["Third Update Crop"]},
                 {"cropVariety":     "Fourth Update Variety"},
                 {"salePointAddress":"Fifth Update Sale Point"},
             ]
@@ -211,7 +211,7 @@ class TestLicenseUpdate:
                 "licenseId":   1,
                 "firmName":    "Firm with spéciäl chàrs & numbers 123",
                 "firmAddress": "Address with newline\nand tab\t",
-                "cropName":    "Crop with (parentheses) and [brackets]",
+                "cropName":    ["Crop with (parentheses) and [brackets]"],
                 "role":        "AGRICULTURE_OFFICER",
             })
             assert resp.status_code in (202, 500)

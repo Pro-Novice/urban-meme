@@ -44,7 +44,7 @@ const applicantData = new SharedArray('applicants', function () {
             aadhaarNumber: '123456789012',
             firmName: 'Ravi Agro Traders',
             firmType: 'Partnership',
-            cropName: 'Wheat',
+            cropName: ['Wheat', 'Rice', 'Maize'],
             cropVariety: 'HD2967',
             isSeedSelfProduced: false,
             productionCompany: 'Sharma Seeds Pvt Ltd'
@@ -56,7 +56,7 @@ const applicantData = new SharedArray('applicants', function () {
             aadhaarNumber: '987654321098',
             firmName: 'Sharma Seeds',
             firmType: 'Proprietorship',
-            cropName: 'Rice',
+            cropName: ['Rice'],
             cropVariety: 'PR126',
             isSeedSelfProduced: true,
             productionCompany: 'Sharma Seeds Pvt Ltd'
@@ -68,7 +68,7 @@ const applicantData = new SharedArray('applicants', function () {
             aadhaarNumber: '564738291023',
             firmName: 'Vijay Agro',
             firmType: 'LLP',
-            cropName: 'Maize',
+            cropName: ['Maize'],
             cropVariety: 'PMH1',
             isSeedSelfProduced: false,
             productionCompany: 'Sharma Seeds Pvt Ltd'

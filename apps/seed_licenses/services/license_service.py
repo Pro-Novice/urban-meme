@@ -167,18 +167,29 @@ class LicenseService(ILicenseService):
 
     # ---------- UPDATE DETAILS ---------- #
     def update_details(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        update_input = {
+            "applicantName": data.get("applicant_name", ""),
+            "aadhaarNumber": data.get("aadhaar_number", ""),
+            "applicantPermanentAddress": data.get("applicant_permanent_address", ""),
+            "firmName": data.get("firm_name", ""),
+            "firmType": data.get("firm_type", ""),
+            "firmAddress": data.get("firm_address", ""),
+            "salePointAddress": data.get("sale_point_address", ""),
+            "saleStorageAddress": data.get("sale_storage_address", ""),
+            "productionCompany": data.get("production_company", ""),
+            "cropName": data.get("crop_name", []),
+            "cropVariety": data.get("crop_variety", ""),
+            "isSeedSelfProduced": data.get("is_seed_self_produced", False),
+            "isSeedSelfProducedProvided": "is_seed_self_produced" in data,
+            "latitude": data.get("latitude", 0),
+            "longitude": data.get("longitude", 0),
+            "coordinatesProvided": "latitude" in data,
+        }
         return self.tx.write(
             "updateLicenseDetails",
             [
                 data["license_id"],
-                data.get("firm_name", ""),
-                data.get("firm_type", ""),
-                data.get("firm_address", ""),
-                data.get("sale_point_address", ""),
-                data.get("sale_storage_address", ""),
-                data.get("production_company", ""),
-                data.get("crop_name", ""),
-                data.get("crop_variety", ""),
+                update_input,
                 data["role"],
             ],
         )

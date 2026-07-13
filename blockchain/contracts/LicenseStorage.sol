@@ -91,6 +91,7 @@ contract LicenseStorage {
         bool isPaid;
         bool documentsVerified;
         bool inspectionPassed;
+        string[] cropNames;
     }
 
     struct Payment {
@@ -123,7 +124,7 @@ contract LicenseStorage {
         string salePointAddress;
         string saleStorageAddress;
         string productionCompany;
-        string cropName;
+        string[] cropName;
         string cropVariety;
         string registeringOfficeName;
         string registeringAuthority;
@@ -169,7 +170,7 @@ contract LicenseStorage {
         string salePointAddress;
         string saleStorageAddress;
         string productionCompany;
-        string cropName;
+        string[] cropName;
         string cropVariety;
         int256 latitude;
         int256 longitude;
@@ -190,7 +191,7 @@ contract LicenseStorage {
         string salePointAddress;
         string saleStorageAddress;
         string productionCompany;
-        string cropName;
+        string[] cropName;
         string cropVariety;
         int256 latitude;
         int256 longitude;

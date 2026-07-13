@@ -95,9 +95,9 @@ class TestMultipleLicenses:
 
             licenses = [
                 {"applicantName": "First Applicant",  "firmName": "First Firm",
-                 "cropName": "Wheat", "licenseNumber": "RJSDST-ISO-001"},
+                 "cropName": ["Wheat"], "licenseNumber": "RJSDST-ISO-001"},
                 {"applicantName": "Second Applicant", "firmName": "Second Firm",
-                 "cropName": "Rice",  "licenseNumber": "RJSDST-ISO-002"},
+                 "cropName": ["Rice"],  "licenseNumber": "RJSDST-ISO-002"},
             ]
             for lic in licenses:
                 _submit(client, {**seed_license_payload, **lic})

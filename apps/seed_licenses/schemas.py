@@ -35,7 +35,7 @@ class LicenseBasicInfoSerializer(serializers.Serializer):
     registeringAuthority    = serializers.CharField()
     registeringOfficeName   = serializers.CharField()
     productionCompany       = serializers.CharField()
-    cropName                = serializers.CharField()
+    cropName                = serializers.ListField(child=serializers.CharField())
     cropVariety             = serializers.CharField()
     latitude                = serializers.IntegerField()
     longitude               = serializers.IntegerField()
@@ -164,7 +164,7 @@ def submit_license_schema():
                 "salePointAddress":         serializers.CharField(),
                 "saleStorageAddress":       serializers.CharField(),
                 "productionCompany":        serializers.CharField(),
-                "cropName":                 serializers.CharField(),
+                "cropName":                 serializers.ListField(child=serializers.CharField()),
                 "cropVariety":              serializers.CharField(),
                 "latitude":                 serializers.IntegerField(required=False, help_text="Required for FERTILIZER and PESTICIDE only"),
                 "longitude":                serializers.IntegerField(required=False, help_text="Required for FERTILIZER and PESTICIDE only"),
@@ -196,7 +196,7 @@ def submit_license_schema():
                     "salePointAddress": "Shop 12, Market Road",
                     "saleStorageAddress": "Warehouse 3, NH8",
                     "productionCompany": "AgriChem India",
-                    "cropName": "Wheat",
+                    "cropName": ["Wheat", "Rice", "Maize"],
                     "cropVariety": "HD-2967",
                     "latitude": 269500,
                     "longitude": 756800,
@@ -220,7 +220,7 @@ def submit_license_schema():
                     "salePointAddress": "Shop 12, Market Road",
                     "saleStorageAddress": "Warehouse 3, NH8",
                     "productionCompany": "AgriChem India",
-                    "cropName": "Wheat",
+                    "cropName": ["Wheat", "Rice", "Maize"],
                     "cropVariety": "HD-2967",
                     "latitude": 269500,
                     "longitude": 756800,
@@ -244,7 +244,7 @@ def submit_license_schema():
                     "salePointAddress": "Shop 12, Market Road",
                     "saleStorageAddress": "Warehouse 3, NH8",
                     "productionCompany": "SeedCorp India",
-                    "cropName": "Rice",
+                    "cropName": ["Rice", "Wheat"],
                     "cropVariety": "Basmati-370",
                 }
             ),
@@ -458,8 +458,11 @@ def update_details_schema():
         description=(
             "Updates mutable fields on an existing license. "
             "`licenseId` and `role` are required. At least one optional field must be provided.\n\n"
-            "**Updatable fields:** firmName, firmType, firmAddress, salePointAddress, saleStorageAddress, "
-            "productionCompany, cropName, cropVariety"
+            "**Updatable fields:** applicantName, aadhaarNumber, applicantPermanentAddress, firmName, "
+            "firmType, firmAddress, salePointAddress, saleStorageAddress, productionCompany, cropName, "
+            "cropVariety, isSeedSelfProduced, latitude, longitude.\n\n"
+            "**Immutable fields:** licenseCategory, licenseLevel, registeringAuthority, "
+            "registeringOfficeName, licenseNumber. Requests containing these fields are rejected."
         ),
         request=inline_serializer(
             name="UpdateLicenseDetails",
@@ -470,14 +473,20 @@ def update_details_schema():
                     "ASSISTANT_DIRECTOR", "DEPUTY_DIRECTOR", "JOINT_DIRECTOR",
                     "JOINT_DIRECTOR_INPUT", "FIELD_INSPECTOR"
                 ], help_text="Required"),
+                "applicantName":       serializers.CharField(required=False),
+                "aadhaarNumber":       serializers.CharField(required=False, help_text="RSA-encrypted Aadhaar number"),
+                "applicantPermanentAddress": serializers.CharField(required=False),
                 "firmName":           serializers.CharField(required=False),
                 "firmType":           serializers.CharField(required=False),
                 "firmAddress":        serializers.CharField(required=False),
                 "salePointAddress":   serializers.CharField(required=False),
                 "saleStorageAddress": serializers.CharField(required=False),
                 "productionCompany":  serializers.CharField(required=False),
-                "cropName":           serializers.CharField(required=False),
+                "cropName":           serializers.ListField(child=serializers.CharField(), required=False),
                 "cropVariety":        serializers.CharField(required=False),
+                "isSeedSelfProduced": serializers.BooleanField(required=False, help_text="SEED licenses only"),
+                "latitude":           serializers.FloatField(required=False, help_text="Must be supplied with longitude; FERTILIZER/PESTICIDE only"),
+                "longitude":          serializers.FloatField(required=False, help_text="Must be supplied with latitude; FERTILIZER/PESTICIDE only"),
             }
         ),
         responses={

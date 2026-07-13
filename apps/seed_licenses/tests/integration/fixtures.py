@@ -357,13 +357,29 @@ class BlockchainStateManager:
             if raw["status"] != 5:
                 return {"success": False, "error": "License must be APPROVED to update details"}
 
-            update_fields = [
-                "firmName", "firmType", "firmAddress", "salePointAddress",
-                "saleStorageAddress", "productionCompany", "cropName", "cropVariety",
-            ]
-            for i, field in enumerate(update_fields, 1):
-                if i < len(params) and params[i]:
-                    raw[field] = params[i]
+            if isinstance(params[1], dict):
+                updates = params[1]
+                update_fields = (
+                    "applicantName", "aadhaarNumber", "applicantPermanentAddress",
+                    "firmName", "firmType", "firmAddress", "salePointAddress",
+                    "saleStorageAddress", "productionCompany", "cropName", "cropVariety",
+                )
+                for field in update_fields:
+                    if updates.get(field):
+                        raw[field] = updates[field]
+                if updates.get("isSeedSelfProducedProvided"):
+                    raw["isSeedSelfProduced"] = updates["isSeedSelfProduced"]
+                if updates.get("coordinatesProvided"):
+                    raw["latitude"] = updates["latitude"]
+                    raw["longitude"] = updates["longitude"]
+            else:
+                update_fields = [
+                    "firmName", "firmType", "firmAddress", "salePointAddress",
+                    "saleStorageAddress", "productionCompany", "cropName", "cropVariety",
+                ]
+                for i, field in enumerate(update_fields, 1):
+                    if i < len(params) and params[i]:
+                        raw[field] = params[i]
 
             return {
                 "success":          True,
@@ -433,7 +449,7 @@ def seed_license_payload():
         "firmAddress":               "456 Industrial Area, Jaipur",
         "salePointAddress":          "789 Market Road, Jaipur",
         "saleStorageAddress":        "101 Warehouse District, Jaipur",
-        "cropName":                  "Wheat",
+        "cropName":                  ["Wheat", "Rice", "Maize"],
         "cropVariety":               "HD-2967",
         "productionCompany":         "Kumar Seeds Pvt Ltd",
         # NO latitude / longitude — SEED forbids them
@@ -457,7 +473,7 @@ def fertilizer_license_payload():
         "firmAddress":               "Plot 45, Industrial Area, Jaipur",
         "salePointAddress":          "Shop 12, Market Road, Jaipur",
         "saleStorageAddress":        "Warehouse 3, NH-8, Jaipur",
-        "cropName":                  "Wheat",
+        "cropName":                  ["Wheat", "Rice", "Maize"],
         "cropVariety":               "HD-2967",
         "productionCompany":         "AgriChem India Ltd",
         "latitude":                  26.9500,
@@ -482,7 +498,7 @@ def pesticide_license_payload():
         "firmAddress":               "Plot 22, RIICO Area, Jodhpur",
         "salePointAddress":          "Shop 5, Agri Market, Jodhpur",
         "saleStorageAddress":        "Godown 1, NH-65, Jodhpur",
-        "cropName":                  "Cotton",
+        "cropName":                  ["Cotton", "Wheat"],
         "cropVariety":               "Bt Cotton",
         "productionCompany":         "ChemAgro India",
         "latitude":                  26.2900,

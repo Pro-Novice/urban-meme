@@ -89,7 +89,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         newLicense.salePointAddress = input.salePointAddress;
         newLicense.saleStorageAddress = input.saleStorageAddress;
         newLicense.productionCompany = input.productionCompany;
-        newLicense.cropName = input.cropName;
+        _setCropName(newLicense, input.cropName);
         newLicense.cropVariety = input.cropVariety;
         newLicense.applicationDate = block.timestamp;
         newLicense.lastModifiedDate = block.timestamp;
@@ -142,7 +142,8 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         ) {
             lat = license.latitude;
             lng = license.longitude;
-        } 
+        }
+        string[] memory cropName = _copyCropName(license);
         return
             LicenseBasicInfo({
                 licenseId: license.licenseId,
@@ -157,7 +158,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                 salePointAddress: license.salePointAddress,
                 saleStorageAddress: license.saleStorageAddress,
                 productionCompany: license.productionCompany,
-                cropName: license.cropName,
+                cropName: cropName,
                 cropVariety: license.cropVariety,
                 registeringOfficeName: license.registeringOfficeName,
                 registeringAuthority: license.registeringAuthority,
@@ -174,6 +175,32 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                 documentsVerified: license.documentsVerified,
                 inspectionPassed: license.inspectionPassed
             });
+    }
+
+    function _setCropName(License storage license, string[] memory cropName) internal {
+        delete license.cropNames;
+        for (uint256 i = 0; i < cropName.length; i++) {
+            license.cropNames.push(cropName[i]);
+        }
+        license.cropName = cropName.length > 0 ? cropName[0] : "";
+    }
+
+    function _copyCropName(License storage license) internal view returns (string[] memory) {
+        if (license.cropNames.length > 0) {
+            string[] memory copiedCropName = new string[](license.cropNames.length);
+            for (uint256 i = 0; i < license.cropNames.length; i++) {
+                copiedCropName[i] = license.cropNames[i];
+            }
+            return copiedCropName;
+        }
+
+        if (bytes(license.cropName).length > 0) {
+            string[] memory legacyCropName = new string[](1);
+            legacyCropName[0] = license.cropName;
+            return legacyCropName;
+        }
+
+        return new string[](0);
     }
 
     // 3. Get License Action History

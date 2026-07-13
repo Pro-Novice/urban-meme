@@ -270,7 +270,7 @@ This backend includes a **log monitoring system** that captures deployment logs 
   "firmAddress": "Plot No 22, Mandi Road, Jaipur",
   "salePointAddress": "Shop No 5, Krishi Market, Jaipur",
   "saleStorageAddress": "Warehouse No 3, Outer Ring Road, Jaipur",
-  "cropName": "Wheat",
+  "cropName": ["Wheat", "Rice", "Maize"],
   "cropVariety": "HD2967",
   "isSeedSelfProduced": false,
   "productionCompany": "Agro Seeds Pvt Ltd"

@@ -772,6 +772,76 @@ class TestUpdateLicenseDetails:
         )
         
         assert_transaction_accepted(resp)
+
+    def test_all_mutable_fields_are_forwarded(self, client, monkeypatch):
+        update_details = MagicMock(return_value={
+            "success": True,
+            "transaction_hash": "0xabc",
+            "changed": True,
+        })
+        monkeypatch.setattr(
+            "apps.seed_licenses.views.license_view.license_service.update_details",
+            update_details,
+        )
+        payload = {
+            "licenseId": 2,
+            "applicantName": "Updated Applicant",
+            "applicantPermanentAddress": "Updated Permanent Address",
+            "firmName": "Updated Firm",
+            "firmType": "Proprietorship",
+            "firmAddress": "Updated Firm Address",
+            "salePointAddress": "Updated Sale Point",
+            "saleStorageAddress": "Updated Storage",
+            "productionCompany": "Updated Producer",
+            "cropName": ["Wheat", "Rice"],
+            "cropVariety": "HD-3086",
+            "isSeedSelfProduced": False,
+            "latitude": 26.9124,
+            "longitude": 75.7873,
+            "role": "AGRICULTURE_OFFICER",
+        }
+
+        resp = client.post(reverse("update-license-details"), data=payload, format="json")
+
+        assert_transaction_accepted(resp)
+        forwarded = update_details.call_args.args[0]
+        assert forwarded["applicant_name"] == "Updated Applicant"
+        assert forwarded["applicant_permanent_address"] == "Updated Permanent Address"
+        assert forwarded["is_seed_self_produced"] is False
+        assert forwarded["latitude"] == 26_912_400
+        assert forwarded["longitude"] == 75_787_300
+
+    @pytest.mark.parametrize("field", [
+        "licenseCategory",
+        "licenseLevel",
+        "registeringAuthority",
+        "registeringOfficeName",
+        "licenseNumber",
+    ])
+    def test_immutable_fields_are_rejected(self, client, field):
+        payload = {
+            "licenseId": 2,
+            "firmName": "Updated Firm",
+            "role": "AGRICULTURE_OFFICER",
+            field: "attempted change",
+        }
+
+        resp = client.post(reverse("update-license-details"), data=payload, format="json")
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_coordinates_must_be_updated_together(self, client):
+        resp = client.post(
+            reverse("update-license-details"),
+            data={
+                "licenseId": 2,
+                "latitude": 26.9124,
+                "role": "AGRICULTURE_OFFICER",
+            },
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
     
     def test_invalid_license_id_type(self, client):
         """Test with invalid license_id type"""

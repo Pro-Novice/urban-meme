@@ -32,7 +32,10 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
     sale_point_address = serializers.CharField()
     sale_storage_address = serializers.CharField()
     production_company = serializers.CharField(required=False, allow_blank=True)
-    crop_name = serializers.CharField()
+    crop_name = serializers.ListField(
+        child=serializers.CharField(allow_blank=False),
+        allow_empty=False,
+    )
     crop_variety = serializers.CharField()
     latitude = serializers.FloatField(required=False)
     longitude = serializers.FloatField(required=False)
@@ -216,16 +219,48 @@ class VerifyLicenseSerializer(serializers.Serializer):
 # 4️⃣ Update License Details Serializer
 # ============================================================
 class UpdateLicenseDetailsSerializer(serializers.Serializer):
+    IMMUTABLE_FIELDS = {
+        "license_category",
+        "license_level",
+        "registering_authority",
+        "registering_office_name",
+        "license_number",
+    }
+
     license_id = serializers.IntegerField(min_value=1)
+    applicant_name = serializers.CharField(required=False, allow_blank=True)
+    aadhaar_number = serializers.CharField(required=False)
+    applicant_permanent_address = serializers.CharField(required=False, allow_blank=True)
     firm_name = serializers.CharField(required=False, allow_blank=True)
     firm_type = serializers.CharField(required=False, allow_blank=True)
     firm_address = serializers.CharField(required=False, allow_blank=True)
     sale_point_address = serializers.CharField(required=False, allow_blank=True)
     sale_storage_address = serializers.CharField(required=False, allow_blank=True)
     production_company = serializers.CharField(required=False, allow_blank=True)
-    crop_name = serializers.CharField(required=False, allow_blank=True)
+    crop_name = serializers.ListField(
+        child=serializers.CharField(allow_blank=False),
+        required=False,
+        allow_empty=False,
+    )
     crop_variety = serializers.CharField(required=False, allow_blank=True)
+    is_seed_self_produced = serializers.BooleanField(required=False)
+    latitude = serializers.FloatField(required=False)
+    longitude = serializers.FloatField(required=False)
     role = serializers.CharField()
+
+    def to_internal_value(self, data):
+        immutable_fields = sorted(self.IMMUTABLE_FIELDS.intersection(data.keys()))
+        if immutable_fields:
+            raise serializers.ValidationError({
+                field: "This field cannot be updated."
+                for field in immutable_fields
+            })
+
+        ret = super().to_internal_value(data)
+        for field in ("latitude", "longitude"):
+            if field in ret:
+                ret[field] = int(ret[field] * 1_000_000)
+        return ret
 
     def validate_license_id(self, value):
         if value <= 0:
@@ -240,12 +275,18 @@ class UpdateLicenseDetailsSerializer(serializers.Serializer):
         except ValueError as e:
             raise serializers.ValidationError(str(e))
 
+    def validate_aadhaar_number(self, value):
+        return SubmitLicenseApplicationSerializer().validate_aadhaar_number(value)
+
     def validate(self, data):
         if not data.get("license_id"):
             raise serializers.ValidationError("License ID is required.")
 
         # Ensure at least one updatable field is provided
         update_fields = [
+            "applicant_name",
+            "aadhaar_number",
+            "applicant_permanent_address",
             "firm_name",
             "firm_type",
             "firm_address",
@@ -254,10 +295,18 @@ class UpdateLicenseDetailsSerializer(serializers.Serializer):
             "production_company",
             "crop_name",
             "crop_variety",
+            "is_seed_self_produced",
+            "latitude",
+            "longitude",
         ]
-        if not any(data.get(field) for field in update_fields):
+        if not any(field in data for field in update_fields):
             raise serializers.ValidationError(
                 "At least one field must be provided for update."
+            )
+
+        if ("latitude" in data) != ("longitude" in data):
+            raise serializers.ValidationError(
+                "Latitude and longitude must be provided together."
             )
 
         return data

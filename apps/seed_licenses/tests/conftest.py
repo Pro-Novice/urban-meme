@@ -46,7 +46,7 @@ def valid_license_payload():
         "firmAddress": "456 Industrial Area, Jaipur",
         "salePointAddress": "789 Market Road, Jaipur",
         "saleStorageAddress": "101 Warehouse District, Jaipur",
-        "cropName": "Wheat",
+        "cropName": ["Wheat", "Rice", "Maize"],
         "cropVariety": "HD-2967",
         "isSeedSelfProduced": False, 
         "productionCompany": "Kumar Seeds Pvt Ltd",
@@ -103,7 +103,7 @@ def mock_license_data():
         "salePointAddress": "456 Sale St",
         "saleStorageAddress": "789 Storage St",
         "productionCompany": "Test Company",
-        "cropName": "Wheat",
+        "cropName": ["Wheat", "Rice", "Maize"],
         "cropVariety": "HD-2967",
         "registeringOfficeName": "Test Office",
         "registeringAuthority": "Test Authority",
@@ -160,7 +160,6 @@ def mock_celery_and_redis(monkeypatch):
         def delete(self, key): return True
 
     monkeypatch.setattr("redis.Redis", lambda *a, **kw: DummyRedis())
-
 
 
 
