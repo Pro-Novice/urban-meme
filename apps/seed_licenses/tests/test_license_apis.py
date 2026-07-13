@@ -115,9 +115,12 @@ class TestSubmitLicenseApplication:
 
     def test_success(self, client, valid_license_payload, monkeypatch):
         """Test successful license submission"""
+        submit_application = MagicMock(
+            return_value={"success": True, "transaction_hash": "0xabc123"}
+        )
         monkeypatch.setattr(
             "apps.seed_licenses.views.license_view.license_service.submit_application",
-            MagicMock(return_value={"success": True, "transaction_hash": "0xabc123"})
+            submit_application,
         )
 
         resp = client.post(
@@ -132,6 +135,10 @@ class TestSubmitLicenseApplication:
         assert data["status"] == "accepted"
         assert "transaction_hash" in data
         assert data["license_number"] == valid_license_payload["licenseNumber"]
+        assert (
+            submit_application.call_args.args[0]["application_license_type"]
+            == "NEW_APPLICATION"
+        )
 
     def test_duplicate_license_number(self, client, valid_license_payload, monkeypatch):
         """Test duplicate license number is rejected"""
@@ -156,7 +163,7 @@ class TestSubmitLicenseApplication:
     
     @pytest.mark.parametrize("field", [
         "licenseCategory", "licenseLevel", "registeringAuthority",
-        "registeringOfficeName", "licenseNumber", "applicantName", "aadhaarNumber",
+        "applicationLicenseType", "registeringOfficeName", "licenseNumber", "applicantName", "aadhaarNumber",
     ])
     def test_missing_required_fields(self, client, valid_license_payload, field):
         """Test missing required fields"""
@@ -189,6 +196,28 @@ class TestSubmitLicenseApplication:
         print(resp.json())
     
         assert_error_response(resp, status.HTTP_400_BAD_REQUEST, [field.lower()])
+
+    @pytest.mark.parametrize("category,application_type", [
+        ("SEED", "RETAIL_DEALER"),
+        ("FERTILIZER", "NEW_APPLICATION"),
+        ("PESTICIDE", "WHOLESALER_DEALER"),
+    ])
+    def test_application_license_type_must_match_category(
+        self, client, valid_license_payload, category, application_type
+    ):
+        valid_license_payload["licenseCategory"] = category
+        valid_license_payload["applicationLicenseType"] = application_type
+        if category != "SEED":
+            valid_license_payload["latitude"] = 26.9124
+            valid_license_payload["longitude"] = 75.7873
+
+        resp = client.post(
+            reverse("submit-license-application"),
+            data=valid_license_payload,
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
     
     def test_blockchain_transaction_failure(self, client, valid_license_payload, monkeypatch):
         """Test when blockchain transaction fails"""
@@ -243,7 +272,7 @@ class TestGetLicenseBasicInfo:
     """Tests for get-license-basic-info endpoint"""
     
     EXPECTED_KEYS = {
-        "licenseNumber", "applicantName", "category", "level", "status",
+        "licenseNumber", "applicationLicenseType", "applicantName", "category", "level", "status",
         "firmName", "firmType", "firmAddress", "salePointAddress", "saleStorageAddress",
         "productionCompany", "cropName", "cropVariety", "registeringOfficeName",
         "registeringAuthority", "applicationDate", "isActive"

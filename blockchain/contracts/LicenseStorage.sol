@@ -92,6 +92,7 @@ contract LicenseStorage {
         bool documentsVerified;
         bool inspectionPassed;
         string[] cropNames;
+        string applicationLicenseType;
     }
 
     struct Payment {
@@ -140,6 +141,7 @@ contract LicenseStorage {
         bool isPaid;
         bool documentsVerified;
         bool inspectionPassed;
+        string applicationLicenseType;
     }
 
     struct LicenseVerificationData {
@@ -178,6 +180,7 @@ contract LicenseStorage {
 
     struct LicenseApplicationInputV2 {
         LicenseCategory category;
+        string applicationLicenseType;
         LicenseLevel level;
         string licenseNumber;
         string registeringAuthority;

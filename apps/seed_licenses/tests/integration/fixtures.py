@@ -115,7 +115,8 @@ class BlockchainStateManager:
                 "registeringOfficeName":   raw[14] if len(raw) > 14 else None,
                 "registeringAuthority":    raw[15] if len(raw) > 15 else None,
                 "applicationDate":         raw[16] if len(raw) > 16 else None,
-                "isActive":                raw[22] if len(raw) > 22 else None,
+                "isActive":                raw[24] if len(raw) > 24 else None,
+                "applicationLicenseType":  raw[28] if len(raw) > 28 else "",
             }
         else:
             data = dict(raw)
@@ -256,6 +257,7 @@ class BlockchainStateManager:
             self._licenses[lid] = {
                 "licenseId":                 lid,
                 "licenseNumber":             license_number,
+                "applicationLicenseType":    struct["applicationLicenseType"],
                 "applicantName":             struct["applicantName"],
                 "category":                  category_int,
                 "level":                     struct.get("level", 0),
@@ -437,6 +439,7 @@ def seed_license_payload():
     """SEED license — latitude / longitude MUST NOT be present."""
     return {
         "licenseCategory":           "SEED",
+        "applicationLicenseType":    "NEW_APPLICATION",
         "licenseLevel":              "STATE",
         "registeringAuthority":      "Department of Agriculture",
         "registeringOfficeName":     "State Agriculture Office",
@@ -461,6 +464,7 @@ def fertilizer_license_payload():
     """FERTILIZER license — latitude / longitude REQUIRED."""
     return {
         "licenseCategory":           "FERTILIZER",
+        "applicationLicenseType":    "RETAIL_DEALER",
         "licenseLevel":              "STATE",
         "registeringAuthority":      "Department of Agriculture",
         "registeringOfficeName":     "District Agri Office, Jaipur",
@@ -486,6 +490,7 @@ def pesticide_license_payload():
     """PESTICIDE license — latitude / longitude REQUIRED."""
     return {
         "licenseCategory":           "PESTICIDE",
+        "applicationLicenseType":    "SALES_LICENSE",
         "licenseLevel":              "DISTRICT",
         "registeringAuthority":      "Department of Agriculture",
         "registeringOfficeName":     "District Agri Office, Jodhpur",

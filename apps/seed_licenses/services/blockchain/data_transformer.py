@@ -20,7 +20,8 @@ GENERIC_TRANSFORM_MAP = {
             "firmName", "firmType", "firmAddress", "salePointAddress", "saleStorageAddress",
             "productionCompany", "cropName", "cropVariety", "registeringOfficeName",
             "registeringAuthority", "applicationDate", "approvalDate", "rejectionDate",
-            "expiryDate", "revokedDate", "renewalDate", "latitude", "longitude", "isActive"
+            "expiryDate", "revokedDate", "renewalDate", "latitude", "longitude", "isActive",
+            "isPaid", "documentsVerified", "inspectionPassed", "applicationLicenseType"
             
         ],
         "enum_mappings": {

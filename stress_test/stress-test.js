@@ -90,6 +90,7 @@ function getEncryptedAadhaar(){ return randItem(encryptedAadhaars); }
 const applicantData = new SharedArray('applicants', () => [
   {
     licenseCategory: 'SEED',
+    applicationLicenseType: 'NEW_APPLICATION',
     licenseLevel: 'DISTRICT',
     applicantName: 'Ravi Kumar',
     firmName: 'Ravi Agro Traders',
@@ -103,6 +104,7 @@ const applicantData = new SharedArray('applicants', () => [
   },
   {
     licenseCategory: 'FERTILIZER',
+    applicationLicenseType: 'RETAIL_DEALER',
     licenseLevel: 'STATE',
     applicantName: 'Priya Sharma',
     firmName: 'Green Earth Fertilizers',

@@ -39,6 +39,7 @@ const applicantData = new SharedArray('applicants', function () {
     return [
         {
             licenseCategory: 'SEED',
+            applicationLicenseType: 'NEW_APPLICATION',
             licenseLevel: 'DISTRICT',
             applicantName: 'Ravi Kumar',
             aadhaarNumber: '123456789012',
@@ -51,6 +52,7 @@ const applicantData = new SharedArray('applicants', function () {
         },
         {
             licenseCategory: 'SEED',
+            applicationLicenseType: 'NEW_APPLICATION',
             licenseLevel: 'STATE',
             applicantName: 'Priya Sharma',
             aadhaarNumber: '987654321098',
@@ -63,6 +65,7 @@ const applicantData = new SharedArray('applicants', function () {
         },
         {
             licenseCategory: 'SEED',
+            applicationLicenseType: 'NEW_APPLICATION',
             licenseLevel: 'DISTRICT',
             applicantName: 'Vijay Singh',
             aadhaarNumber: '564738291023',

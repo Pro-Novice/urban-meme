@@ -42,6 +42,7 @@ contract LicenseSystemV2 is LicenseSystemV1 {
         License storage newLicense = licenses[newLicenseId];
         newLicense.licenseId = newLicenseId;
         newLicense.category = input.category;
+        newLicense.applicationLicenseType = input.applicationLicenseType;
         newLicense.level = input.level;
         newLicense.status = LicenseStatus.SUBMITTED;
         newLicense.registeringAuthority = input.registeringAuthority;

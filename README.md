@@ -253,11 +253,12 @@ This backend includes a **log monitoring system** that captures deployment logs 
 
 `POST /license/create/`
 
-**Required fields include `licenseNumber` (must be unique).**
+**Required fields include `licenseNumber` (must be unique) and `applicationLicenseType`.**
 
 ```json
 {
   "licenseCategory": "SEED",
+  "applicationLicenseType": "NEW_APPLICATION",
   "licenseLevel": "STATE",
   "registeringAuthority": "Department of Agriculture",
   "registeringOfficeName": "District Agri Office, Jaipur",

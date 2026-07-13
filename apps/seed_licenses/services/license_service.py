@@ -34,6 +34,7 @@ class LicenseService(ILicenseService):
         
         struct_input = {
             "category": data["license_category"],
+            "applicationLicenseType": data["application_license_type"],
             "level": data["license_level"],
             "licenseNumber": data["license_number"],
             "registeringAuthority": data["registering_authority"],

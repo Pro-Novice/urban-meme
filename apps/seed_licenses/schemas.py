@@ -24,6 +24,7 @@ class LicenseBasicInfoSerializer(serializers.Serializer):
     licenseId               = serializers.IntegerField()
     licenseNumber           = serializers.CharField()
     licenseCategory         = serializers.CharField()
+    applicationLicenseType  = serializers.CharField(allow_blank=True)
     licenseLevel            = serializers.CharField()
     status                  = serializers.CharField()
     applicantName           = serializers.CharField()
@@ -138,6 +139,10 @@ def submit_license_schema():
             "Creates a new license on-chain and waits for confirmation (~2s on QBFT). "
             "Returns the confirmed `licenseId` and `licenseNumber` directly.\n\n"
             "**License categories:** SEED, FERTILIZER, PESTICIDE\n\n"
+            "**Application license types:**\n"
+            "- SEED: NEW_APPLICATION, OLD_APPLICATION\n"
+            "- FERTILIZER: MANUFACTURER, RETAIL_DEALER, WHOLESALER_DEALER\n"
+            "- PESTICIDE: SALES_LICENSE, COMMERCIAL_PEST_CONTROL, INSECTICIDE_MANUFACTURER\n\n"
             "**Rules:**\n"
             "- `latitude` / `longitude` are **required** for FERTILIZER and PESTICIDE\n"
             "- `latitude` / `longitude` must be **omitted** for SEED\n"
@@ -151,6 +156,7 @@ def submit_license_schema():
             name="SubmitLicenseApplication",
             fields={
                 "licenseCategory":          serializers.ChoiceField(choices=["SEED", "FERTILIZER", "PESTICIDE"]),
+                "applicationLicenseType":  serializers.CharField(help_text="Required; allowed values depend on licenseCategory"),
                 "licenseLevel":             serializers.ChoiceField(choices=["STATE", "DIVISION", "DISTRICT"]),
                 "registeringAuthority":     serializers.CharField(),
                 "registeringOfficeName":    serializers.CharField(),
@@ -183,6 +189,7 @@ def submit_license_schema():
                 request_only=True,
                 value={
                     "licenseCategory": "FERTILIZER",
+                    "applicationLicenseType": "RETAIL_DEALER",
                     "licenseLevel": "STATE",
                     "registeringAuthority": "Department of Agriculture",
                     "registeringOfficeName": "District Agri Office, Jaipur",
@@ -207,6 +214,7 @@ def submit_license_schema():
                 request_only=True,
                 value={
                     "licenseCategory": "PESTICIDE",
+                    "applicationLicenseType": "SALES_LICENSE",
                     "licenseLevel": "STATE",
                     "registeringAuthority": "Department of Agriculture",
                     "registeringOfficeName": "District Agri Office, Jaipur",
@@ -231,6 +239,7 @@ def submit_license_schema():
                 request_only=True,
                 value={
                     "licenseCategory": "SEED",
+                    "applicationLicenseType": "NEW_APPLICATION",
                     "licenseLevel": "STATE",
                     "registeringAuthority": "Department of Agriculture",
                     "registeringOfficeName": "District Agri Office, Jaipur",
@@ -461,7 +470,7 @@ def update_details_schema():
             "**Updatable fields:** applicantName, aadhaarNumber, applicantPermanentAddress, firmName, "
             "firmType, firmAddress, salePointAddress, saleStorageAddress, productionCompany, cropName, "
             "cropVariety, isSeedSelfProduced, latitude, longitude.\n\n"
-            "**Immutable fields:** licenseCategory, licenseLevel, registeringAuthority, "
+            "**Immutable fields:** licenseCategory, applicationLicenseType, licenseLevel, registeringAuthority, "
             "registeringOfficeName, licenseNumber. Requests containing these fields are rejected."
         ),
         request=inline_serializer(

@@ -33,7 +33,8 @@ def reset_blockchain():
 def valid_license_payload():
     """Valid license application payload"""
     return {
-         "licenseCategory": "SEED",
+        "licenseCategory": "SEED",
+        "applicationLicenseType": "NEW_APPLICATION",
         "licenseLevel": "STATE",
         "registeringAuthority": "Department of Agriculture",
         "registeringOfficeName": "State Agriculture Office",
@@ -93,6 +94,7 @@ def mock_license_data():
     return {
         "licenseId": 1,
         "licenseNumber": "RJSDST-TEST-001",
+        "applicationLicenseType": "NEW_APPLICATION",
         "applicantName": "John Doe",
         "category": "SEED_DEALER",
         "level": "STATE",
@@ -160,6 +162,4 @@ def mock_celery_and_redis(monkeypatch):
         def delete(self, key): return True
 
     monkeypatch.setattr("redis.Redis", lambda *a, **kw: DummyRedis())
-
-
 

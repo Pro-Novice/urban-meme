@@ -173,7 +173,8 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                 isActive: license.isActive,
                 isPaid: license.isPaid,
                 documentsVerified: license.documentsVerified,
-                inspectionPassed: license.inspectionPassed
+                inspectionPassed: license.inspectionPassed,
+                applicationLicenseType: license.applicationLicenseType
             });
     }
 

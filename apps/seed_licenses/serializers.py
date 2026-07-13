@@ -10,6 +10,7 @@ from .enums import (
     OfficerRole,
     LICENSE_CATEGORY_MAP,
     LEVEL_MAP,
+    APPLICATION_LICENSE_TYPES,
 )
 from .models import LicenseSubmission
 
@@ -19,6 +20,7 @@ from .models import LicenseSubmission
 # ============================================================
 class SubmitLicenseApplicationSerializer(serializers.Serializer):
     license_category = serializers.CharField()
+    application_license_type = serializers.CharField()
     license_level = serializers.CharField()
     registering_authority = serializers.CharField()
     registering_office_name = serializers.CharField()
@@ -53,6 +55,9 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid license level.")
         return enum_value
 
+    def validate_application_license_type(self, value):
+        return value.strip().upper().replace("-", "_").replace(" ", "_")
+
     def validate_license_number(self, value):
         if not value or not value.strip():
             raise serializers.ValidationError("License number cannot be empty.")
@@ -73,8 +78,23 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
             ret.pop("is_seed_self_produced", None)
 
         return ret
+
     def validate(self, attrs):
         category = attrs["license_category"]
+        application_license_type = attrs["application_license_type"]
+        allowed_types = APPLICATION_LICENSE_TYPES[category]
+
+        if application_license_type not in allowed_types:
+            category_name = next(
+                name for name, enum_value in LICENSE_CATEGORY_MAP.items()
+                if enum_value == category
+            )
+            raise serializers.ValidationError({
+                "application_license_type": (
+                    f"Invalid application license type for {category_name}. "
+                    f"Allowed values: {', '.join(sorted(allowed_types))}."
+                )
+            })
 
         if category in {LICENSE_CATEGORY_MAP["FERTILIZER"], LICENSE_CATEGORY_MAP["PESTICIDE"]}:
             if attrs.get("latitude") is None or attrs.get("longitude") is None:
@@ -222,6 +242,7 @@ class UpdateLicenseDetailsSerializer(serializers.Serializer):
     IMMUTABLE_FIELDS = {
         "license_category",
         "license_level",
+        "application_license_type",
         "registering_authority",
         "registering_office_name",
         "license_number",

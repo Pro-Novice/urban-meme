@@ -36,6 +36,7 @@ except Exception as e:
 applicant_data = [
     {
         "licenseCategory": "SEED",
+        "applicationLicenseType": "NEW_APPLICATION",
         "licenseLevel": "DISTRICT",
         "applicantName": "Ravi Kumar",
         "firmName": "Ravi Agro Traders",
@@ -49,6 +50,7 @@ applicant_data = [
     },
     {
         "licenseCategory": "FERTILIZER",
+        "applicationLicenseType": "RETAIL_DEALER",
         "licenseLevel": "STATE",
         "applicantName": "Priya Sharma",
         "firmName": "Green Earth Fertilizers",
