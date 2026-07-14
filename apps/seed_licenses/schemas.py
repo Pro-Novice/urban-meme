@@ -5,6 +5,13 @@ from drf_spectacular.utils import (
 from drf_spectacular.types import OpenApiTypes
 from rest_framework import serializers
 
+from apps.seed_licenses.enums import APPLICATION_LICENSE_TYPES
+
+
+APPLICATION_LICENSE_TYPE_CHOICES = sorted(
+    set().union(*APPLICATION_LICENSE_TYPES.values())
+)
+
 
 # ─────────────────────────────────────────────
 # Response serializers for documentation — not used directly in views
@@ -468,10 +475,14 @@ def update_details_schema():
         description=(
             "Updates mutable fields on an APPROVED or RENEWED license. "
             "`licenseId` and `role` are required. At least one optional field must be provided.\n\n"
-            "**Updatable fields:** applicantName, aadhaarNumber, applicantPermanentAddress, firmName, "
+            "**Updatable fields:** applicationLicenseType, applicantName, aadhaarNumber, applicantPermanentAddress, firmName, "
             "firmType, firmAddress, salePointAddress, saleStorageAddress, productionCompany, cropName, "
             "cropVariety, isSeedSelfProduced, latitude, longitude.\n\n"
-            "**Immutable fields:** licenseCategory, applicationLicenseType, licenseLevel, registeringAuthority, "
+            "Application-license-type values remain category-specific: "
+            "SEED (`NEW_APPLICATION`, `OLD_APPLICATION`), FERTILIZER (`MANUFACTURER`, `RETAIL_DEALER`, "
+            "`WHOLESALER_DEALER`), and PESTICIDE (`SALES_LICENSE`, `COMMERCIAL_PEST_CONTROL`, "
+            "`INSECTICIDE_MANUFACTURER`).\n\n"
+            "**Immutable fields:** licenseCategory, licenseLevel, registeringAuthority, "
             "registeringOfficeName, licenseNumber. Requests containing these fields are rejected."
         ),
         request=inline_serializer(
@@ -483,6 +494,11 @@ def update_details_schema():
                     "ASSISTANT_DIRECTOR", "DEPUTY_DIRECTOR", "JOINT_DIRECTOR",
                     "JOINT_DIRECTOR_INPUT", "FIELD_INSPECTOR"
                 ], help_text="Required"),
+                "applicationLicenseType": serializers.ChoiceField(
+                    choices=APPLICATION_LICENSE_TYPE_CHOICES,
+                    required=False,
+                    help_text="Allowed value must match the license category",
+                ),
                 "applicantName":       serializers.CharField(required=False),
                 "aadhaarNumber":       serializers.CharField(required=False, help_text="RSA-encrypted Aadhaar number"),
                 "applicantPermanentAddress": serializers.CharField(required=False),

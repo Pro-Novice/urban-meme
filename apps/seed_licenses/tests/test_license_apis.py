@@ -814,6 +814,7 @@ class TestUpdateLicenseDetails:
         )
         payload = {
             "licenseId": 2,
+            "applicationLicenseType": "old application",
             "applicantName": "Updated Applicant",
             "applicantPermanentAddress": "Updated Permanent Address",
             "firmName": "Updated Firm",
@@ -834,6 +835,7 @@ class TestUpdateLicenseDetails:
 
         assert_transaction_accepted(resp)
         forwarded = update_details.call_args.args[0]
+        assert forwarded["application_license_type"] == "OLD_APPLICATION"
         assert forwarded["applicant_name"] == "Updated Applicant"
         assert forwarded["applicant_permanent_address"] == "Updated Permanent Address"
         assert forwarded["is_seed_self_produced"] is False
@@ -858,6 +860,24 @@ class TestUpdateLicenseDetails:
         resp = client.post(reverse("update-license-details"), data=payload, format="json")
 
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_invalid_application_license_type_is_rejected(self, client, monkeypatch):
+        update_details = MagicMock()
+        monkeypatch.setattr(
+            "apps.seed_licenses.views.license_view.license_service.update_details",
+            update_details,
+        )
+        payload = {
+            "licenseId": 2,
+            "applicationLicenseType": "UNSUPPORTED_TYPE",
+            "role": "AGRICULTURE_OFFICER",
+        }
+
+        resp = client.post(reverse("update-license-details"), data=payload, format="json")
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert "application_license_type" in resp.json()["error"]
+        update_details.assert_not_called()
 
     def test_coordinates_must_be_updated_together(self, client):
         resp = client.post(

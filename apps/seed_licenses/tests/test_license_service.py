@@ -17,6 +17,39 @@ def _action(action_type, remarks=""):
     }
 
 
+def test_update_details_forwards_application_license_type_to_contract():
+    tx_service = MagicMock()
+    tx_service.read.return_value = {"category": "SEED"}
+
+    LicenseService(tx_service).update_details({
+        "license_id": 7,
+        "application_license_type": "OLD_APPLICATION",
+        "role": 1,
+    })
+
+    tx_service.write.assert_called_once()
+    method_name, params = tx_service.write.call_args.args
+    assert method_name == "updateLicenseDetails"
+    assert params[0] == 7
+    assert params[1]["applicationLicenseType"] == "OLD_APPLICATION"
+    assert params[2] == 1
+
+
+def test_update_details_rejects_application_type_for_different_category():
+    tx_service = MagicMock()
+    tx_service.read.return_value = {"category": "SEED"}
+
+    result = LicenseService(tx_service).update_details({
+        "license_id": 7,
+        "application_license_type": "RETAIL_DEALER",
+        "role": 1,
+    })
+
+    assert result["success"] is False
+    assert "Invalid application license type for SEED" in result["error"]
+    tx_service.write.assert_not_called()
+
+
 @pytest.mark.django_db
 def test_action_history_matches_repeated_detail_updates_oldest_first():
     tx_service = MagicMock()

@@ -305,7 +305,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    // license_id and role are required fields, rest ae optional but atleast there should be 1 field to update\n    \"license_id\": 1,\n    \"firm_name\": \"New Firm Name\",\n    \"firm_type\": \"New Firm Type\",\n    \"firm_address\": \"New Firm Address\",\n    \"sale_point_address\": \"New Sale Point Address\",\n    // \"sale_storage_address\": \"New Sale Storage Address\",\n    // \"production_company\": \"New Production Company\",\n    // \"crop_name\": \"New Crop Name\",\n    \"crop_variety\": \"New Crop Variety\",\n    \"role\": \"JOINT_DIRECTOR\"\n}",
+                  "raw": "{\n    // licenseId and role are required fields; provide at least one field to update\n    \"licenseId\": 1,\n    \"applicationLicenseType\": \"WHOLESALER_DEALER\",\n    \"firmName\": \"New Firm Name\",\n    \"firmType\": \"New Firm Type\",\n    \"firmAddress\": \"New Firm Address\",\n    \"salePointAddress\": \"New Sale Point Address\",\n    \"cropVariety\": \"New Crop Variety\",\n    \"role\": \"JOINT_DIRECTOR\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -711,7 +711,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    // license_id and role are required fields, rest ae optional but atleast there should be 1 field to update\n    \"license_id\": 1,\n    \"firm_name\": \"New Firm Name\",\n    \"firm_type\": \"New Firm Type\",\n    \"firm_address\": \"New Firm Address\",\n    \"sale_point_address\": \"New Sale Point Address\",\n    // \"sale_storage_address\": \"New Sale Storage Address\",\n    // \"production_company\": \"New Production Company\",\n    // \"crop_name\": \"New Crop Name\",\n    \"crop_variety\": \"New Crop Variety\",\n    \"role\": \"JOINT_DIRECTOR\"\n}",
+                  "raw": "{\n    // licenseId and role are required fields; provide at least one field to update\n    \"licenseId\": 1,\n    \"applicationLicenseType\": \"COMMERCIAL_PEST_CONTROL\",\n    \"firmName\": \"New Firm Name\",\n    \"firmType\": \"New Firm Type\",\n    \"firmAddress\": \"New Firm Address\",\n    \"salePointAddress\": \"New Sale Point Address\",\n    \"cropVariety\": \"New Crop Variety\",\n    \"role\": \"JOINT_DIRECTOR\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -1117,7 +1117,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    // license_id and role are required fields, rest ae optional but atleast there should be 1 field to update\n    \"license_id\": 1,\n    \"firm_name\": \"New Firm Name\",\n    \"firm_type\": \"New Firm Type\",\n    \"firm_address\": \"New Firm Address\",\n    \"sale_point_address\": \"New Sale Point Address\",\n    // \"sale_storage_address\": \"New Sale Storage Address\",\n    // \"production_company\": \"New Production Company\",\n    // \"crop_name\": \"New Crop Name\",\n    \"crop_variety\": \"New Crop Variety\",\n    \"role\": \"JOINT_DIRECTOR\"\n}",
+                  "raw": "{\n    // licenseId and role are required fields; provide at least one field to update\n    \"licenseId\": 1,\n    \"applicationLicenseType\": \"OLD_APPLICATION\",\n    \"firmName\": \"New Firm Name\",\n    \"firmType\": \"New Firm Type\",\n    \"firmAddress\": \"New Firm Address\",\n    \"salePointAddress\": \"New Sale Point Address\",\n    \"cropVariety\": \"New Crop Variety\",\n    \"role\": \"JOINT_DIRECTOR\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"

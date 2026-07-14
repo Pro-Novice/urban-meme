@@ -9,6 +9,7 @@ import "./LicenseSystemV1.sol";
  */
 contract LicenseSystemV2 is LicenseSystemV1 {
     struct LicenseDetailsUpdateInput {
+        string applicationLicenseType;
         string applicantName;
         string aadhaarNumber;
         string applicantPermanentAddress;
@@ -35,6 +36,7 @@ contract LicenseSystemV2 is LicenseSystemV1 {
     function submitLicenseApplicationV2(LicenseApplicationInputV2 memory input) public virtual onlyAuthorizedCallers {
         require(bytes(input.licenseNumber).length > 0, "License number required");
         require(licenseNumberToId[input.licenseNumber] == 0, "License number already exists");
+        _validateApplicationLicenseType(input.category, input.applicationLicenseType);
 
         _incrementLicenseCounter();
         uint256 newLicenseId = licenseIdCounter();
@@ -111,6 +113,10 @@ contract LicenseSystemV2 is LicenseSystemV1 {
             "Only approved or renewed licenses can be edited"
         );
 
+        if (bytes(input.applicationLicenseType).length > 0) {
+            _validateApplicationLicenseType(license.category, input.applicationLicenseType);
+            license.applicationLicenseType = input.applicationLicenseType;
+        }
         if (bytes(input.applicantName).length > 0) license.applicantName = input.applicantName;
         if (bytes(input.aadhaarNumber).length > 0) license.aadhaarNumber = input.aadhaarNumber;
         if (bytes(input.applicantPermanentAddress).length > 0) {
@@ -154,6 +160,32 @@ contract LicenseSystemV2 is LicenseSystemV1 {
         );
 
         emit LicenseDetailsUpdated(_licenseId, block.timestamp);
+    }
+
+    function _validateApplicationLicenseType(
+        LicenseCategory category,
+        string memory applicationLicenseType
+    ) internal pure {
+        require(bytes(applicationLicenseType).length > 0, "Application license type required");
+
+        bool isValid;
+        if (category == LicenseCategory.SEED) {
+            isValid =
+                _compareStrings(applicationLicenseType, "NEW_APPLICATION") ||
+                _compareStrings(applicationLicenseType, "OLD_APPLICATION");
+        } else if (category == LicenseCategory.FERTILIZER) {
+            isValid =
+                _compareStrings(applicationLicenseType, "MANUFACTURER") ||
+                _compareStrings(applicationLicenseType, "RETAIL_DEALER") ||
+                _compareStrings(applicationLicenseType, "WHOLESALER_DEALER");
+        } else {
+            isValid =
+                _compareStrings(applicationLicenseType, "SALES_LICENSE") ||
+                _compareStrings(applicationLicenseType, "COMMERCIAL_PEST_CONTROL") ||
+                _compareStrings(applicationLicenseType, "INSECTICIDE_MANUFACTURER");
+        }
+
+        require(isValid, "Invalid application license type for category");
     }
 
 }

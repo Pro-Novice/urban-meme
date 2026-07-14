@@ -146,6 +146,7 @@ class TestLicenseUpdate:
 
             resp = _update_details(client, {
                 "licenseId": 1,
+                "applicationLicenseType": "old application",
                 "firmAddress": "Updated After Renewal",
                 "role": "AGRICULTURE_OFFICER",
             })
@@ -153,6 +154,7 @@ class TestLicenseUpdate:
             assert resp.status_code == 202
             info = client.get(reverse("license-basic-info", args=[1])).json()["data"]
             assert info["firmAddress"] == "Updated After Renewal"
+            assert info["applicationLicenseType"] == "OLD_APPLICATION"
 
     def test_update_non_approved_license_fails(
         self, client, seed_license_payload, blockchain_state,

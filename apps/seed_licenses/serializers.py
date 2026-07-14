@@ -242,13 +242,13 @@ class UpdateLicenseDetailsSerializer(serializers.Serializer):
     IMMUTABLE_FIELDS = {
         "license_category",
         "license_level",
-        "application_license_type",
         "registering_authority",
         "registering_office_name",
         "license_number",
     }
 
     license_id = serializers.IntegerField(min_value=1)
+    application_license_type = serializers.CharField(required=False)
     applicant_name = serializers.CharField(required=False, allow_blank=True)
     aadhaar_number = serializers.CharField(required=False)
     applicant_permanent_address = serializers.CharField(required=False, allow_blank=True)
@@ -296,6 +296,16 @@ class UpdateLicenseDetailsSerializer(serializers.Serializer):
         except ValueError as e:
             raise serializers.ValidationError(str(e))
 
+    def validate_application_license_type(self, value):
+        normalized = value.strip().upper().replace("-", "_").replace(" ", "_")
+        allowed_types = set().union(*APPLICATION_LICENSE_TYPES.values())
+        if normalized not in allowed_types:
+            raise serializers.ValidationError(
+                "Invalid application license type. "
+                f"Allowed values: {', '.join(sorted(allowed_types))}."
+            )
+        return normalized
+
     def validate_aadhaar_number(self, value):
         return SubmitLicenseApplicationSerializer().validate_aadhaar_number(value)
 
@@ -305,6 +315,7 @@ class UpdateLicenseDetailsSerializer(serializers.Serializer):
 
         # Ensure at least one updatable field is provided
         update_fields = [
+            "application_license_type",
             "applicant_name",
             "aadhaar_number",
             "applicant_permanent_address",

@@ -366,7 +366,7 @@ class BlockchainStateManager:
             if isinstance(params[1], dict):
                 updates = params[1]
                 update_fields = (
-                    "applicantName", "aadhaarNumber", "applicantPermanentAddress",
+                    "applicationLicenseType", "applicantName", "aadhaarNumber", "applicantPermanentAddress",
                     "firmName", "firmType", "firmAddress", "salePointAddress",
                     "saleStorageAddress", "productionCompany", "cropName", "cropVariety",
                 )

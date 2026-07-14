@@ -325,6 +325,30 @@ This backend includes a **log monitoring system** that captures deployment logs 
 
 Use `licenseNumber` instead of `licenseId` in the payload.
 
+### Update License Details
+
+**Endpoint**
+
+`POST /license/update/`
+
+`applicationLicenseType` is optional and can be changed while the license is
+`APPROVED` or `RENEWED`. Its value must remain valid for the existing license
+category. Values are normalized to uppercase snake case.
+
+```json
+{
+  "licenseId": 1,
+  "applicationLicenseType": "OLD_APPLICATION",
+  "role": "JOINT_DIRECTOR"
+}
+```
+
+Allowed values:
+
+- SEED: `NEW_APPLICATION`, `OLD_APPLICATION`
+- FERTILIZER: `MANUFACTURER`, `RETAIL_DEALER`, `WHOLESALER_DEALER`
+- PESTICIDE: `SALES_LICENSE`, `COMMERCIAL_PEST_CONTROL`, `INSECTICIDE_MANUFACTURER`
+
 ### Force Refresh License Mapping
 
 **Endpoint**

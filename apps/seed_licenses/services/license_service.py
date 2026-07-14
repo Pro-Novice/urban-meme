@@ -2,7 +2,13 @@ import logging
 from typing import Dict, Any, List
 from apps.seed_licenses.models import EventLog
 from apps.seed_licenses.services.blockchain import TransactionService
-from apps.seed_licenses.enums import LICENSE_CATEGORY_MAP, LicenseStatusEnum, LICENSE_STATUS_REVERSE
+from apps.seed_licenses.enums import (
+    APPLICATION_LICENSE_TYPES,
+    LICENSE_CATEGORY_MAP,
+    LICENSE_STATUS_REVERSE,
+    REVERSE_LICENSE_CATEGORY,
+    LicenseStatusEnum,
+)
 from apps.seed_licenses.services.multi_account_manager import multi_account_manager
 logger = logging.getLogger(__name__)
 
@@ -203,7 +209,37 @@ class LicenseService(ILicenseService):
 
     # ---------- UPDATE DETAILS ---------- #
     def update_details(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        application_license_type = data.get("application_license_type")
+        if application_license_type is not None:
+            current_license = self.tx.read(
+                "getLicenseBasicInfo",
+                [data["license_id"]],
+            )
+            current_category = current_license.get("category")
+            if isinstance(current_category, str):
+                category = LICENSE_CATEGORY_MAP.get(current_category.strip().upper())
+            else:
+                category = current_category
+
+            if category not in APPLICATION_LICENSE_TYPES:
+                return {
+                    "success": False,
+                    "error": "Unable to determine the license category.",
+                }
+
+            allowed_types = APPLICATION_LICENSE_TYPES[category]
+            if application_license_type not in allowed_types:
+                category_name = REVERSE_LICENSE_CATEGORY[category]
+                return {
+                    "success": False,
+                    "error": (
+                        f"Invalid application license type for {category_name}. "
+                        f"Allowed values: {', '.join(sorted(allowed_types))}."
+                    ),
+                }
+
         update_input = {
+            "applicationLicenseType": application_license_type or "",
             "applicantName": data.get("applicant_name", ""),
             "aadhaarNumber": data.get("aadhaar_number", ""),
             "applicantPermanentAddress": data.get("applicant_permanent_address", ""),
