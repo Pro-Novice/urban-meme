@@ -3,6 +3,14 @@ set -e
 
 cd "$(dirname "$0")"   # ensure we are inside blockchain/
 
+# BuildKit keeps the Node/npm layers locally. On Docker Desktop, prefer its
+# built-in builder instead of a custom builder that may have no registry access.
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+if [ -z "${BUILDX_BUILDER:-}" ] && docker buildx inspect desktop-linux >/dev/null 2>&1; then
+  export BUILDX_BUILDER=desktop-linux
+fi
+
 if [ ! -f .env ]; then
   echo "❌ Error: .env file not found."
   echo "Please create one with BESU_RPC_URL and BESU_PRIVATE_KEY."

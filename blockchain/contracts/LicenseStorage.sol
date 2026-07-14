@@ -32,6 +32,19 @@ contract LicenseStorage {
         EXPIRED,
         RENEWED
     }
+    enum ActionType {
+        SUBMITTED,
+        UNDER_REVIEW,
+        DOCUMENTS_VERIFIED,
+        INSPECTION_SCHEDULED,
+        INSPECTION_COMPLETED,
+        APPROVED,
+        REJECTED,
+        REVOKED,
+        EXPIRED,
+        RENEWED,
+        LICENSE_DETAILS_UPDATED
+    }
     enum userRole {
         CITIZEN,
         AGRICULTURE_OFFICER,
@@ -104,7 +117,7 @@ contract LicenseStorage {
 
     struct Action {
         uint256 timestamp;
-        LicenseStatus actionType;
+        ActionType actionType;
         string actorName;
         userRole actorRole;
         string remarks;

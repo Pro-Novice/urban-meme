@@ -4,6 +4,13 @@ set -euo pipefail
 COMPOSE_FILE="docker-compose.test.yml"
 REBUILD=false
 
+# Use the same persistent dependency caches as the application image.
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+if [[ -z "${BUILDX_BUILDER:-}" ]] && docker buildx inspect desktop-linux >/dev/null 2>&1; then
+    export BUILDX_BUILDER=desktop-linux
+fi
+
 # Optional flag: --rebuild (force full rebuild)
 if [[ "${1:-}" == "--rebuild" ]]; then
   REBUILD=true

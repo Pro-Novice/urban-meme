@@ -3,6 +3,14 @@ set -e
 
 cd "$(dirname "$0")"   # always run inside blockchain/
 
+# Use BuildKit's persistent cache and avoid a stale custom Docker Desktop
+# builder when the built-in desktop-linux builder is available.
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+if [ -z "${BUILDX_BUILDER:-}" ] && docker buildx inspect desktop-linux >/dev/null 2>&1; then
+  export BUILDX_BUILDER=desktop-linux
+fi
+
 COMPOSE_FILE="docker-compose.hardhat.yml"
 SERVICE="hardhat"
 

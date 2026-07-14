@@ -17,6 +17,15 @@ if [[ -f .env ]]; then
     export $(grep -v '^#' .env | xargs)
 fi
 
+# BuildKit provides the persistent apt/pip caches used by the Dockerfile.
+# Docker Desktop's built-in builder shares the local image/cache store and
+# avoids accidentally using a stale custom buildx builder.
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+if [[ -z "${BUILDX_BUILDER:-}" ]] && docker buildx inspect desktop-linux >/dev/null 2>&1; then
+    export BUILDX_BUILDER=desktop-linux
+fi
+
 # Validate Redis credentials
 if [[ -z "$REDIS_USER" || -z "$REDIS_PASSWORD" ]]; then
     echo -e "${RED}Error: REDIS_USER and REDIS_PASSWORD must be set in .env${NC}"

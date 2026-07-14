@@ -22,6 +22,7 @@ class BlockchainStateManager:
         6: "REJECTED",             7: "REVOKED",
         8: "EXPIRED",              9: "RENEWED",
     }
+    ACTION_MAP = {**STATUS_MAP, 10: "LICENSE_DETAILS_UPDATED"}
     STATUS_REVERSE = {v: k for k, v in STATUS_MAP.items()}
 
     CATEGORY_MAP     = {0: "SEED", 1: "FERTILIZER", 2: "PESTICIDE"}
@@ -169,7 +170,7 @@ class BlockchainStateManager:
             for item in raw.get("history", []):
                 t = dict(item)
                 if isinstance(t.get("actionType"), int):
-                    t["actionType"] = self.STATUS_MAP.get(t["actionType"], "UNKNOWN")
+                    t["actionType"] = self.ACTION_MAP.get(t["actionType"], "UNKNOWN")
                 if isinstance(t.get("actorRole"),  int):
                     t["actorRole"]  = self.ROLE_MAP.get(t["actorRole"],  "UNKNOWN")
                 result.append(t)
@@ -385,6 +386,16 @@ class BlockchainStateManager:
                 for i, field in enumerate(update_fields, 1):
                     if i < len(params) and params[i]:
                         raw[field] = params[i]
+
+            actor_role = params[2] if isinstance(params[1], dict) else params[-1]
+            raw["history"].append({
+                "timestamp": 1733270400,
+                "actionType": 10,
+                "actorName": raw["registeringAuthority"],
+                "actorRole": actor_role,
+                "remarks": "License details updated",
+                "dataHash": f"hash_update_{lid}",
+            })
 
             return {
                 "success":          True,

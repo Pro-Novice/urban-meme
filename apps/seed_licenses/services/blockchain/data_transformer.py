@@ -7,6 +7,7 @@ from apps.seed_licenses.enums import (
     LICENSE_CATEGORY_MAP,
     LICENSE_LEVELS,
     LICENSE_STATUSES,
+    LICENSE_ACTION_TYPES,
     USER_ROLE,
 )
 
@@ -37,7 +38,7 @@ GENERIC_TRANSFORM_MAP = {
     "getLicenseActionHistory": {
         "fields": ["timestamp", "actionType", "actorName", "actorRole", "remarks", "dataHash"],
         "enum_mappings": {
-            "actionType": LICENSE_STATUSES,
+            "actionType": LICENSE_ACTION_TYPES,
             "actorRole": USER_ROLE
         },
         "timestamp_fields": ["timestamp"]

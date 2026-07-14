@@ -48,9 +48,12 @@ if [[ -f .env ]]; then
     export $(grep -v '^#' .env | xargs)
 fi
 
-# Disable BuildKit to avoid pulling buildx images during builds
-export DOCKER_BUILDKIT=0
-export COMPOSE_DOCKER_CLI_BUILD=0
+# BuildKit is required for the persistent apt/pip caches in the Dockerfile.
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+if [[ -z "${BUILDX_BUILDER:-}" ]] && docker buildx inspect desktop-linux >/dev/null 2>&1; then
+    export BUILDX_BUILDER=desktop-linux
+fi
 
 # Validate Redis credentials
 if [[ -z "$REDIS_USER" || -z "$REDIS_PASSWORD" ]]; then

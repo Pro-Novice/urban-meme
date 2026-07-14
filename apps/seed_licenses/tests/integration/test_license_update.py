@@ -97,6 +97,10 @@ class TestLicenseUpdate:
             assert resp.status_code in (202, 500)
             if resp.status_code == 202:
                 assert resp.json()["data"]["status"] in ("pending", "accepted")
+                history = client.get(
+                    reverse("license-action-history", args=[1])
+                ).json()["data"]
+                assert history[-1]["actionType"] == "LICENSE_DETAILS_UPDATED"
 
     def test_partial_update_seed_license(
         self, client, seed_license_payload, blockchain_state,

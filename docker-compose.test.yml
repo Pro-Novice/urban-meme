@@ -24,6 +24,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.tests
+      network: host
     container_name: test-runner
     extra_hosts:
       - "host.docker.internal:host-gateway"

@@ -5,18 +5,22 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Install only required system deps
-RUN apt-get update && apt-get install -y \
-    build-essential libpq-dev netcat-openbsd \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# Reuse locally cached Debian packages first; apt uses the network only for
+# packages or metadata that are not available in the BuildKit cache.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    build-essential libpq-dev netcat-openbsd
 
 # Create non-root user
 RUN useradd -m appuser
 
-# Install Python deps
+# Reuse locally cached Python wheels/sdists first. pip automatically falls
+# back to the configured package index only for missing dependencies.
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    python -m pip install -r requirements.txt
 
 # Copy project files and set ownership
 COPY --chown=appuser:appuser . .

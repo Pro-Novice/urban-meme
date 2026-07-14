@@ -1,6 +1,8 @@
 services:
   web:
-    build: .
+    build:
+      context: .
+      network: host
     image: rajasthan-seed-backend-web:latest
     container_name: rajasthan-seed-backend
     restart: always
@@ -51,7 +53,9 @@ services:
         max-file: "3"
 
   celery:
-    build: .
+    build:
+      context: .
+      network: host
     container_name: rajasthan-seed-celery
     command: celery -A config worker -l info
     mem_limit: 2g

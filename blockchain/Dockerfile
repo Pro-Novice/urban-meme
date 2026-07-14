@@ -7,8 +7,10 @@ WORKDIR /app
 # Copy package files first (better layer caching)
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install --legacy-peer-deps
+# Reuse the local npm cache first and contact the registry only for packages
+# that are not cached yet.
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
 
 # Copy rest of project
 COPY . .

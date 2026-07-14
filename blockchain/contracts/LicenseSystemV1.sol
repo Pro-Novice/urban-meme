@@ -112,7 +112,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         newLicense.actionHistory.push(
             Action({
                 timestamp: block.timestamp,
-                actionType: LicenseStatus.SUBMITTED,
+                actionType: ActionType.SUBMITTED,
                 actorName: input.applicantName,
                 actorRole: userRole.CITIZEN,
                 remarks: "License Application Successfully Submitted",
@@ -386,7 +386,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         license.actionHistory.push(
             Action({
                 timestamp: block.timestamp,
-                actionType: _actionType,
+                actionType: ActionType(uint8(_actionType)),
                 actorName: _officerName,
                 actorRole: _userRole,
                 remarks: _remarks,

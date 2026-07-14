@@ -78,7 +78,7 @@ contract LicenseSystemV2 is LicenseSystemV1 {
         newLicense.actionHistory.push(
             Action({
                 timestamp: block.timestamp,
-                actionType: LicenseStatus.SUBMITTED,
+                actionType: ActionType.SUBMITTED,
                 actorName: input.applicantName,
                 actorRole: userRole.CITIZEN,
                 remarks: "License Application Successfully Submitted",
@@ -145,7 +145,7 @@ contract LicenseSystemV2 is LicenseSystemV1 {
         license.actionHistory.push(
             Action({
                 timestamp: block.timestamp,
-                actionType: LicenseStatus.APPROVED,
+                actionType: ActionType.LICENSE_DETAILS_UPDATED,
                 actorName: license.registeringAuthority,
                 actorRole: _role,
                 remarks: "License details updated",
