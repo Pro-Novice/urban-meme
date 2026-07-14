@@ -246,7 +246,10 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             }
         } else if (_newStatus == LicenseStatus.REVOKED) {
             // For revocations
-            require(oldStatus == LicenseStatus.APPROVED, "Only approved licenses can be revoked");
+            require(
+                oldStatus == LicenseStatus.APPROVED || oldStatus == LicenseStatus.RENEWED,
+                "Only approved or renewed licenses can be revoked"
+            );
             license.revokedDate = block.timestamp;
             license.isActive = false;
         } else if (_newStatus == LicenseStatus.EXPIRED) {
@@ -333,7 +336,11 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         bool isRevoked = (license.status == LicenseStatus.REVOKED);
 
         // Determine if license is valid and active
-        bool isValid = (license.status == LicenseStatus.APPROVED && !isExpired && !isRevoked);
+        bool hasValidStatus = (
+            license.status == LicenseStatus.APPROVED ||
+            license.status == LicenseStatus.RENEWED
+        );
+        bool isValid = (hasValidStatus && !isExpired && !isRevoked);
         bool isActive = license.isActive && isValid;
 
         // Generate status message
@@ -540,7 +547,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             return "License has expired and needs renewal";
         }
 
-        if (status == LicenseStatus.APPROVED) {
+        if (status == LicenseStatus.APPROVED || status == LicenseStatus.RENEWED) {
             return "License is valid and active";
         } else if (status == LicenseStatus.UNDER_REVIEW) {
             return "License application is under review";

@@ -7,6 +7,45 @@ from apps.seed_licenses.services.multi_account_manager import multi_account_mana
 logger = logging.getLogger(__name__)
 
 
+_EVENT_ACTION_TYPES = {
+    "LICENSEAPPLICATIONSUBMITTED": "SUBMITTED",
+    "LICENSEAPPLICATIONSUBMITTEDV2": "SUBMITTED",
+    "LICENSEAPPROVED": "APPROVED",
+    "LICENSEREJECTED": "REJECTED",
+    "LICENSEREVOKED": "REVOKED",
+    "LICENSERENEWED": "RENEWED",
+    "LICENSEDETAILSUPDATED": "LICENSE_DETAILS_UPDATED",
+}
+
+
+def _normalize_event_name(value: Any) -> str:
+    """Normalize Solidity event names without relying on their casing/style."""
+    return "".join(character for character in str(value or "").upper() if character.isalnum())
+
+
+def _normalize_action_type(value: Any) -> str:
+    """Normalize API/decoded enum values to the action-history representation."""
+    if isinstance(value, int):
+        value = LICENSE_STATUS_REVERSE.get(value, value)
+    return str(value or "").strip().upper().replace(" ", "_").replace("-", "_")
+
+
+def _event_matches_action(log: Dict[str, Any], action_type: Any) -> bool:
+    """Return whether a persisted contract event represents an action-history row."""
+    normalized_action = _normalize_action_type(action_type)
+    event_name = _normalize_event_name(log.get("event_name"))
+
+    direct_action = _EVENT_ACTION_TYPES.get(event_name)
+    if direct_action is not None:
+        return direct_action == normalized_action
+
+    if event_name != "STATUSCHANGED":
+        return False
+
+    event_data = log.get("event_data") or {}
+    return _normalize_action_type(event_data.get("newStatus")) == normalized_action
+
+
 class ILicenseService:
     """Abstract service interface (for Dependency Inversion)."""
 
@@ -123,30 +162,26 @@ class LicenseService(ILicenseService):
                 return []
 
             # Query local EventLog for blockchain transaction hashes
-            logs = EventLog.objects.filter(
-                license_id=license_id
-            ).values("transaction_hash", "event_name", "event_data")
+            # The model's default ordering is newest-first. Action history comes
+            # from the contract oldest-first, so explicitly align the event logs
+            # before matching them. ``id`` preserves receipt/log insertion order
+            # when multiple events share a block and timestamp.
+            unmatched_logs = list(
+                EventLog.objects.filter(license_id=license_id)
+                .values("transaction_hash", "event_name", "event_data")
+                .order_by("block_number", "timestamp", "id")
+            )
 
             enriched = []
             for action in actions:
-                # Try to match event by status keyword or remarks content
-                match = next(
-                    (
-                        log for log in logs
-                        if (
-                            # Direct event name match (e.g., LicenseApplicationSubmitted)
-                            log["event_name"].upper().find(action["actionType"]) != -1
-                            # For StatusChanged → match by newStatus field
-                            or (
-                                log["event_name"] == "StatusChanged"
-                                and log["event_data"].get("newStatus", "").upper() == action["actionType"].upper()
-                            )
-                            # Backup match using remarks (for user-facing messages)
-                            or log["event_data"].get("remarks") == action.get("remarks")
-                        )
-                    ),
-                    None,
-                )
+                match = None
+                for index, log in enumerate(unmatched_logs):
+                    if _event_matches_action(log, action.get("actionType")):
+                        # A blockchain event represents exactly one history action.
+                        # Removing it prevents repeated actions (especially detail
+                        # updates with identical remarks) from sharing a tx hash.
+                        match = unmatched_logs.pop(index)
+                        break
 
                 enriched.append({
                     **action,
