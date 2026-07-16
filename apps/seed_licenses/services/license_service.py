@@ -250,7 +250,7 @@ class LicenseService(ILicenseService):
             "saleStorageAddress": data.get("sale_storage_address", ""),
             "productionCompany": data.get("production_company", ""),
             "cropName": data.get("crop_name", []),
-            "cropVariety": data.get("crop_variety", ""),
+            "cropVariety": data.get("crop_variety", []),
             "isSeedSelfProduced": data.get("is_seed_self_produced", False),
             "isSeedSelfProducedProvided": "is_seed_self_produced" in data,
             "latitude": data.get("latitude", 0),

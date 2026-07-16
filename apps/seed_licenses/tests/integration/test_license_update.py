@@ -91,7 +91,7 @@ class TestLicenseUpdate:
                 "saleStorageAddress":"Updated Warehouse Complex",
                 "productionCompany": "Updated Production Co",
                 "cropName":          ["Updated Wheat", "Updated Rice"],
-                "cropVariety":       "HD-3086",
+                "cropVariety":       ["HD-3086", "Basmati-370", "IR-64"],
                 "role":              "AGRICULTURE_OFFICER",
             })
             assert resp.status_code in (202, 500)
@@ -216,7 +216,7 @@ class TestLicenseUpdate:
                 {"firmName":        "First Update Firm"},
                 {"firmAddress":     "Second Update Address"},
                 {"cropName":        ["Third Update Crop"]},
-                {"cropVariety":     "Fourth Update Variety"},
+                {"cropVariety":     ["Fourth Update Variety"]},
                 {"salePointAddress":"Fifth Update Sale Point"},
             ]
             for u in updates:

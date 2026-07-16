@@ -20,7 +20,7 @@ contract LicenseSystemV2 is LicenseSystemV1 {
         string saleStorageAddress;
         string productionCompany;
         string[] cropName;
-        string cropVariety;
+        string[] cropVariety;
         bool isSeedSelfProduced;
         bool isSeedSelfProducedProvided;
         int256 latitude;
@@ -59,7 +59,7 @@ contract LicenseSystemV2 is LicenseSystemV1 {
         newLicense.saleStorageAddress = input.saleStorageAddress;
         newLicense.productionCompany = input.productionCompany;
         _setCropName(newLicense, input.cropName);
-        newLicense.cropVariety = input.cropVariety;
+        _setCropVariety(newLicense, input.cropVariety);
         newLicense.applicationDate = block.timestamp;
         newLicense.lastModifiedDate = block.timestamp;
         newLicense.isActive = false;
@@ -129,7 +129,7 @@ contract LicenseSystemV2 is LicenseSystemV1 {
         if (bytes(input.saleStorageAddress).length > 0) license.saleStorageAddress = input.saleStorageAddress;
         if (bytes(input.productionCompany).length > 0) license.productionCompany = input.productionCompany;
         if (input.cropName.length > 0) _setCropName(license, input.cropName);
-        if (bytes(input.cropVariety).length > 0) license.cropVariety = input.cropVariety;
+        if (input.cropVariety.length > 0) _setCropVariety(license, input.cropVariety);
 
         if (input.isSeedSelfProducedProvided) {
             require(license.category == LicenseCategory.SEED, "Seed production flag is only valid for seed licenses");

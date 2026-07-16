@@ -92,7 +92,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
         newLicense.saleStorageAddress = input.saleStorageAddress;
         newLicense.productionCompany = input.productionCompany;
         _setCropName(newLicense, input.cropName);
-        newLicense.cropVariety = input.cropVariety;
+        _setCropVariety(newLicense, input.cropVariety);
         newLicense.applicationDate = block.timestamp;
         newLicense.lastModifiedDate = block.timestamp;
         newLicense.isActive = false;
@@ -146,6 +146,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
             lng = license.longitude;
         }
         string[] memory cropName = _copyCropName(license);
+        string[] memory cropVariety = _copyCropVariety(license);
         return
             LicenseBasicInfo({
                 licenseId: license.licenseId,
@@ -161,7 +162,7 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
                 saleStorageAddress: license.saleStorageAddress,
                 productionCompany: license.productionCompany,
                 cropName: cropName,
-                cropVariety: license.cropVariety,
+                cropVariety: cropVariety,
                 registeringOfficeName: license.registeringOfficeName,
                 registeringAuthority: license.registeringAuthority,
                 applicationDate: license.applicationDate,
@@ -205,7 +206,30 @@ contract LicenseSystemV1 is LicenseStorage, Initializable, UUPSUpgradeable, Owna
 
         return new string[](0);
     }
+    function _setCropVariety(License storage license, string[] memory cropVariety) internal {
+        delete license.cropVarieties;
+        for (uint256 i = 0; i < cropVariety.length; i++) {
+            license.cropVarieties.push(cropVariety[i]);
+        }
+        license.cropVariety = cropVariety.length > 0 ? cropVariety[0] : "";
+    }
+    function _copyCropVariety(License storage license) internal view returns (string[] memory) {
+        if (license.cropVarieties.length > 0) {
+            string[] memory copiedCropVariety = new string[](license.cropVarieties.length);
+            for (uint256 i = 0; i < license.cropVarieties.length; i++) {
+                copiedCropVariety[i] = license.cropVarieties[i];
+            }
+            return copiedCropVariety;
+        }
 
+        if (bytes(license.cropVariety).length > 0) {
+            string[] memory legacyCropVariety = new string[](1);
+            legacyCropVariety[0] = license.cropVariety;
+            return legacyCropVariety;
+        }
+
+        return new string[](0);
+    }
     // 3. Get License Action History
     function getLicenseActionHistory(uint256 _licenseId) public view licenseExists(_licenseId) returns (Action[] memory) {
         return licenses[_licenseId].actionHistory;

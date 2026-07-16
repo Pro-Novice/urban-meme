@@ -34,7 +34,7 @@ describe("LicenseSystemV2 application license type", function () {
       saleStorageAddress: "Warehouse No 3, Outer Ring Road, Jaipur",
       productionCompany: "Ravi Agro Traders",
       cropName: ["Wheat"],
-      cropVariety: "HD2967",
+      cropVariety: ["HD2967"],
       latitude: 0,
       longitude: 0,
     };
@@ -53,7 +53,7 @@ describe("LicenseSystemV2 application license type", function () {
       saleStorageAddress: "",
       productionCompany: "",
       cropName: [],
-      cropVariety: "",
+      cropVariety: [],
       isSeedSelfProduced: false,
       isSeedSelfProducedProvided: false,
       latitude: 0,

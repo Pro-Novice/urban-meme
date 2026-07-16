@@ -44,7 +44,7 @@ class LicenseBasicInfoSerializer(serializers.Serializer):
     registeringOfficeName   = serializers.CharField()
     productionCompany       = serializers.CharField()
     cropName                = serializers.ListField(child=serializers.CharField())
-    cropVariety             = serializers.CharField()
+    cropVariety             = serializers.ListField(child=serializers.CharField())
     latitude                = serializers.IntegerField()
     longitude               = serializers.IntegerField()
     createdAt               = serializers.CharField()
@@ -178,7 +178,7 @@ def submit_license_schema():
                 "saleStorageAddress":       serializers.CharField(),
                 "productionCompany":        serializers.CharField(),
                 "cropName":                 serializers.ListField(child=serializers.CharField()),
-                "cropVariety":              serializers.CharField(),
+                "cropVariety":              serializers.ListField(child=serializers.CharField()),
                 "latitude":                 serializers.IntegerField(required=False, help_text="Required for FERTILIZER and PESTICIDE only"),
                 "longitude":                serializers.IntegerField(required=False, help_text="Required for FERTILIZER and PESTICIDE only"),
             }
@@ -211,7 +211,7 @@ def submit_license_schema():
                     "saleStorageAddress": "Warehouse 3, NH8",
                     "productionCompany": "AgriChem India",
                     "cropName": ["Wheat", "Rice", "Maize"],
-                    "cropVariety": "HD-2967",
+                    "cropVariety": ["HD-2967"],
                     "latitude": 269500,
                     "longitude": 756800,
                 }
@@ -236,7 +236,7 @@ def submit_license_schema():
                     "saleStorageAddress": "Warehouse 3, NH8",
                     "productionCompany": "AgriChem India",
                     "cropName": ["Wheat", "Rice", "Maize"],
-                    "cropVariety": "HD-2967",
+                    "cropVariety": ["HD-2967"],
                     "latitude": 269500,
                     "longitude": 756800,
                 }
@@ -261,7 +261,7 @@ def submit_license_schema():
                     "saleStorageAddress": "Warehouse 3, NH8",
                     "productionCompany": "SeedCorp India",
                     "cropName": ["Rice", "Wheat"],
-                    "cropVariety": "Basmati-370",
+                    "cropVariety": ["Basmati-370"],
                 }
             ),
             OpenApiExample(
@@ -509,7 +509,7 @@ def update_details_schema():
                 "saleStorageAddress": serializers.CharField(required=False),
                 "productionCompany":  serializers.CharField(required=False),
                 "cropName":           serializers.ListField(child=serializers.CharField(), required=False),
-                "cropVariety":        serializers.CharField(required=False),
+                "cropVariety":        serializers.ListField(child=serializers.CharField(), required=False),
                 "isSeedSelfProduced": serializers.BooleanField(required=False, help_text="SEED licenses only"),
                 "latitude":           serializers.FloatField(required=False, help_text="Must be supplied with longitude; FERTILIZER/PESTICIDE only"),
                 "longitude":          serializers.FloatField(required=False, help_text="Must be supplied with latitude; FERTILIZER/PESTICIDE only"),

@@ -48,7 +48,7 @@ def valid_license_payload():
         "salePointAddress": "789 Market Road, Jaipur",
         "saleStorageAddress": "101 Warehouse District, Jaipur",
         "cropName": ["Wheat", "Rice", "Maize"],
-        "cropVariety": "HD-2967",
+        "cropVariety": ["HD-2967", "IR-64", "Pioneer 30T90"],
         "isSeedSelfProduced": False, 
         "productionCompany": "Kumar Seeds Pvt Ltd",
     }
@@ -83,7 +83,7 @@ def valid_update_payload():
         "firmType": "Updated Address 123",
         "firmAddress": "Updated Address 123",
         "salePointAddress": "New Sale Point",
-        "cropVariety": "Officer Smith",
+        "cropVariety": ["HD-2967", "IR-64", "Pioneer 30T90"],
         "role": "AGRICULTURE_OFFICER"
     }
 
@@ -106,7 +106,7 @@ def mock_license_data():
         "saleStorageAddress": "789 Storage St",
         "productionCompany": "Test Company",
         "cropName": ["Wheat", "Rice", "Maize"],
-        "cropVariety": "HD-2967",
+        "cropVariety": ["HD-2967", "IR-64", "Pioneer 30T90"],
         "registeringOfficeName": "Test Office",
         "registeringAuthority": "Test Authority",
         "applicationDate": "2025-01-01",

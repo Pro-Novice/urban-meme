@@ -824,7 +824,7 @@ class TestUpdateLicenseDetails:
             "saleStorageAddress": "Updated Storage",
             "productionCompany": "Updated Producer",
             "cropName": ["Wheat", "Rice"],
-            "cropVariety": "HD-3086",
+            "cropVariety": ["HD-3086","Basmati-370", "IR-64"],
             "isSeedSelfProduced": False,
             "latitude": 26.9124,
             "longitude": 75.7873,

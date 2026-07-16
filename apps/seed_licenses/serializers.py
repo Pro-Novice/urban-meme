@@ -38,7 +38,10 @@ class SubmitLicenseApplicationSerializer(serializers.Serializer):
         child=serializers.CharField(allow_blank=False),
         allow_empty=False,
     )
-    crop_variety = serializers.CharField()
+    crop_variety = serializers.ListField(
+        child=serializers.CharField(allow_blank=False),
+        allow_empty=False,
+    )
     latitude = serializers.FloatField(required=False)
     longitude = serializers.FloatField(required=False)
 
@@ -263,7 +266,11 @@ class UpdateLicenseDetailsSerializer(serializers.Serializer):
         required=False,
         allow_empty=False,
     )
-    crop_variety = serializers.CharField(required=False, allow_blank=True)
+    crop_variety = serializers.ListField(
+        child=serializers.CharField(allow_blank=False),
+        required=False,
+        allow_empty=False,
+    )
     is_seed_self_produced = serializers.BooleanField(required=False)
     latitude = serializers.FloatField(required=False)
     longitude = serializers.FloatField(required=False)

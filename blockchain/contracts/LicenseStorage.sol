@@ -105,6 +105,7 @@ contract LicenseStorage {
         bool documentsVerified;
         bool inspectionPassed;
         string[] cropNames;
+        string[] cropVarieties;
         string applicationLicenseType;
     }
 
@@ -139,7 +140,7 @@ contract LicenseStorage {
         string saleStorageAddress;
         string productionCompany;
         string[] cropName;
-        string cropVariety;
+        string[] cropVariety;
         string registeringOfficeName;
         string registeringAuthority;
         uint256 applicationDate;
@@ -186,7 +187,7 @@ contract LicenseStorage {
         string saleStorageAddress;
         string productionCompany;
         string[] cropName;
-        string cropVariety;
+        string[] cropVariety;
         int256 latitude;
         int256 longitude;
     }
@@ -208,7 +209,7 @@ contract LicenseStorage {
         string saleStorageAddress;
         string productionCompany;
         string[] cropName;
-        string cropVariety;
+        string[] cropVariety;
         int256 latitude;
         int256 longitude;
     }

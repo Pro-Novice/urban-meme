@@ -467,7 +467,7 @@ def seed_license_payload():
         "salePointAddress":          "789 Market Road, Jaipur",
         "saleStorageAddress":        "101 Warehouse District, Jaipur",
         "cropName":                  ["Wheat", "Rice", "Maize"],
-        "cropVariety":               "HD-2967",
+        "cropVariety":               ["HD-2967", "IR-64", "Pioneer 30T90"],
         "productionCompany":         "Kumar Seeds Pvt Ltd",
         # NO latitude / longitude — SEED forbids them
     }
@@ -492,7 +492,7 @@ def fertilizer_license_payload():
         "salePointAddress":          "Shop 12, Market Road, Jaipur",
         "saleStorageAddress":        "Warehouse 3, NH-8, Jaipur",
         "cropName":                  ["Wheat", "Rice", "Maize"],
-        "cropVariety":               "HD-2967",
+        "cropVariety":               ["HD-2967", "IR-64", "Pioneer 30T90"],
         "productionCompany":         "AgriChem India Ltd",
         "latitude":                  26.9500,
         "longitude":                 75.6800,
@@ -518,7 +518,7 @@ def pesticide_license_payload():
         "salePointAddress":          "Shop 5, Agri Market, Jodhpur",
         "saleStorageAddress":        "Godown 1, NH-65, Jodhpur",
         "cropName":                  ["Cotton", "Wheat"],
-        "cropVariety":               "Bt Cotton",
+        "cropVariety":               ["Bt Cotton", "HD-3086"],
         "productionCompany":         "ChemAgro India",
         "latitude":                  26.2900,
         "longitude":                 73.0200,

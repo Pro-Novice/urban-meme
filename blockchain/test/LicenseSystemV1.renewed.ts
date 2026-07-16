@@ -32,7 +32,7 @@ describe("LicenseSystemV1 renewed licenses", function () {
       saleStorageAddress,
       productionCompany: firmName,
       cropName: ["Wheat"],
-      cropVariety: "HD2967",
+      cropVariety: ["HD2967"],
       latitude: 0,
       longitude: 0,
     });
