@@ -1,10 +1,10 @@
 {
   "info": {
-    "_postman_id": "6098032b-a449-473c-a54e-9e7079c14f2d",
+    "_postman_id": "96f3a9d2-613e-4c1d-835f-a3a993ef9e2d",
     "name": "Rajasthan Project1",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "43756014",
-    "_collection_link": "https://go.postman.co/collection/43756014-6098032b-a449-473c-a54e-9e7079c14f2d?source=collection_link"
+    "_collection_link": "https://go.postman.co/collection/43756014-96f3a9d2-613e-4c1d-835f-a3a993ef9e2d?source=collection_link"
   },
   "variable": [
     {
@@ -47,7 +47,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"licenseCategory\": \"FERTILIZER\",\n  \"applicationLicenseType\": \"RETAIL_DEALER\",\n  \"licenseLevel\": \"STATE\",\n  \"registeringAuthority\": \"Department of Agriculture\",\n  \"registeringOfficeName\": \"District Agri Office, Jaipur\",\n  \"licenseNumber\": \"RJFTST-TEST-001\",  // must be unique\n  \"applicantName\": \"Ravi Kumar\",\n  \"aadhaarNumber\": \"IRk4zRfT9iJvf5CRYUQOZwor9ro553k8mWwlfqwLPheTWoz0oLEPlr/+4vPOPOa0nOROMII9ZhLV9r2DR1AnPqsVXUj2g1JiAZWvIE61Zu/qU/RU/B+yxUnbmztYC8kmK0eunlvFyNtmBidbgbatQWnn4JufcuewGFwCIUblTCQ9PpPouh8KK9602n4rPi36MGcGQFVdm8uoxig9/RRLh34UFb8yBamhuY5I/5UMDQUgli5Vu9Fc8AXuu+3sZ3odR8DIeMykmtTyrysTYAu7I8jHHThGcHNiysrESgaPEc5azFdFHdULoLiWA4RRMrgKDFWJV1MeTbI1UZsHtCc/PA==\",\n  \"applicantPermanentAddress\": \"H.No 45, Green Colony, Jaipur\",\n  \"firmName\": \"Ravi Agro Traders\",\n  \"firmType\": \"Partnership\",\n  \"firmAddress\": \"Plot No 22, Mandi Road, Jaipur\",\n  \"salePointAddress\": \"Shop No 5, Krishi Market, Jaipur\",\n  \"saleStorageAddress\": \"Warehouse No 3, Outer Ring Road, Jaipur\",\n  \"cropName\": [\"Wheat\", \"Rice\", \"Maize\"],\n  \"cropVariety\": \"HD2967\",\n  \"isSeedSelfProduced\": false, \n  \"productionCompany\": \"Agro Seeds Pvt Ltd\",  // required only when isSeedSelfProduced is true else its by default firmName\n  \"latitude\": 26.9124,\n  \"longitude\": 75.7873   \n}\n",
+                  "raw": "{\n  \"licenseCategory\": \"FERTILIZER\",\n  \"applicationLicenseType\": \"RETAIL_DEALER\",\n  \"licenseLevel\": \"STATE\",\n  \"registeringAuthority\": \"Department of Agriculture\",\n  \"registeringOfficeName\": \"District Agri Office, Jaipur\",\n  \"licenseNumber\": \"RJFTST-TEST-001\",  // must be unique\n  \"applicantName\": \"Ravi Kumar\",\n  \"aadhaarNumber\": \"IRk4zRfT9iJvf5CRYUQOZwor9ro553k8mWwlfqwLPheTWoz0oLEPlr/+4vPOPOa0nOROMII9ZhLV9r2DR1AnPqsVXUj2g1JiAZWvIE61Zu/qU/RU/B+yxUnbmztYC8kmK0eunlvFyNtmBidbgbatQWnn4JufcuewGFwCIUblTCQ9PpPouh8KK9602n4rPi36MGcGQFVdm8uoxig9/RRLh34UFb8yBamhuY5I/5UMDQUgli5Vu9Fc8AXuu+3sZ3odR8DIeMykmtTyrysTYAu7I8jHHThGcHNiysrESgaPEc5azFdFHdULoLiWA4RRMrgKDFWJV1MeTbI1UZsHtCc/PA==\",\n  \"applicantPermanentAddress\": \"H.No 45, Green Colony, Jaipur\",\n  \"firmName\": \"Ravi Agro Traders\",\n  \"firmType\": \"Partnership\",\n  \"firmAddress\": \"Plot No 22, Mandi Road, Jaipur\",\n  \"salePointAddress\": \"Shop No 5, Krishi Market, Jaipur\",\n  \"saleStorageAddress\": \"Warehouse No 3, Outer Ring Road, Jaipur\",\n  \"cropName\": [\"Wheat\", \"Rice\", \"Maize\"],\n  \"cropVariety\": [\"HD2967\"],\n  \"isSeedSelfProduced\": false, \n  \"productionCompany\": \"Agro Seeds Pvt Ltd\",  // required only when isSeedSelfProduced is true else its by default firmName\n  \"latitude\": 26.9124,\n  \"longitude\": 75.7873   \n}\n",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -305,7 +305,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    // licenseId and role are required fields; provide at least one field to update\n    \"licenseId\": 1,\n    \"applicationLicenseType\": \"WHOLESALER_DEALER\",\n    \"firmName\": \"New Firm Name\",\n    \"firmType\": \"New Firm Type\",\n    \"firmAddress\": \"New Firm Address\",\n    \"salePointAddress\": \"New Sale Point Address\",\n    \"cropVariety\": \"New Crop Variety\",\n    \"role\": \"JOINT_DIRECTOR\"\n}",
+                  "raw": "{\n    // licenseId and role are required fields; provide at least one field to update\n    \"licenseId\": 1,\n    \"applicationLicenseType\": \"WHOLESALER_DEALER\",\n    \"firmName\": \"New Firm Name\",\n    \"firmType\": \"New Firm Type\",\n    \"firmAddress\": \"New Firm Address\",\n    \"salePointAddress\": \"New Sale Point Address\",\n    \"cropVariety\": [\"HD2967\"],\n    \"role\": \"JOINT_DIRECTOR\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -453,7 +453,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"licenseCategory\": \"PESTICIDE\",\n  \"applicationLicenseType\": \"SALES_LICENSE\",\n  \"licenseLevel\": \"STATE\",\n  \"registeringAuthority\": \"Department of Agriculture\",\n  \"registeringOfficeName\": \"District Agri Office, Jaipur\",\n  \"licenseNumber\": \"RJPST-TEST-002\",  // must be unique\n  \"applicantName\": \"Ravi Kumar\",\n  \"aadhaarNumber\": \"IRk4zRfT9iJvf5CRYUQOZwor9ro553k8mWwlfqwLPheTWoz0oLEPlr/+4vPOPOa0nOROMII9ZhLV9r2DR1AnPqsVXUj2g1JiAZWvIE61Zu/qU/RU/B+yxUnbmztYC8kmK0eunlvFyNtmBidbgbatQWnn4JufcuewGFwCIUblTCQ9PpPouh8KK9602n4rPi36MGcGQFVdm8uoxig9/RRLh34UFb8yBamhuY5I/5UMDQUgli5Vu9Fc8AXuu+3sZ3odR8DIeMykmtTyrysTYAu7I8jHHThGcHNiysrESgaPEc5azFdFHdULoLiWA4RRMrgKDFWJV1MeTbI1UZsHtCc/PA==\",\n  \"applicantPermanentAddress\": \"H.No 45, Green Colony, Jaipur\",\n  \"firmName\": \"Ravi Agro Traders\",\n  \"firmType\": \"Partnership\",\n  \"firmAddress\": \"Plot No 22, Mandi Road, Jaipur\",\n  \"salePointAddress\": \"Shop No 5, Krishi Market, Jaipur\",\n  \"saleStorageAddress\": \"Warehouse No 3, Outer Ring Road, Jaipur\",\n  \"cropName\": [\"Wheat\", \"Rice\", \"Maize\"],\n  \"cropVariety\": \"HD2967\",\n  \"isSeedSelfProduced\": false, \n  \"productionCompany\": \"Agro Seeds Pvt Ltd\",  // required only when isSeedSelfProduced is true else its by default firmName\n  \"latitude\": 26.9124,\n  \"longitude\": 75.7873\n}\n",
+                  "raw": "{\n  \"licenseCategory\": \"PESTICIDE\",\n  \"applicationLicenseType\": \"SALES_LICENSE\",\n  \"licenseLevel\": \"STATE\",\n  \"registeringAuthority\": \"Department of Agriculture\",\n  \"registeringOfficeName\": \"District Agri Office, Jaipur\",\n  \"licenseNumber\": \"RJPST-TEST-002\",  // must be unique\n  \"applicantName\": \"Ravi Kumar\",\n  \"aadhaarNumber\": \"IRk4zRfT9iJvf5CRYUQOZwor9ro553k8mWwlfqwLPheTWoz0oLEPlr/+4vPOPOa0nOROMII9ZhLV9r2DR1AnPqsVXUj2g1JiAZWvIE61Zu/qU/RU/B+yxUnbmztYC8kmK0eunlvFyNtmBidbgbatQWnn4JufcuewGFwCIUblTCQ9PpPouh8KK9602n4rPi36MGcGQFVdm8uoxig9/RRLh34UFb8yBamhuY5I/5UMDQUgli5Vu9Fc8AXuu+3sZ3odR8DIeMykmtTyrysTYAu7I8jHHThGcHNiysrESgaPEc5azFdFHdULoLiWA4RRMrgKDFWJV1MeTbI1UZsHtCc/PA==\",\n  \"applicantPermanentAddress\": \"H.No 45, Green Colony, Jaipur\",\n  \"firmName\": \"Ravi Agro Traders\",\n  \"firmType\": \"Partnership\",\n  \"firmAddress\": \"Plot No 22, Mandi Road, Jaipur\",\n  \"salePointAddress\": \"Shop No 5, Krishi Market, Jaipur\",\n  \"saleStorageAddress\": \"Warehouse No 3, Outer Ring Road, Jaipur\",\n  \"cropName\": [\"Wheat\", \"Rice\", \"Maize\"],\n  \"cropVariety\": [\"HD2967\",\"HD2967\", \"HD2967\"],\n  \"isSeedSelfProduced\": false, \n  \"productionCompany\": \"Agro Seeds Pvt Ltd\",  // required only when isSeedSelfProduced is true else its by default firmName\n  \"latitude\": 26.9124,\n  \"longitude\": 75.7873\n}\n",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -711,7 +711,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    // licenseId and role are required fields; provide at least one field to update\n    \"licenseId\": 1,\n    \"applicationLicenseType\": \"COMMERCIAL_PEST_CONTROL\",\n    \"firmName\": \"New Firm Name\",\n    \"firmType\": \"New Firm Type\",\n    \"firmAddress\": \"New Firm Address\",\n    \"salePointAddress\": \"New Sale Point Address\",\n    \"cropVariety\": \"New Crop Variety\",\n    \"role\": \"JOINT_DIRECTOR\"\n}",
+                  "raw": "{\n    // licenseId and role are required fields; provide at least one field to update\n    \"licenseId\": 1,\n    \"applicationLicenseType\": \"COMMERCIAL_PEST_CONTROL\",\n    \"firmName\": \"New Firm Name\",\n    \"firmType\": \"New Firm Type\",\n    \"firmAddress\": \"New Firm Address\",\n    \"salePointAddress\": \"New Sale Point Address\",\n    \"cropVariety\": [\"HD2967\"],\n    \"role\": \"JOINT_DIRECTOR\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -859,7 +859,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"licenseCategory\": \"SEED\",\n  \"applicationLicenseType\": \"NEW_APPLICATION\",\n  \"licenseLevel\": \"STATE\",\n  \"registeringAuthority\": \"Department of Agriculture\",\n  \"registeringOfficeName\": \"District Agri Office, Jaipur\",\n  \"licenseNumber\": \"RJSDST-TEST-003\",  // must be unique\n  \"applicantName\": \"Ravi Kumar\",\n  \"aadhaarNumber\": \"IRk4zRfT9iJvf5CRYUQOZwor9ro553k8mWwlfqwLPheTWoz0oLEPlr/+4vPOPOa0nOROMII9ZhLV9r2DR1AnPqsVXUj2g1JiAZWvIE61Zu/qU/RU/B+yxUnbmztYC8kmK0eunlvFyNtmBidbgbatQWnn4JufcuewGFwCIUblTCQ9PpPouh8KK9602n4rPi36MGcGQFVdm8uoxig9/RRLh34UFb8yBamhuY5I/5UMDQUgli5Vu9Fc8AXuu+3sZ3odR8DIeMykmtTyrysTYAu7I8jHHThGcHNiysrESgaPEc5azFdFHdULoLiWA4RRMrgKDFWJV1MeTbI1UZsHtCc/PA==\",\n  \"applicantPermanentAddress\": \"H.No 45, Green Colony, Jaipur\",\n  \"firmName\": \"Ravi Agro Traders\",\n  \"firmType\": \"Partnership\",\n  \"firmAddress\": \"Plot No 22, Mandi Road, Jaipur\",\n  \"salePointAddress\": \"Shop No 5, Krishi Market, Jaipur\",\n  \"saleStorageAddress\": \"Warehouse No 3, Outer Ring Road, Jaipur\",\n  \"cropName\": [\"Wheat\", \"Rice\", \"Maize\"],\n  \"cropVariety\": \"HD2967\",\n  \"isSeedSelfProduced\": false, \n  \"productionCompany\": \"Agro Seeds Pvt Ltd\"  // required only when isSeedSelfProduced is true else its by default firmName\n}\n",
+                  "raw": "{\n  \"licenseCategory\": \"SEED\",\n  \"applicationLicenseType\": \"NEW_APPLICATION\",\n  \"licenseLevel\": \"STATE\",\n  \"registeringAuthority\": \"Department of Agriculture\",\n  \"registeringOfficeName\": \"District Agri Office, Jaipur\",\n  \"licenseNumber\": \"RJSDST-TEST-005\",  // must be unique\n  \"applicantName\": \"Ravi Kumar\",\n  \"aadhaarNumber\": \"IRk4zRfT9iJvf5CRYUQOZwor9ro553k8mWwlfqwLPheTWoz0oLEPlr/+4vPOPOa0nOROMII9ZhLV9r2DR1AnPqsVXUj2g1JiAZWvIE61Zu/qU/RU/B+yxUnbmztYC8kmK0eunlvFyNtmBidbgbatQWnn4JufcuewGFwCIUblTCQ9PpPouh8KK9602n4rPi36MGcGQFVdm8uoxig9/RRLh34UFb8yBamhuY5I/5UMDQUgli5Vu9Fc8AXuu+3sZ3odR8DIeMykmtTyrysTYAu7I8jHHThGcHNiysrESgaPEc5azFdFHdULoLiWA4RRMrgKDFWJV1MeTbI1UZsHtCc/PA==\",\n  \"applicantPermanentAddress\": \"H.No 45, Green Colony, Jaipur\",\n  \"firmName\": \"Ravi Agro Traders\",\n  \"firmType\": \"Partnership\",\n  \"firmAddress\": \"Plot No 22, Mandi Road, Jaipur\",\n  \"salePointAddress\": \"Shop No 5, Krishi Market, Jaipur\",\n  \"saleStorageAddress\": \"Warehouse No 3, Outer Ring Road, Jaipur\",\n  \"cropName\": [\"Wheat\", \"Rice\", \"Maize\"],\n  \"cropVariety\": [\"HD2967\", \"HD2967\", \"AD345\"],\n  \"isSeedSelfProduced\": false, \n  \"productionCompany\": \"Agro Seeds Pvt Ltd\"  // required only when isSeedSelfProduced is true else its by default firmName\n}\n",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -1117,7 +1117,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    // licenseId and role are required fields; provide at least one field to update\n    \"licenseId\": 1,\n    \"applicationLicenseType\": \"OLD_APPLICATION\",\n    \"firmName\": \"New Firm Name\",\n    \"firmType\": \"New Firm Type\",\n    \"firmAddress\": \"New Firm Address\",\n    \"salePointAddress\": \"New Sale Point Address\",\n    \"cropVariety\": \"New Crop Variety\",\n    \"role\": \"JOINT_DIRECTOR\"\n}",
+                  "raw": "{\n    // licenseId and role are required fields; provide at least one field to update\n    \"licenseId\": \"2\",\n    \"applicationLicenseType\": \"OLD_APPLICATION\",\n    \"firmName\": \"New Firm Name\",\n    \"firmType\": \"New Firm Type\",\n    \"firmAddress\": \"New Firm Address\",\n    \"salePointAddress\": \"New Sale Point Address\",\n    \"cropVariety\": [\"HD123\"],\n    \"role\": \"JOINT_DIRECTOR\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
