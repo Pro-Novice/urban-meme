@@ -231,11 +231,10 @@ def get_license_qr_data(request, license_id: int):
         return ApiResponse(err="License ID must be an integer.", status=HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception(f"QR data fetch failed for license ID {license_id}")
-        return ApiResponse(
-            err=f"QR data fetch failed: {e}",
-            status=HTTP_500_INTERNAL_SERVER_ERROR,
-        )
-
+        err = str(e)
+        if e.args and isinstance(e.args[0], dict):
+            err = e.args[0].get("message", err)
+        return ApiResponse(err=err, status=HTTP_500_INTERNAL_SERVER_ERROR)
 # --------------------------------------------------------------------
 # 5️ Get License Action History
 # --------------------------------------------------------------------
