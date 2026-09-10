@@ -1,5 +1,6 @@
 import logging
-from django.core.cache import cache  
+import re
+from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from rest_framework.decorators import api_view
 from rest_framework.status import (
@@ -231,10 +232,17 @@ def get_license_qr_data(request, license_id: int):
         return ApiResponse(err="License ID must be an integer.", status=HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception(f"QR data fetch failed for license ID {license_id}")
-        err = "Internal Server Error"
-        if e.args and isinstance(e.args[0], dict):
-            err = e.args[0].get("message", err)
+
+        raw = str(e)
+        match_obj = re.search(r"'message':\s*'([^']*)'", raw)
+
+        if match_obj:
+            err = match_obj.group(1)
+        else:
+            err = "An unexpected error occurred. Please try again later."
+
         return ApiResponse(err=err, status=HTTP_500_INTERNAL_SERVER_ERROR)
+
 # --------------------------------------------------------------------
 # 5️ Get License Action History
 # --------------------------------------------------------------------
