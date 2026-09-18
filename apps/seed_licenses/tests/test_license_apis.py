@@ -10,6 +10,7 @@ from apps.seed_licenses.tests.helper import (
     assert_transaction_accepted,
     assert_error_contains
 )
+from utils.blockchain_errors import ContractRevertError
 from config import settings as settings
 import time
 
@@ -409,13 +410,15 @@ class TestGetLicenseQRData:
         
         assert resp.status_code in [status.HTTP_400_BAD_REQUEST, status.HTTP_500_INTERNAL_SERVER_ERROR]
     
-    @pytest.mark.parametrize("exception,keyword", [
-        (Exception("License must be active to generate QR data"), "active"),
-        (ConnectionError("Blockchain connection failed"), "error"),
-        (RuntimeError("Unexpected error"), "error"),
+    @pytest.mark.parametrize("exception,keyword,expected_status", [
+        (ContractRevertError("License must be active to generate QR data"), "active", status.HTTP_400_BAD_REQUEST),
+        (Exception("Execution reverted (License must be active to generate QR data)"), "active", status.HTTP_400_BAD_REQUEST),
+        (Exception("License must be active to generate QR data"), "active", status.HTTP_400_BAD_REQUEST),
+        (ConnectionError("Blockchain connection failed"), "blockchain connection failed", status.HTTP_400_BAD_REQUEST),
+        (RuntimeError("Unexpected error"), "unexpected error", status.HTTP_400_BAD_REQUEST),
     ])
-    def test_exceptions(self, client, monkeypatch, exception, keyword):
-        """Test exception scenarios"""
+    def test_exceptions(self, client, monkeypatch, exception, keyword, expected_status):
+        """Clean require() text, never 'Execution reverted', never 500."""
         monkeypatch.setattr(
             "apps.seed_licenses.views.license_view.license_service.get_qr_data",
             MagicMock(side_effect=exception)
@@ -423,7 +426,9 @@ class TestGetLicenseQRData:
         
         resp = client.get(reverse("license-qr-data", args=[19]))
         
-        assert_error_response(resp, status.HTTP_500_INTERNAL_SERVER_ERROR, [keyword])
+        assert_error_response(resp, expected_status, [keyword])
+        body = resp.json()
+        assert "execution reverted" not in body.get("error", "").lower()
 
 
 # ============================================================================
