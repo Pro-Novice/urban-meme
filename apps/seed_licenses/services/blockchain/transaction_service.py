@@ -9,6 +9,7 @@ from .connection import multi_rpc as rpc_manager, w3, NONCE_LOCK, get_default_ac
 from .contract_manager import get_contract
 from .data_transformer import format_and_transform_response
 from .event_parser import EventParser
+from utils.blockchain_errors import ContractRevertError, clean_revert_message
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,8 @@ class TransactionService:
 
         except ContractLogicError as e:
             logger.error(f"Contract logic error in {method_name}: {e}")
-            raise
+            # Strip web3 "Execution reverted (...)" — surface require() text only
+            raise ContractRevertError(clean_revert_message(e)) from e
         except Exception as e:
             logger.error(f"Error reading from contract ({method_name}): {e}")
             raise
@@ -310,10 +312,15 @@ class TransactionService:
         try:
             error_details_str = str(e.args[0])
             error_dict = ast.literal_eval(error_details_str)
-            revert_reason = error_dict.get("message", "Execution reverted without reason")
-            return {"success": False, "error": revert_reason}
+            revert_reason = error_dict.get("message", "")
+            return {
+                "success": False,
+                "error": clean_revert_message(
+                    Exception(revert_reason or str(e))
+                ),
+            }
         except Exception:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": clean_revert_message(e)}
 
 
 # ======================================================

@@ -1,5 +1,4 @@
 import logging
-import re
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from rest_framework.decorators import api_view
@@ -10,6 +9,7 @@ from rest_framework.status import (
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
 from utils.api_response import ApiResponse
+from utils.blockchain_errors import ContractRevertError, clean_revert_message
 from apps.seed_licenses.serializers import (
     SubmitLicenseApplicationSerializer,
     UpdateLicenseStatusSerializer,
@@ -230,18 +230,18 @@ def get_license_qr_data(request, license_id: int):
         return ApiResponse(data=data, status=HTTP_200_OK)
     except ValueError:
         return ApiResponse(err="License ID must be an integer.", status=HTTP_400_BAD_REQUEST)
+    except ContractRevertError as e:
+        # require() text from .sol — already cleaned in TransactionService.read()
+        return ApiResponse(err=str(e), status=HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception(f"QR data fetch failed for license ID {license_id}")
-
-        raw = str(e)
-        match_obj = re.search(r"'message':\s*'([^']*)'", raw)
-
-        if match_obj:
-            err = match_obj.group(1)
-        else:
-            err = "An unexpected error occurred. Please try again later."
-
-        return ApiResponse(err=err, status=HTTP_500_INTERNAL_SERVER_ERROR)
+        return ApiResponse(
+            err=clean_revert_message(
+                e,
+                fallback="Unable to generate QR data at this time. Please try again later.",
+            ),
+            status=HTTP_400_BAD_REQUEST,
+        )
 
 # --------------------------------------------------------------------
 # 5️ Get License Action History
